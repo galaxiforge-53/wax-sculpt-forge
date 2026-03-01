@@ -45,8 +45,9 @@ export default function TopBar({
     <div className="flex items-center justify-between px-4 py-2 bg-card border-b border-border">
       <div className="flex items-center gap-2">
         {!embed && (
-          <h1 className="font-display text-sm text-primary mr-4 tracking-wider">
-            Wax Ring Builder
+          <h1 className="font-display text-sm text-primary mr-4 tracking-[0.15em]">
+            Forge<span className="text-foreground">Lab</span>
+            <span className="text-[9px] text-muted-foreground ml-2 font-body tracking-normal">Ring Builder</span>
           </h1>
         )}
 

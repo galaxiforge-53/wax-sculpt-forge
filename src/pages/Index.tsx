@@ -8,7 +8,6 @@ import { useNavigate } from "react-router-dom";
 export default function Index() {
   const navigate = useNavigate();
 
-  // If embed mode, skip landing and go straight to builder
   useEffect(() => {
     if (isEmbedMode()) navigate("/builder?embed=1", { replace: true });
   }, [navigate]);
@@ -22,7 +21,7 @@ export default function Index() {
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-border text-center">
         <p className="text-xs text-muted-foreground font-body">
-          Wax Ring Builder · Powered by{" "}
+          ForgeLab · Powered by{" "}
           <a href="https://galaxiforge.com" className="text-primary hover:text-molten transition-colors">
             GalaxiForge
           </a>
