@@ -6,27 +6,33 @@ export default function Hero() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden cosmic-noise starfield">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-forge-dark via-background to-background" />
 
+      {/* Subtle cosmic nebula glow */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/[0.03] rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-accent/[0.02] rounded-full blur-[100px]" />
+      </div>
+
       {/* Ember particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(12)].map((_, i) => (
+        {[...Array(8)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1 h-1 rounded-full bg-primary"
+            className="absolute w-0.5 h-0.5 rounded-full bg-primary/80"
             style={{
-              left: `${10 + Math.random() * 80}%`,
-              bottom: `${Math.random() * 40}%`,
+              left: `${15 + Math.random() * 70}%`,
+              bottom: `${Math.random() * 30}%`,
             }}
             animate={{
               y: [0, -200 - Math.random() * 300],
-              opacity: [0, 1, 0],
+              opacity: [0, 0.8, 0],
               scale: [0.5, 1, 0.3],
             }}
             transition={{
-              duration: 3 + Math.random() * 4,
+              duration: 4 + Math.random() * 4,
               repeat: Infinity,
               delay: Math.random() * 5,
               ease: "easeOut",
@@ -40,16 +46,16 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-xs uppercase tracking-[0.3em] text-primary mb-6 font-body"
+          className="text-[10px] uppercase tracking-[0.4em] text-primary/80 mb-8 font-body"
         >
-          Powered by GalaxiForge Casting
+          ForgeLab · Powered by GalaxiForge
         </motion.p>
 
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1 }}
-          className="font-display text-4xl md:text-6xl lg:text-7xl font-bold leading-tight ember-text"
+          className="font-display text-4xl md:text-6xl lg:text-7xl font-bold leading-[1.1] ember-text"
         >
           Carve Your Wax.
           <br />
@@ -60,7 +66,7 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto font-body"
+          className="mt-8 text-base text-muted-foreground max-w-md mx-auto font-body leading-relaxed"
         >
           Sculpt a custom ring in digital wax, preview it in metal, and send it straight
           to the forge for precision casting.
@@ -70,22 +76,22 @@ export default function Hero() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="mt-10 flex gap-4 justify-center"
+          className="mt-12 flex gap-4 justify-center"
         >
           <Button
             size="lg"
             onClick={() => navigate("/builder")}
-            className="bg-primary text-primary-foreground hover:bg-ember-glow px-8 py-6 text-base font-display tracking-wider animate-ember-pulse"
+            className="bg-primary text-primary-foreground hover:bg-ember-glow px-10 py-6 text-sm font-display tracking-[0.15em] animate-ember-pulse"
           >
             Start Carving
           </Button>
           <Button
             size="lg"
             variant="outline"
-            onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" })}
-            className="border-border text-foreground hover:bg-secondary px-8 py-6 text-base font-body"
+            onClick={() => navigate("/builders")}
+            className="border-border text-foreground hover:bg-secondary px-8 py-6 text-sm font-body"
           >
-            How It Works
+            Explore Builders
           </Button>
         </motion.div>
       </div>

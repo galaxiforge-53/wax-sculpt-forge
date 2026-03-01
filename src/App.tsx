@@ -6,15 +6,20 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import PlatformNav from "@/components/layout/PlatformNav";
 
 const Builder = lazy(() => import("./pages/Builder"));
 const Export = lazy(() => import("./pages/Export"));
+const Builders = lazy(() => import("./pages/Builders"));
+const Templates = lazy(() => import("./pages/Templates"));
+const MyDesigns = lazy(() => import("./pages/MyDesigns"));
+const Help = lazy(() => import("./pages/Help"));
 
 const queryClient = new QueryClient();
 
 const Loading = () => (
   <div className="h-screen flex items-center justify-center bg-background">
-    <div className="text-primary animate-pulse font-display text-xl">Loading...</div>
+    <div className="text-primary animate-pulse font-display text-xl tracking-wider">ForgeLab</div>
   </div>
 );
 
@@ -24,10 +29,15 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <PlatformNav />
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/builder" element={<Builder />} />
+            <Route path="/builders" element={<Builders />} />
+            <Route path="/templates" element={<Templates />} />
+            <Route path="/my-designs" element={<MyDesigns />} />
+            <Route path="/help" element={<Help />} />
             <Route path="/export" element={<Export />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
