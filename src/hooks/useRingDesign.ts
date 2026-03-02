@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   RingParameters,
   DEFAULT_RING,
@@ -10,6 +10,11 @@ import {
   DesignPackage,
   RING_SIZE_MAP,
 } from "@/types/ring";
+import { CraftState, CraftAction } from "@/types/craft";
+
+function craftId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 export function useRingDesign() {
   const [params, setParams] = useState<RingParameters>(DEFAULT_RING);
@@ -20,6 +25,22 @@ export function useRingDesign() {
   const [history, setHistory] = useState<RingParameters[]>([DEFAULT_RING]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [toolHistory, setToolHistory] = useState<ToolHistoryEntry[]>([]);
+
+  const craftStateRef = useRef<CraftState>({
+    baseRingParams: DEFAULT_RING,
+    actionLog: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const logCraftAction = useCallback((type: string, payload: Record<string, unknown>) => {
+    const action: CraftAction = { id: craftId(), type, timestamp: Date.now(), payload };
+    craftStateRef.current = {
+      ...craftStateRef.current,
+      actionLog: [...craftStateRef.current.actionLog, action],
+      updatedAt: new Date().toISOString(),
+    };
+  }, []);
 
   const pushHistory = useCallback(
     (newParams: RingParameters) => {
@@ -34,14 +55,29 @@ export function useRingDesign() {
   const updateParams = useCallback(
     (updates: Partial<RingParameters>) => {
       const newParams = { ...params, ...updates };
-      // Sync inner diameter with size
       if (updates.size !== undefined) {
         newParams.innerDiameter = RING_SIZE_MAP[updates.size] || params.innerDiameter;
       }
       setParams(newParams);
       pushHistory(newParams);
+      craftStateRef.current.baseRingParams = newParams;
+      logCraftAction("parameter_adjusted", { updates });
     },
-    [params, pushHistory]
+    [params, pushHistory, logCraftAction]
+  );
+
+  const applyTemplate = useCallback(
+    (updates: Partial<RingParameters>) => {
+      const newParams = { ...params, ...updates };
+      if (updates.size !== undefined) {
+        newParams.innerDiameter = RING_SIZE_MAP[updates.size] || params.innerDiameter;
+      }
+      setParams(newParams);
+      pushHistory(newParams);
+      craftStateRef.current.baseRingParams = newParams;
+      logCraftAction("template_applied", { updates });
+    },
+    [params, pushHistory, logCraftAction]
   );
 
   const undo = useCallback(() => {
@@ -67,6 +103,8 @@ export function useRingDesign() {
         { tool, timestamp: Date.now(), params: toolParams },
       ]);
 
+      logCraftAction("tool_used", { tool, toolParams });
+
       switch (tool) {
         case "smooth":
           updateParams({ bevelSize: Math.min(params.bevelSize + 0.1, 1.5) });
@@ -87,7 +125,7 @@ export function useRingDesign() {
           break;
       }
     },
-    [params, updateParams]
+    [params, updateParams, logCraftAction]
   );
 
   const generateDesignPackage = useCallback((): DesignPackage => {
@@ -101,12 +139,14 @@ export function useRingDesign() {
       finishPreset,
       toolHistory,
       previews: [],
+      craftState: { ...craftStateRef.current },
     };
   }, [params, viewMode, metalPreset, finishPreset, toolHistory]);
 
   return {
     params,
     updateParams,
+    applyTemplate,
     viewMode,
     setViewMode,
     metalPreset,

@@ -12,7 +12,7 @@ import { getTemplate } from "@/config/templates";
 export default function Builder() {
   const navigate = useNavigate();
   const {
-    params, updateParams,
+    params, updateParams, applyTemplate,
     viewMode, setViewMode,
     metalPreset, setMetalPreset,
     finishPreset, setFinishPreset,
@@ -29,7 +29,7 @@ export default function Builder() {
     if (templateId) {
       sessionStorage.removeItem("applyTemplate");
       const t = getTemplate(templateId);
-      if (t) updateParams(t.params);
+      if (t) applyTemplate(t.params);
     }
   }, []);
 
@@ -85,7 +85,7 @@ export default function Builder() {
           </div>
           <div className="border-t border-border p-3 h-[40%] overflow-hidden">
             <TemplatesPanel
-              onApply={updateParams}
+              onApply={applyTemplate}
               currentParams={params}
             />
           </div>
