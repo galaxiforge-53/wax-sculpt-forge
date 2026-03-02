@@ -28,6 +28,7 @@ export interface DesignPackage {
   toolHistory: ToolHistoryEntry[];
   previews: string[]; // base64 or URLs
   craftState: import("./craft").CraftState;
+  castabilityReport: import("./castability").CastabilityReport;
 }
 
 export interface ToolHistoryEntry {
