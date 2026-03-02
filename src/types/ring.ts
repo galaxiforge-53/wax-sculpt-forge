@@ -27,6 +27,7 @@ export interface DesignPackage {
   finishPreset: FinishPreset;
   toolHistory: ToolHistoryEntry[];
   previews: string[]; // base64 or URLs
+  craftState: import("./craft").CraftState;
 }
 
 export interface ToolHistoryEntry {
