@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import {
   RingParameters,
   DEFAULT_RING,
@@ -11,6 +11,7 @@ import {
   RING_SIZE_MAP,
 } from "@/types/ring";
 import { CraftState, CraftAction } from "@/types/craft";
+import { evaluateCastability } from "@/lib/castabilityEngine";
 
 function craftId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -140,10 +141,14 @@ export function useRingDesign() {
       toolHistory,
       previews: [],
       craftState: { ...craftStateRef.current },
+      castabilityReport: evaluateCastability(params),
     };
   }, [params, viewMode, metalPreset, finishPreset, toolHistory]);
 
+  const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
+
   return {
+    castabilityReport,
     params,
     updateParams,
     applyTemplate,

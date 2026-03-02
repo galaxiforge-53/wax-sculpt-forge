@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import RingViewport from "@/components/builder/RingViewport";
 import ToolRail from "@/components/builder/ToolRail";
 import PropertiesPanel from "@/components/builder/PropertiesPanel";
+import CastabilityPanel from "@/components/builder/CastabilityPanel";
 import TemplatesPanel from "@/components/builder/TemplatesPanel";
 import TopBar from "@/components/builder/TopBar";
 import { isEmbedMode } from "@/config/galaxiforge";
@@ -19,6 +20,7 @@ export default function Builder() {
     activeTool, setActiveTool, applyTool,
     undo, redo, canUndo, canRedo,
     generateDesignPackage,
+    castabilityReport,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -83,7 +85,10 @@ export default function Builder() {
               showMeasure={activeTool === "measure"}
             />
           </div>
-          <div className="border-t border-border p-3 h-[40%] overflow-hidden">
+          <div className="border-t border-border p-3">
+            <CastabilityPanel report={castabilityReport} />
+          </div>
+          <div className="border-t border-border p-3 h-[35%] overflow-hidden">
             <TemplatesPanel
               onApply={applyTemplate}
               currentParams={params}
