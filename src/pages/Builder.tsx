@@ -8,6 +8,7 @@ import CastabilityPanel from "@/components/builder/CastabilityPanel";
 import ForgePipelinePanel from "@/components/builder/ForgePipelinePanel";
 import TemplatesPanel from "@/components/builder/TemplatesPanel";
 import TopBar from "@/components/builder/TopBar";
+import ForgeCinematicModal from "@/components/forge/ForgeCinematicModal";
 import { isEmbedMode } from "@/config/galaxiforge";
 import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
@@ -19,6 +20,8 @@ export default function Builder() {
   const viewportRef = useRef<RingViewportHandle>(null);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [forgeModalOpen, setForgeModalOpen] = useState(false);
+  const [livePreviews, setLivePreviews] = useState<DesignPreview[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
 
@@ -31,7 +34,7 @@ export default function Builder() {
     undo, redo, canUndo, canRedo,
     generateDesignPackage,
     castabilityReport,
-    pipelineState, nextStage, prevStage,
+    pipelineState, setStage, nextStage, prevStage,
     restoreDesign,
   } = useRingDesign();
 
@@ -130,6 +133,14 @@ export default function Builder() {
     navigate("/export" + (embed ? "?embed=1" : ""));
   };
 
+  const handleForgeNow = async () => {
+    const castStages = ["POUR", "QUENCH", "FINISH"];
+    const captureMode: ViewMode = castStages.includes(pipelineState.currentStage) ? "cast" : viewMode;
+    const previews = await capturePreviewsAsync(captureMode);
+    setLivePreviews(previews);
+    setForgeModalOpen(true);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <TopBar
@@ -146,6 +157,7 @@ export default function Builder() {
         onExport={handleExport}
         onSave={handleSave}
         isSaving={isSaving}
+        onForgeNow={handleForgeNow}
       />
 
       <div className="flex flex-1 min-h-0">
@@ -176,6 +188,22 @@ export default function Builder() {
           Orbit: drag · Zoom: scroll · Select a tool and click to apply
         </div>
       )}
+
+      <ForgeCinematicModal
+        open={forgeModalOpen}
+        onClose={() => setForgeModalOpen(false)}
+        pipelineState={pipelineState}
+        setStage={setStage}
+        nextStage={nextStage}
+        prevStage={prevStage}
+        previews={livePreviews}
+        metalPreset={metalPreset}
+        finishPreset={finishPreset}
+        viewMode={viewMode}
+        castabilityReport={castabilityReport}
+        onSave={() => { setForgeModalOpen(false); handleSave(); }}
+        onSendToGalaxiForge={() => { setForgeModalOpen(false); handleExport(); }}
+      />
     </div>
   );
 }
