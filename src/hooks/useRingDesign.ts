@@ -12,6 +12,8 @@ import {
 } from "@/types/ring";
 import { CraftState, CraftAction } from "@/types/craft";
 import { evaluateCastability } from "@/lib/castabilityEngine";
+import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
+import { STAGES } from "@/config/pipeline";
 
 function craftId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -26,7 +28,11 @@ export function useRingDesign() {
   const [history, setHistory] = useState<RingParameters[]>([DEFAULT_RING]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [toolHistory, setToolHistory] = useState<ToolHistoryEntry[]>([]);
-
+  const [pipelineState, setPipelineState] = useState<ForgePipelineState>({
+    currentStage: "WAX_SCULPT",
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
   const craftStateRef = useRef<CraftState>({
     baseRingParams: DEFAULT_RING,
     actionLog: [],
@@ -129,6 +135,24 @@ export function useRingDesign() {
     [params, updateParams, logCraftAction]
   );
 
+  const setStage = useCallback((id: ForgeStageId) => {
+    const stage = STAGES.find((s) => s.id === id);
+    if (!stage) return;
+    setPipelineState((prev) => ({ ...prev, currentStage: id, updatedAt: new Date().toISOString() }));
+    setViewMode(stage.defaultViewMode);
+    logCraftAction("stage_changed", { stage: id });
+  }, [setViewMode, logCraftAction]);
+
+  const nextStage = useCallback(() => {
+    const idx = STAGES.findIndex((s) => s.id === pipelineState.currentStage);
+    if (idx < STAGES.length - 1) setStage(STAGES[idx + 1].id);
+  }, [pipelineState.currentStage, setStage]);
+
+  const prevStage = useCallback(() => {
+    const idx = STAGES.findIndex((s) => s.id === pipelineState.currentStage);
+    if (idx > 0) setStage(STAGES[idx - 1].id);
+  }, [pipelineState.currentStage, setStage]);
+
   const generateDesignPackage = useCallback((): DesignPackage => {
     return {
       id: `WRB-${Date.now().toString(36).toUpperCase()}`,
@@ -142,8 +166,9 @@ export function useRingDesign() {
       previews: [],
       craftState: { ...craftStateRef.current },
       castabilityReport: evaluateCastability(params),
+      pipelineState,
     };
-  }, [params, viewMode, metalPreset, finishPreset, toolHistory]);
+  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState]);
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
@@ -167,5 +192,8 @@ export function useRingDesign() {
     canRedo: historyIndex < history.length - 1,
     generateDesignPackage,
     toolHistory,
+    pipelineState,
+    nextStage,
+    prevStage,
   };
 }
