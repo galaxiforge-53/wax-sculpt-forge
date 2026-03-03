@@ -35,7 +35,7 @@ export default function Builder() {
     generateDesignPackage,
     castabilityReport,
     pipelineState, setStage, nextStage, prevStage,
-    restoreDesign,
+    restoreDesign, craftState,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -201,6 +201,7 @@ export default function Builder() {
         finishPreset={finishPreset}
         viewMode={viewMode}
         castabilityReport={castabilityReport}
+        craftActions={craftState.actionLog}
         onSave={() => { setForgeModalOpen(false); handleSave(); }}
         onSendToGalaxiForge={() => { setForgeModalOpen(false); handleExport(); }}
       />

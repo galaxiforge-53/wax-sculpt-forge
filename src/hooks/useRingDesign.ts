@@ -187,6 +187,7 @@ export function useRingDesign() {
   }, []);
 
   return {
+    craftState: craftStateRef.current,
     castabilityReport,
     params,
     updateParams,

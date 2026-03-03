@@ -1,22 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { STAGES } from "@/config/pipeline";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { DesignPreview, ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { CastabilityReport } from "@/types/castability";
+import { CraftAction } from "@/types/craft";
+import { summarizeCraftActions, enrichStageNotes } from "@/lib/craftNarrative";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Play,
   Save,
   Send,
   X,
   Flame,
   Sparkles,
+  ScrollText,
 } from "lucide-react";
 
 interface ForgeCinematicModalProps {
@@ -31,6 +34,7 @@ interface ForgeCinematicModalProps {
   finishPreset: FinishPreset;
   viewMode: ViewMode;
   castabilityReport: CastabilityReport;
+  craftActions: CraftAction[];
   onSave: () => void;
   onSendToGalaxiForge: () => void;
 }
@@ -84,6 +88,7 @@ export default function ForgeCinematicModal({
   metalPreset,
   finishPreset,
   castabilityReport,
+  craftActions,
   onSave,
   onSendToGalaxiForge,
 }: ForgeCinematicModalProps) {
@@ -91,6 +96,14 @@ export default function ForgeCinematicModal({
   const [autoForging, setAutoForging] = useState(false);
   const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [stageTransition, setStageTransition] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+
+  // Narrative
+  const narrative = useMemo(() => {
+    const base = summarizeCraftActions(craftActions);
+    const enriched = enrichStageNotes(base.stageNotes, metalPreset, finishPreset);
+    return { ...base, stageNotes: enriched };
+  }, [craftActions, metalPreset, finishPreset]);
 
   const currentIndex = STAGES.findIndex((s) => s.id === pipelineState.currentStage);
   const stage = STAGES[currentIndex] ?? STAGES[0];
@@ -113,19 +126,26 @@ export default function ForgeCinematicModal({
     setTimeout(() => setStageTransition(false), 600);
   }, [reducedMotion]);
 
+  const stopAutoForge = useCallback(() => {
+    setAutoForging(false);
+    if (autoRef.current) clearTimeout(autoRef.current);
+  }, []);
+
   const handleNext = useCallback(() => {
+    stopAutoForge();
     if (currentIndex < STAGES.length - 1) {
       triggerTransition();
       nextStage();
     }
-  }, [currentIndex, nextStage, triggerTransition]);
+  }, [currentIndex, nextStage, triggerTransition, stopAutoForge]);
 
   const handlePrev = useCallback(() => {
+    stopAutoForge();
     if (currentIndex > 0) {
       triggerTransition();
       prevStage();
     }
-  }, [currentIndex, prevStage, triggerTransition]);
+  }, [currentIndex, prevStage, triggerTransition, stopAutoForge]);
 
   // Auto Forge
   const startAutoForge = useCallback(() => {
@@ -145,11 +165,6 @@ export default function ForgeCinematicModal({
     };
     autoRef.current = setTimeout(advance, 1500);
   }, [reducedMotion, setStage, triggerTransition]);
-
-  const stopAutoForge = useCallback(() => {
-    setAutoForging(false);
-    if (autoRef.current) clearTimeout(autoRef.current);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -261,10 +276,9 @@ export default function ForgeCinematicModal({
               {STAGES.map((s, i) => (
                 <button
                   key={s.id}
-                  onClick={() => { if (!autoForging) { triggerTransition(); setStage(s.id); } }}
+                  onClick={() => { stopAutoForge(); triggerTransition(); setStage(s.id); }}
                   className={cn(
-                    "flex flex-col items-center gap-1 group transition-all",
-                    autoForging && "pointer-events-none"
+                    "flex flex-col items-center gap-1 group transition-all"
                   )}
                 >
                   <div
@@ -372,6 +386,12 @@ export default function ForgeCinematicModal({
                   <p className="text-sm text-muted-foreground mt-2 max-w-md">
                     {stage.description}
                   </p>
+                  {/* Stage notes from narrative */}
+                  {(narrative.stageNotes[stage.id] ?? []).slice(0, 2).map((note, ni) => (
+                    <p key={ni} className="text-xs text-primary/70 mt-1.5 italic">
+                      {note}
+                    </p>
+                  ))}
                 </div>
 
                 {/* Preview panel with stage effect overlay */}
@@ -422,6 +442,44 @@ export default function ForgeCinematicModal({
               </div>
             )}
           </div>
+
+          {/* Forge Transcript (collapsible) */}
+          {narrative.highlights.length > 0 && (
+            <div className="relative z-10 px-6 pb-2">
+              <button
+                onClick={() => setTranscriptOpen((v) => !v)}
+                className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-center"
+              >
+                <ScrollText className="h-3.5 w-3.5" />
+                <span className="tracking-wider font-medium">Forge Transcript</span>
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", transcriptOpen && "rotate-180")} />
+              </button>
+
+              {transcriptOpen && (
+                <div className="mt-2 mx-auto max-w-md panel-premium rounded-lg p-3 animate-fade-in">
+                  {/* Stats row */}
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2 justify-center flex-wrap">
+                    <span>{narrative.stats.toolsUsed} tools</span>
+                    <span className="text-border">·</span>
+                    <span>{narrative.stats.parameterEdits} edits</span>
+                    <span className="text-border">·</span>
+                    <span>{narrative.stats.templatesApplied} templates</span>
+                    <span className="text-border">·</span>
+                    <span>{narrative.stats.stagesChanged} stage changes</span>
+                  </div>
+                  {/* Highlights */}
+                  <ul className="space-y-1">
+                    {narrative.highlights.slice(0, 8).map((h, i) => (
+                      <li key={i} className="text-xs text-foreground/80 flex items-start gap-2">
+                        <span className="text-primary mt-0.5 text-[8px]">▸</span>
+                        <span>{h}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bottom controls */}
           <div className="relative z-10 flex items-center justify-center gap-4 px-6 pb-6">
