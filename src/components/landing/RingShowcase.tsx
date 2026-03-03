@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 interface InlayDef {
   material: "crystal" | "opal" | "meteorite";
   name: string;
-  placement: number; // -0.5 to 0.5 normalized position along width
+  placement: number;
   widthMm: number;
   color: string;
   emissive: string;
@@ -21,6 +21,7 @@ interface InlayDef {
   roughness: number;
   metalness: number;
   opacity: number;
+  depthMm?: number; // channel depth for realism
 }
 
 // ── Design definitions ───────────────────────────────────────────
@@ -53,7 +54,7 @@ const DESIGNS: RingDesign[] = [
     id: "yggdrasil",
     name: "Yggdrasil Band",
     tagline: "Roots of the World Tree",
-    lore: "Deep grooves echo the bark of eternity, channels of crushed emerald crystal and ancient meteorite fill the roots that connect the Nine Realms.",
+    lore: "Deep grooves echo the bark of eternity. Channels of crushed emerald crystal and ancient meteorite fill the roots that connect the Nine Realms.",
     profile: "runic",
     grooves: 4,
     grooveDepth: 0.35,
@@ -61,30 +62,33 @@ const DESIGNS: RingDesign[] = [
     width: 8,
     thickness: 2.2,
     inlays: [
-      { material: "crystal", name: "Emerald", placement: -0.25, widthMm: 1.0, color: "#22c55e", emissive: "#0a6b2e", emissiveIntensity: 0.6, roughness: 0.15, metalness: 0.1, opacity: 0.85 },
-      { material: "meteorite", name: "Muonionalusta", placement: 0.25, widthMm: 1.2, color: "#9ca3af", emissive: "#4b5563", emissiveIntensity: 0.15, roughness: 0.55, metalness: 0.7, opacity: 0.95 },
+      { material: "crystal", name: "Emerald", placement: -0.32, widthMm: 1.2, color: "#22c55e", emissive: "#0a6b2e", emissiveIntensity: 0.8, roughness: 0.08, metalness: 0.05, opacity: 0.82, depthMm: 0.4 },
+      { material: "meteorite", name: "Muonionalusta", placement: 0.0, widthMm: 1.4, color: "#9ca3af", emissive: "#4b5563", emissiveIntensity: 0.15, roughness: 0.55, metalness: 0.7, opacity: 0.95, depthMm: 0.3 },
+      { material: "crystal", name: "Emerald", placement: 0.32, widthMm: 1.2, color: "#22c55e", emissive: "#0a6b2e", emissiveIntensity: 0.8, roughness: 0.08, metalness: 0.05, opacity: 0.82, depthMm: 0.4 },
     ],
   },
   {
     id: "nebula-edge",
     name: "Nebula Edge",
     tagline: "Born from Stellar Dust",
-    lore: "A single vein of fire opal runs through the knife-edge like a dying star's final breath — luminous, fleeting, eternal in metal.",
+    lore: "A luminous vein of fire opal flanked by tanzanite crystals — like a dying star's final breath frozen in precious metal.",
     profile: "knife",
-    grooves: 1,
+    grooves: 2,
     grooveDepth: 0.2,
     bevel: 0.1,
-    width: 6,
+    width: 7,
     thickness: 2.0,
     inlays: [
-      { material: "opal", name: "Fire Opal", placement: 0.0, widthMm: 1.4, color: "#ff6b2b", emissive: "#ff4500", emissiveIntensity: 0.9, roughness: 0.08, metalness: 0.05, opacity: 0.88 },
+      { material: "crystal", name: "Tanzanite", placement: -0.22, widthMm: 0.9, color: "#7c3aed", emissive: "#5b21b6", emissiveIntensity: 0.7, roughness: 0.06, metalness: 0.04, opacity: 0.8, depthMm: 0.3 },
+      { material: "opal", name: "Fire Opal", placement: 0.0, widthMm: 1.6, color: "#ff6b2b", emissive: "#ff4500", emissiveIntensity: 1.1, roughness: 0.04, metalness: 0.02, opacity: 0.85, depthMm: 0.5 },
+      { material: "crystal", name: "Tanzanite", placement: 0.22, widthMm: 0.9, color: "#7c3aed", emissive: "#5b21b6", emissiveIntensity: 0.7, roughness: 0.06, metalness: 0.04, opacity: 0.8, depthMm: 0.3 },
     ],
   },
   {
     id: "mjolnir-forge",
     name: "Mjölnir Forge",
     tagline: "Hammered by Thunder",
-    lore: "Three channels of lapis lazuli, meteorite iron, and amethyst — Odin's ravens embedded in the anvil's memory.",
+    lore: "Three mighty channels of lapis lazuli, meteorite iron, and amethyst — Odin's ravens embedded in the anvil's memory.",
     profile: "flat",
     grooves: 3,
     grooveDepth: 0.4,
@@ -92,16 +96,16 @@ const DESIGNS: RingDesign[] = [
     width: 10,
     thickness: 2.8,
     inlays: [
-      { material: "crystal", name: "Lapis Lazuli", placement: -0.28, widthMm: 1.1, color: "#2563eb", emissive: "#1e3a8a", emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.08, opacity: 0.9 },
-      { material: "meteorite", name: "Campo del Cielo", placement: 0.0, widthMm: 1.5, color: "#78716c", emissive: "#57534e", emissiveIntensity: 0.1, roughness: 0.6, metalness: 0.75, opacity: 0.95 },
-      { material: "crystal", name: "Amethyst", placement: 0.28, widthMm: 1.1, color: "#a855f7", emissive: "#7e22ce", emissiveIntensity: 0.55, roughness: 0.12, metalness: 0.05, opacity: 0.88 },
+      { material: "crystal", name: "Lapis Lazuli", placement: -0.28, widthMm: 1.3, color: "#2563eb", emissive: "#1e3a8a", emissiveIntensity: 0.6, roughness: 0.1, metalness: 0.06, opacity: 0.88, depthMm: 0.4 },
+      { material: "meteorite", name: "Campo del Cielo", placement: 0.0, widthMm: 1.8, color: "#78716c", emissive: "#57534e", emissiveIntensity: 0.12, roughness: 0.6, metalness: 0.75, opacity: 0.95, depthMm: 0.5 },
+      { material: "crystal", name: "Amethyst", placement: 0.28, widthMm: 1.3, color: "#a855f7", emissive: "#7e22ce", emissiveIntensity: 0.6, roughness: 0.1, metalness: 0.06, opacity: 0.88, depthMm: 0.4 },
     ],
   },
   {
     id: "aurora-comfort",
     name: "Aurora Comfort",
     tagline: "Northern Light's Embrace",
-    lore: "White opal captures the aurora borealis — shifting prismatic light sealed in a smooth dome of precious metal.",
+    lore: "Broad white opal captures the aurora borealis — shifting prismatic light sealed between twin diamond-dust crystal rails.",
     profile: "dome",
     grooves: 1,
     grooveDepth: 0.15,
@@ -109,7 +113,9 @@ const DESIGNS: RingDesign[] = [
     width: 7,
     thickness: 2.0,
     inlays: [
-      { material: "opal", name: "White Opal", placement: 0.0, widthMm: 2.0, color: "#e0f0ff", emissive: "#93c5fd", emissiveIntensity: 0.7, roughness: 0.05, metalness: 0.02, opacity: 0.82 },
+      { material: "crystal", name: "Diamond Dust", placement: -0.2, widthMm: 0.6, color: "#f0f9ff", emissive: "#bae6fd", emissiveIntensity: 0.9, roughness: 0.02, metalness: 0.03, opacity: 0.75, depthMm: 0.25 },
+      { material: "opal", name: "White Opal", placement: 0.0, widthMm: 2.2, color: "#e0f0ff", emissive: "#93c5fd", emissiveIntensity: 0.85, roughness: 0.03, metalness: 0.02, opacity: 0.8, depthMm: 0.5 },
+      { material: "crystal", name: "Diamond Dust", placement: 0.2, widthMm: 0.6, color: "#f0f9ff", emissive: "#bae6fd", emissiveIntensity: 0.9, roughness: 0.02, metalness: 0.03, opacity: 0.75, depthMm: 0.25 },
     ],
   },
   {
@@ -124,17 +130,18 @@ const DESIGNS: RingDesign[] = [
     width: 9,
     thickness: 2.4,
     inlays: [
-      { material: "opal", name: "Black Opal", placement: -0.3, widthMm: 0.8, color: "#1e293b", emissive: "#3b82f6", emissiveIntensity: 1.0, roughness: 0.05, metalness: 0.1, opacity: 0.9 },
-      { material: "crystal", name: "Moldavite", placement: -0.1, widthMm: 0.7, color: "#4ade80", emissive: "#16a34a", emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.08, opacity: 0.85 },
-      { material: "opal", name: "Black Opal", placement: 0.1, widthMm: 0.8, color: "#1e293b", emissive: "#8b5cf6", emissiveIntensity: 1.0, roughness: 0.05, metalness: 0.1, opacity: 0.9 },
-      { material: "crystal", name: "Moldavite", placement: 0.3, widthMm: 0.7, color: "#4ade80", emissive: "#16a34a", emissiveIntensity: 0.7, roughness: 0.15, metalness: 0.08, opacity: 0.85 },
+      { material: "opal", name: "Black Opal", placement: -0.35, widthMm: 0.9, color: "#1e293b", emissive: "#3b82f6", emissiveIntensity: 1.2, roughness: 0.03, metalness: 0.08, opacity: 0.88, depthMm: 0.35 },
+      { material: "crystal", name: "Moldavite", placement: -0.15, widthMm: 0.8, color: "#4ade80", emissive: "#16a34a", emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.06, opacity: 0.82, depthMm: 0.3 },
+      { material: "meteorite", name: "Gibeon", placement: 0.0, widthMm: 1.0, color: "#a1a1aa", emissive: "#71717a", emissiveIntensity: 0.1, roughness: 0.5, metalness: 0.8, opacity: 0.95, depthMm: 0.4 },
+      { material: "crystal", name: "Moldavite", placement: 0.15, widthMm: 0.8, color: "#4ade80", emissive: "#16a34a", emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.06, opacity: 0.82, depthMm: 0.3 },
+      { material: "opal", name: "Black Opal", placement: 0.35, widthMm: 0.9, color: "#1e293b", emissive: "#8b5cf6", emissiveIntensity: 1.2, roughness: 0.03, metalness: 0.08, opacity: 0.88, depthMm: 0.35 },
     ],
   },
   {
     id: "fenrir-claw",
     name: "Fenrir's Claw",
     tagline: "Unbound Fury",
-    lore: "Twin claw marks filled with blood-red labradorite and ancient meteorite — the wolf god's mark forged in dark tungsten.",
+    lore: "Twin blood-red labradorite gashes separated by ancient meteorite iron — the wolf god's claw marks forged forever in dark tungsten.",
     profile: "flat",
     grooves: 2,
     grooveDepth: 0.5,
@@ -142,8 +149,9 @@ const DESIGNS: RingDesign[] = [
     width: 12,
     thickness: 3.0,
     inlays: [
-      { material: "crystal", name: "Labradorite", placement: -0.18, widthMm: 1.6, color: "#6366f1", emissive: "#4f46e5", emissiveIntensity: 0.65, roughness: 0.1, metalness: 0.12, opacity: 0.88 },
-      { material: "meteorite", name: "Muonionalusta", placement: 0.18, widthMm: 1.8, color: "#a1a1aa", emissive: "#71717a", emissiveIntensity: 0.12, roughness: 0.5, metalness: 0.8, opacity: 0.95 },
+      { material: "crystal", name: "Labradorite", placement: -0.25, widthMm: 1.8, color: "#6366f1", emissive: "#4f46e5", emissiveIntensity: 0.75, roughness: 0.08, metalness: 0.1, opacity: 0.85, depthMm: 0.5 },
+      { material: "meteorite", name: "Muonionalusta", placement: 0.0, widthMm: 1.5, color: "#a1a1aa", emissive: "#71717a", emissiveIntensity: 0.12, roughness: 0.5, metalness: 0.8, opacity: 0.95, depthMm: 0.4 },
+      { material: "crystal", name: "Labradorite", placement: 0.25, widthMm: 1.8, color: "#6366f1", emissive: "#4f46e5", emissiveIntensity: 0.75, roughness: 0.08, metalness: 0.1, opacity: 0.85, depthMm: 0.5 },
     ],
   },
 ];
@@ -154,7 +162,7 @@ const METALS: MetalDef[] = [
   { id: "rose-gold", label: "Rose Gold", color: "#E8A090", roughness: 0.15, metalness: 0.92, envIntensity: 1.5 },
   { id: "titanium", label: "Titanium", color: "#878681", roughness: 0.2, metalness: 0.88, envIntensity: 1.3 },
   { id: "tungsten", label: "Tungsten", color: "#555555", roughness: 0.08, metalness: 0.97, envIntensity: 1.4 },
-  { id: "wax", label: "Wax", color: "#4a7a3a", roughness: 0.85, metalness: 0.0, envIntensity: 0.2 },
+  { id: "wax", label: "Wax", color: "#78A85B", roughness: 0.85, metalness: 0.05, envIntensity: 0.2 },
 ];
 
 // ── Helper: compute ring outer radius at a given Y position ─────
@@ -167,7 +175,7 @@ function getOuterRadiusAtY(
   bevel: number,
   y: number,
 ): number {
-  const t = (y / w) + 0.5; // normalize 0..1
+  const t = (y / w) + 0.5;
   const clamped = Math.max(0, Math.min(1, t));
   const angle = clamped * Math.PI;
 
@@ -202,8 +210,60 @@ function getOuterRadiusAtY(
   }
 }
 
+// ── Meteorite Widmanstätten texture ──────────────────────────────
+
+function useMeteoriteTexture(seed: number) {
+  return useMemo(() => {
+    const size = 128;
+    const data = new Uint8Array(size * size * 4);
+    let s = seed | 0 || 1;
+    const rng = () => { s = (s * 16807) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
+
+    // Base grey
+    for (let i = 0; i < size * size; i++) {
+      const v = 140 + rng() * 30;
+      data[i * 4] = v;
+      data[i * 4 + 1] = v;
+      data[i * 4 + 2] = v;
+      data[i * 4 + 3] = 255;
+    }
+
+    // Widmanstätten cross-hatch lines
+    const lineCount = 8 + Math.floor(rng() * 8);
+    for (let l = 0; l < lineCount; l++) {
+      const angle = rng() * Math.PI;
+      const cx = rng() * size;
+      const cy = rng() * size;
+      const length = 20 + rng() * 60;
+      const width = 1 + rng() * 2;
+      const brightness = 180 + rng() * 50;
+
+      for (let t = -length / 2; t < length / 2; t += 0.5) {
+        for (let w2 = -width; w2 <= width; w2 += 0.5) {
+          const px = Math.round(cx + Math.cos(angle) * t + Math.cos(angle + Math.PI / 2) * w2);
+          const py = Math.round(cy + Math.sin(angle) * t + Math.sin(angle + Math.PI / 2) * w2);
+          if (px >= 0 && px < size && py >= 0 && py < size) {
+            const idx = (py * size + px) * 4;
+            const falloff = 1 - Math.abs(w2) / width;
+            const v = data[idx] * (1 - falloff * 0.4) + brightness * falloff * 0.4;
+            data[idx] = v;
+            data[idx + 1] = v;
+            data[idx + 2] = v;
+          }
+        }
+      }
+    }
+
+    const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }, [seed]);
+}
+
 // ── Inlay channel as LatheGeometry strip ─────────────────────────
-// Creates a thin ring strip that sits flush on the ring surface
 
 function InlayChannel({
   inlay,
@@ -211,68 +271,114 @@ function InlayChannel({
   innerR,
   outerR,
   ringWidth,
+  idx,
 }: {
   inlay: InlayDef;
   design: RingDesign;
   innerR: number;
   outerR: number;
   ringWidth: number;
+  idx: number;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
   const bandHalf = (inlay.widthMm / 10) / 2;
   const yCenter = inlay.placement * ringWidth;
+  const meteorTex = useMeteoriteTexture(42 + idx * 7);
 
-  // Build a thin lathe strip that follows the ring outer surface
   const geometry = useMemo(() => {
-    const steps = 12;
+    const steps = 16;
     const points: THREE.Vector2[] = [];
-    const inset = 0.005; // slight inset below surface for channel effect
-    const raise = 0.002; // outer face sits just above to be visible
+    const channelDepth = (inlay.depthMm ?? 0.3) / 10;
 
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const y = yCenter - bandHalf + t * bandHalf * 2;
       const surfaceR = getOuterRadiusAtY(design.profile, innerR, outerR, ringWidth, design.bevel, y);
-      // Channel sits between inner surface and outer surface
-      const channelR = surfaceR - inset + raise;
-      points.push(new THREE.Vector2(Math.max(innerR + 0.01, channelR), y));
+
+      // Create a U-channel shape: edges at surface, center sunk
+      const edgeDist = Math.abs(t - 0.5) * 2; // 0 center, 1 edge
+      const channelCurve = 1 - Math.pow(edgeDist, 2.5); // steep walls
+      const r = surfaceR - channelDepth * channelCurve + 0.001;
+      points.push(new THREE.Vector2(Math.max(innerR + 0.01, r), y));
     }
 
+    return new THREE.LatheGeometry(points, 128);
+  }, [inlay, design, innerR, outerR, ringWidth, yCenter, bandHalf]);
+
+  // Glow halo geometry (slightly above surface)
+  const glowGeometry = useMemo(() => {
+    if (inlay.material === "meteorite") return null;
+    const steps = 8;
+    const points: THREE.Vector2[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const y = yCenter - bandHalf * 1.1 + t * bandHalf * 2.2;
+      const surfaceR = getOuterRadiusAtY(design.profile, innerR, outerR, ringWidth, design.bevel, y);
+      points.push(new THREE.Vector2(surfaceR + 0.004, y));
+    }
     return new THREE.LatheGeometry(points, 96);
   }, [inlay, design, innerR, outerR, ringWidth, yCenter, bandHalf]);
 
-  // Animate emissive for opals/crystals
+  // Animate effects
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
     const t = clock.getElapsedTime();
 
     if (inlay.material === "opal") {
-      // Prismatic color shift
-      const phase = t * 0.6 + inlay.placement * 3;
+      // Prismatic color cycling — full RGB shift
+      const phase = t * 0.8 + inlay.placement * 4;
       const r = Math.sin(phase) * 0.5 + 0.5;
       const g = Math.sin(phase + 2.1) * 0.5 + 0.5;
       const b = Math.sin(phase + 4.2) * 0.5 + 0.5;
-      mat.emissive.setRGB(r * 0.3, g * 0.4, b * 0.5);
-      mat.emissiveIntensity = inlay.emissiveIntensity * (0.7 + Math.sin(t * 1.5) * 0.3);
+      mat.emissive.setRGB(r * 0.4, g * 0.5, b * 0.6);
+      mat.emissiveIntensity = inlay.emissiveIntensity * (0.6 + Math.sin(t * 2.0) * 0.4);
     } else if (inlay.material === "crystal") {
-      mat.emissiveIntensity = inlay.emissiveIntensity * (0.8 + Math.sin(t * 0.5 + inlay.placement * 5) * 0.2);
+      // Deep pulsing glow
+      const pulse = Math.sin(t * 0.7 + idx * 2.0) * 0.3 + 0.7;
+      mat.emissiveIntensity = inlay.emissiveIntensity * pulse;
+      // Subtle sparkle via roughness fluctuation
+      mat.roughness = inlay.roughness + Math.sin(t * 3 + idx) * 0.03;
+    }
+
+    // Glow halo animation
+    if (glowRef.current && inlay.material !== "meteorite") {
+      const gMat = glowRef.current.material as THREE.MeshBasicMaterial;
+      gMat.opacity = 0.08 + Math.sin(t * 1.5 + idx) * 0.06;
     }
   });
 
   return (
-    <mesh ref={meshRef} geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
-      <meshStandardMaterial
-        color={inlay.color}
-        emissive={inlay.emissive}
-        emissiveIntensity={inlay.emissiveIntensity}
-        roughness={inlay.roughness}
-        metalness={inlay.metalness}
-        transparent={inlay.opacity < 1}
-        opacity={inlay.opacity}
-        envMapIntensity={inlay.material === "opal" ? 2.5 : inlay.material === "crystal" ? 1.8 : 0.9}
-      />
-    </mesh>
+    <group>
+      {/* Main inlay material */}
+      <mesh ref={meshRef} geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <meshStandardMaterial
+          color={inlay.color}
+          emissive={inlay.emissive}
+          emissiveIntensity={inlay.emissiveIntensity}
+          roughness={inlay.roughness}
+          metalness={inlay.metalness}
+          transparent
+          opacity={inlay.opacity}
+          envMapIntensity={inlay.material === "opal" ? 3.0 : inlay.material === "crystal" ? 2.5 : 1.0}
+          map={inlay.material === "meteorite" ? meteorTex : null}
+        />
+      </mesh>
+
+      {/* Glow halo for crystals and opals */}
+      {glowGeometry && inlay.material !== "meteorite" && (
+        <mesh ref={glowRef} geometry={glowGeometry} rotation={[Math.PI / 2, 0, 0]}>
+          <meshBasicMaterial
+            color={inlay.emissive}
+            transparent
+            opacity={0.1}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      )}
+    </group>
   );
 }
 
@@ -294,7 +400,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
   const geometry = useMemo(() => {
     const bevel = design.bevel / 10;
     const points: THREE.Vector2[] = [];
-    const steps = 48;
+    const steps = 64;
 
     if (design.profile === "dome" || design.profile === "comfort") {
       for (let i = 0; i <= steps; i++) {
@@ -329,7 +435,6 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
         points.push(new THREE.Vector2(r, (t - 0.5) * w));
       }
     } else {
-      // flat
       points.push(new THREE.Vector2(innerR, -w / 2));
       points.push(new THREE.Vector2(outerR - bevel, -w / 2));
       points.push(new THREE.Vector2(outerR, -w / 2 + bevel));
@@ -340,7 +445,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 
     const lathe = new THREE.LatheGeometry(points, 128);
 
-    // Carve grooves into the geometry
+    // Carve grooves
     if (design.grooves > 0) {
       const posAttr = lathe.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
@@ -376,12 +481,12 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
         <meshStandardMaterial
           color={metal.color}
           roughness={isWax ? 0.85 : metal.roughness}
-          metalness={isWax ? 0.0 : metal.metalness}
-          envMapIntensity={isWax ? 0.15 : metal.envIntensity}
+          metalness={isWax ? 0.05 : metal.metalness}
+          envMapIntensity={isWax ? 0.2 : metal.envIntensity}
         />
       </mesh>
 
-      {/* Inlay channels - LatheGeometry strips that sit flush on ring surface */}
+      {/* Inlay channels */}
       {design.inlays.map((inlay, i) => (
         <InlayChannel
           key={`${design.id}-inlay-${i}`}
@@ -390,6 +495,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
           innerR={innerR}
           outerR={outerR}
           ringWidth={w}
+          idx={i}
         />
       ))}
     </group>
@@ -401,13 +507,14 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef }) {
   return (
     <>
-      <ambientLight intensity={0.25} />
-      <directionalLight position={[4, 5, 5]} intensity={1.5} castShadow color="#ffffff" />
-      <directionalLight position={[-3, 2, -4]} intensity={0.6} color="#ff8c00" />
-      <pointLight position={[0, -2, 3]} intensity={0.4} color="#6B8AFF" />
-      {/* Extra lights to catch inlay sparkle */}
-      <pointLight position={[2, 0, -3]} intensity={0.3} color="#e879f9" />
-      <pointLight position={[-2, 1, 2]} intensity={0.25} color="#38bdf8" />
+      <ambientLight intensity={0.2} />
+      <directionalLight position={[4, 5, 5]} intensity={1.6} castShadow color="#ffffff" />
+      <directionalLight position={[-3, 2, -4]} intensity={0.5} color="#ff8c00" />
+      {/* Key fill for inlays */}
+      <pointLight position={[0, 0, 3]} intensity={0.6} color="#ffffff" />
+      <pointLight position={[2, -1, -3]} intensity={0.4} color="#e879f9" />
+      <pointLight position={[-2, 1, 2]} intensity={0.35} color="#38bdf8" />
+      <pointLight position={[0, 2, 0]} intensity={0.3} color="#fbbf24" />
 
       <ShowcaseRing design={design} metal={metal} />
 
