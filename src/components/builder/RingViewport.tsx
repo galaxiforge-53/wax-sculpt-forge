@@ -35,12 +35,15 @@ interface RingMeshProps {
 }
 
 function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
+  const hasLunarEnabled = !!lunarTexture?.enabled;
+
   const geometry = useMemo(() => {
     const innerRadius = params.innerDiameter / 2 / 10;
     const outerRadius = innerRadius + params.thickness / 10;
     const width = params.width / 10;
     const points: THREE.Vector2[] = [];
-    const steps = 24;
+    // High resolution for displacement mapping when lunar is on
+    const steps = hasLunarEnabled ? 80 : 24;
     const bevel = params.bevelSize / 10;
 
     if (params.profile === "dome" || params.profile === "comfort") {
@@ -52,12 +55,25 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
         points.push(new THREE.Vector2(r, y));
       }
     } else if (params.profile === "flat") {
-      points.push(new THREE.Vector2(innerRadius, -width / 2));
-      points.push(new THREE.Vector2(outerRadius - bevel, -width / 2));
-      points.push(new THREE.Vector2(outerRadius, -width / 2 + bevel));
-      points.push(new THREE.Vector2(outerRadius, width / 2 - bevel));
-      points.push(new THREE.Vector2(outerRadius - bevel, width / 2));
-      points.push(new THREE.Vector2(innerRadius, width / 2));
+      // For flat profile, generate many intermediate points for displacement
+      if (hasLunarEnabled) {
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const y = (t - 0.5) * width;
+          // Flat outer surface with small bevel at edges
+          const edgeDist = Math.min(t, 1 - t) * steps;
+          const bevelFactor = edgeDist < 2 ? edgeDist / 2 : 1;
+          const r = innerRadius + (outerRadius - innerRadius) * bevelFactor;
+          points.push(new THREE.Vector2(r, y));
+        }
+      } else {
+        points.push(new THREE.Vector2(innerRadius, -width / 2));
+        points.push(new THREE.Vector2(outerRadius - bevel, -width / 2));
+        points.push(new THREE.Vector2(outerRadius, -width / 2 + bevel));
+        points.push(new THREE.Vector2(outerRadius, width / 2 - bevel));
+        points.push(new THREE.Vector2(outerRadius - bevel, width / 2));
+        points.push(new THREE.Vector2(innerRadius, width / 2));
+      }
     } else if (params.profile === "knife-edge") {
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
@@ -71,7 +87,9 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
       points.push(new THREE.Vector2(innerRadius, -width / 2));
     }
 
-    const lathe = new THREE.LatheGeometry(points, 128);
+    // More radial segments when lunar is active for smooth displacement
+    const radialSegs = hasLunarEnabled ? 256 : 128;
+    const lathe = new THREE.LatheGeometry(points, radialSegs);
     // Copy uv to uv2 so aoMap works (Three.js requires second UV set)
     if (lathe.attributes.uv) {
       lathe.setAttribute("uv2", lathe.attributes.uv);
@@ -79,7 +97,7 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
 
     lathe.computeVertexNormals();
     return lathe;
-  }, [params]);
+  }, [params, hasLunarEnabled]);
 
   // Generate UV-space lunar surface maps (normalMap + roughnessMap)
   const lunarMaps = useMemo(() => {
@@ -94,9 +112,18 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
-    const strength = 0.6 + (lunarTexture.intensity / 100) * 1.2;
+    // Normal map is now for micro-detail only; displacement handles macro depth
+    const strength = 0.3 + (lunarTexture.intensity / 100) * 0.7;
     return new THREE.Vector2(strength, -strength);
   }, [lunarTexture?.enabled, lunarTexture?.intensity]);
+
+  // Displacement scale: how deep craters physically carve into geometry
+  const displacementScale = useMemo(() => {
+    if (!lunarTexture?.enabled) return 0;
+    const thickness = params.thickness / 10;
+    // Scale displacement relative to ring thickness, intensity controls it
+    return thickness * 0.12 * (lunarTexture.intensity / 100);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity, params.thickness]);
 
   const isWax = viewMode === "wax";
 
@@ -146,11 +173,14 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
           aoMapIntensity={1.5}
           map={hasLunar ? lunarMaps.albedoMap : null}
           normalScale={normalScale}
+          displacementMap={hasLunar ? lunarMaps.displacementMap : null}
+          displacementScale={hasLunar ? -displacementScale : 0}
+          displacementBias={hasLunar ? displacementScale * 0.5 : 0}
         />
       ) : (
         <meshPhysicalMaterial
           color={metalColors[metalPreset] ?? "#C0C0C0"}
-          roughness={hasLunar ? 0.55 : 0.35}
+          roughness={hasLunar ? 0.5 : 0.35}
           metalness={0.95}
           normalMap={hasLunar ? lunarMaps.normalMap : null}
           roughnessMap={hasLunar ? lunarMaps.roughnessMap : null}
@@ -158,9 +188,12 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
           aoMapIntensity={2.0}
           normalScale={normalScale}
           envMapIntensity={hasLunar ? 1.8 : 1.0}
-          clearcoat={hasLunar ? 0.15 : 0}
+          clearcoat={hasLunar ? 0.1 : 0}
           clearcoatRoughness={0.4}
           reflectivity={0.9}
+          displacementMap={hasLunar ? lunarMaps.displacementMap : null}
+          displacementScale={hasLunar ? -displacementScale : 0}
+          displacementBias={hasLunar ? displacementScale * 0.5 : 0}
         />
       )}
     </mesh>
