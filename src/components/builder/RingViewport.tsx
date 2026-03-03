@@ -7,7 +7,7 @@ import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { StampSettings } from "@/hooks/useRingDesign";
-import { getCraterTexture, getPitTexture, getGrainTexture } from "@/lib/lunarDecalTexture";
+import { getCraterMaps, getPitMaps, getGrainMaps } from "@/lib/lunarDecalTexture";
 
 export interface RingViewportHandle {
   captureSnapshot(
@@ -262,7 +262,11 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
   ]);
 
   const globalOpacity = (lunarTexture?.intensity ?? 50) / 100;
-  const rimSharpness = (lunarTexture?.rimSharpness ?? 50) / 100;
+  const rimSharpnessNorm = (lunarTexture?.rimSharpness ?? 50) / 100;
+  const microDetailNorm = (lunarTexture?.microDetail ?? 40) / 100;
+  const isWaxMode = viewMode === "wax";
+  // Normal map strength scales with intensity
+  const normalStrength = 0.6 + globalOpacity * 0.8; // 0.6–1.4
 
   return (
     <mesh
@@ -275,11 +279,11 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
 
       {/* Lunar decals projected onto ring surface */}
       {lunarDecals.map((d, i) => {
-        const map = d.kind === "crater"
-          ? getCraterTexture(rimSharpness)
+        const maps = d.kind === "crater"
+          ? getCraterMaps(rimSharpnessNorm)
           : d.kind === "pit"
-            ? getPitTexture()
-            : getGrainTexture();
+            ? getPitMaps()
+            : getGrainMaps(microDetailNorm * 100);
 
         return (
           <Decal
@@ -287,18 +291,21 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
             position={d.position}
             rotation={d.roll as any}
             scale={d.scale}
-            map={map}
           >
             <meshStandardMaterial
               transparent
               depthWrite={false}
               depthTest
               polygonOffset
-              polygonOffsetFactor={-4}
-              map={map}
+              polygonOffsetFactor={-2}
+              alphaMap={maps.alphaMap}
+              normalMap={maps.normalMap}
+              normalScale={new THREE.Vector2(normalStrength, normalStrength)}
+              roughnessMap={maps.roughnessMap}
+              roughness={isWaxMode ? 0.85 : 0.45}
+              metalness={isWaxMode ? 0 : 0.3}
+              color="#2a2a2a"
               opacity={globalOpacity * d.opacity}
-              roughness={0.9}
-              metalness={0}
             />
           </Decal>
         );
