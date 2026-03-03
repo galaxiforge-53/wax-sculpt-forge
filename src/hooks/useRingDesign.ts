@@ -11,10 +11,16 @@ import {
   RING_SIZE_MAP,
 } from "@/types/ring";
 import { CraftState, CraftAction } from "@/types/craft";
-import { WaxMark } from "@/types/waxmarks";
+import { WaxMark, WaxMarkType } from "@/types/waxmarks";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
+
+export interface StampSettings {
+  type: WaxMarkType;
+  radiusMm: number;
+  intensity: number;
+}
 
 function craftId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -34,22 +40,27 @@ export function useRingDesign() {
     startedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
-  const craftStateRef = useRef<CraftState>({
+  const [craftActions, setCraftActions] = useState<CraftAction[]>([]);
+  const [waxMarks, setWaxMarks] = useState<WaxMark[]>([]);
+  const [stampSettings, setStampSettings] = useState<StampSettings>({
+    type: "dent",
+    radiusMm: 1.2,
+    intensity: 0.65,
+  });
+  const craftStateRef = useRef<{
+    baseRingParams: RingParameters;
+    createdAt: string;
+    updatedAt: string;
+  }>({
     baseRingParams: DEFAULT_RING,
-    actionLog: [],
-    waxMarks: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
-  const [waxMarks, setWaxMarks] = useState<WaxMark[]>([]);
 
   const logCraftAction = useCallback((type: string, payload: Record<string, unknown>) => {
     const action: CraftAction = { id: craftId(), type, timestamp: Date.now(), payload };
-    craftStateRef.current = {
-      ...craftStateRef.current,
-      actionLog: [...craftStateRef.current.actionLog, action],
-      updatedAt: new Date().toISOString(),
-    };
+    setCraftActions((prev) => [...prev, action]);
+    craftStateRef.current.updatedAt = new Date().toISOString();
   }, []);
 
   const pushHistory = useCallback(
@@ -167,11 +178,7 @@ export function useRingDesign() {
       id: craftId(),
       createdAt: new Date().toISOString(),
     };
-    setWaxMarks((prev) => {
-      const updated = [...prev, newMark];
-      craftStateRef.current.waxMarks = updated;
-      return updated;
-    });
+    setWaxMarks((prev) => [...prev, newMark]);
     logCraftAction("wax_mark_added", {
       type: mark.type,
       radiusMm: mark.radiusMm,
@@ -181,11 +188,17 @@ export function useRingDesign() {
 
   const clearWaxMarks = useCallback(() => {
     setWaxMarks([]);
-    craftStateRef.current.waxMarks = [];
     logCraftAction("wax_marks_cleared", {});
   }, [logCraftAction]);
 
   const generateDesignPackage = useCallback((): DesignPackage => {
+    const craftState: CraftState = {
+      baseRingParams: craftStateRef.current.baseRingParams,
+      actionLog: craftActions,
+      waxMarks,
+      createdAt: craftStateRef.current.createdAt,
+      updatedAt: craftStateRef.current.updatedAt,
+    };
     return {
       id: `WRB-${Date.now().toString(36).toUpperCase()}`,
       version: "1.0.0",
@@ -196,11 +209,11 @@ export function useRingDesign() {
       finishPreset,
       toolHistory,
       previews: [],
-      craftState: { ...craftStateRef.current, waxMarks },
+      craftState,
       castabilityReport,
       pipelineState,
     };
-  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks]);
+  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions]);
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
@@ -213,12 +226,17 @@ export function useRingDesign() {
     setFinishPreset(pkg.finishPreset);
     setToolHistory(pkg.toolHistory);
     setPipelineState(pkg.pipelineState);
-    craftStateRef.current = pkg.craftState;
+    setCraftActions(pkg.craftState.actionLog ?? []);
     setWaxMarks(pkg.craftState.waxMarks ?? []);
+    craftStateRef.current = {
+      baseRingParams: pkg.parameters,
+      createdAt: pkg.craftState.createdAt,
+      updatedAt: pkg.craftState.updatedAt,
+    };
   }, []);
 
   return {
-    craftState: craftStateRef.current,
+    craftActions,
     castabilityReport,
     params,
     updateParams,
@@ -246,5 +264,7 @@ export function useRingDesign() {
     waxMarks,
     addWaxMark,
     clearWaxMarks,
+    stampSettings,
+    setStampSettings,
   };
 }
