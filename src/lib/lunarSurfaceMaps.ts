@@ -216,7 +216,7 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
 
   // ─── 1) fBm base regolith layer (before craters) ───────
   const baseNoise = makeNoise2D(lunar.seed + 500);
-  const baseAmp = 0.04 * depthScale;
+  const baseAmp = 0.06 * depthScale;
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const u = x / MAP_W * 6;
@@ -229,12 +229,13 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
 
   // ─── 2) Domain warp noise for crater irregularity ───────
   const warpNoise = makeNoise2D(lunar.seed + 1234);
-  const warpAmp = 0.12 + rimSharp * 0.08; // more warp = more irregular craters
+  const warpAmp = 0.15 + rimSharp * 0.12; // more warp = more irregular craters
 
   // ─── 3) Crater stamps ──────────────────────────────────
-  const baseCount = lunar.craterDensity === "low" ? 30 : lunar.craterDensity === "med" ? 70 : 140;
-  const baseSizeMin = lunar.craterSize === "small" ? 0.008 : lunar.craterSize === "med" ? 0.015 : 0.025;
-  const baseSizeMax = lunar.craterSize === "small" ? 0.025 : lunar.craterSize === "med" ? 0.05 : 0.09;
+  // Dramatically increased counts for dense lunar coverage like reference images
+  const baseCount = lunar.craterDensity === "low" ? 60 : lunar.craterDensity === "med" ? 150 : 300;
+  const baseSizeMin = lunar.craterSize === "small" ? 0.006 : lunar.craterSize === "med" ? 0.012 : 0.02;
+  const baseSizeMax = lunar.craterSize === "small" ? 0.03 : lunar.craterSize === "med" ? 0.065 : 0.11;
 
   const stamps: CraterStamp[] = [];
   let lastU = rand();
@@ -255,8 +256,8 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
     cu = ((cu % 1) + 1) % 1;
     cv = Math.max(0.05, Math.min(0.95, cv));
 
-    const depth = (0.3 + rand() * 0.7) * depthScale;
-    const rimH = (0.3 + rimSharp * 0.7) * depthScale;
+    const depth = (0.5 + rand() * 0.5) * depthScale * 1.4;
+    const rimH = (0.4 + rimSharp * 0.8) * depthScale * 1.3;
 
     // Per-crater rim jitter for irregularity
     const rimCenterJitter = (rand() - 0.5) * 0.06;
@@ -275,10 +276,10 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
   // ─── 4) Micro-pitting layer (many tiny shallow pits) ───
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
-    const pitCount = Math.floor(200 + microFactor * 600);
-    const pitRadiusMin = 0.002;
-    const pitRadiusMax = 0.006;
-    const pitDepth = 0.08 * depthScale * microFactor;
+    const pitCount = Math.floor(600 + microFactor * 2000);
+    const pitRadiusMin = 0.001;
+    const pitRadiusMax = 0.008;
+    const pitDepth = 0.14 * depthScale * microFactor;
 
     for (let i = 0; i < pitCount; i++) {
       const pu = pitRng();
@@ -310,7 +311,7 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
   // ─── 5) High-frequency grain noise (break gradients) ───
   if (microFactor > 0) {
     const grainRng = seededRng(lunar.seed + 9999);
-    const strength = microFactor * 0.06 * depthScale;
+    const strength = microFactor * 0.1 * depthScale;
     for (let i = 0; i < hmap.length; i++) {
       const mask = edgeMask[i];
       hmap[i] += (grainRng() - 0.5) * strength * mask;
@@ -319,7 +320,7 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
 
   // ─── 6) Depth contrast boost ───────────────────────────
   for (let i = 0; i < hmap.length; i++) {
-    hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.15;
+    hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.4;
     hmap[i] = Math.max(0, Math.min(1, hmap[i]));
   }
 
@@ -382,7 +383,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const hVal = hmap[y * w + x];
-      let roughness = 0.95 - (hVal - 0.5) * 1.2;
+      let roughness = 0.98 - (hVal - 0.5) * 1.6;
       if (microFactor > 0) {
         roughness += (grainRng() - 0.5) * 0.12 * microFactor;
       }
