@@ -258,15 +258,21 @@ export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurface
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
 
   const normalMap = new THREE.CanvasTexture(normalCanvas);
-  normalMap.colorSpace = THREE.LinearSRGBColorSpace;
+  normalMap.colorSpace = THREE.NoColorSpace;
+  normalMap.flipY = false;
   normalMap.wrapS = THREE.RepeatWrapping;
   normalMap.wrapT = THREE.ClampToEdgeWrapping;
+  normalMap.minFilter = THREE.LinearMipmapLinearFilter;
+  normalMap.magFilter = THREE.LinearFilter;
   normalMap.needsUpdate = true;
 
   const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
-  roughnessMap.colorSpace = THREE.LinearSRGBColorSpace;
+  roughnessMap.colorSpace = THREE.NoColorSpace;
+  roughnessMap.flipY = false;
   roughnessMap.wrapS = THREE.RepeatWrapping;
   roughnessMap.wrapT = THREE.ClampToEdgeWrapping;
+  roughnessMap.minFilter = THREE.LinearMipmapLinearFilter;
+  roughnessMap.magFilter = THREE.LinearFilter;
   roughnessMap.needsUpdate = true;
 
   const maps: LunarSurfaceMapSet = { normalMap, roughnessMap };
