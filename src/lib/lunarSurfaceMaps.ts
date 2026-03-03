@@ -15,6 +15,7 @@ export interface LunarSurfaceMapSet {
   roughnessMap: THREE.CanvasTexture;
   aoMap: THREE.CanvasTexture;
   albedoMap: THREE.CanvasTexture;
+  displacementMap: THREE.CanvasTexture;
 }
 
 const MAP_W = 1024;
@@ -501,6 +502,32 @@ function setupDataTexture(tex: THREE.CanvasTexture) {
   tex.needsUpdate = true;
 }
 
+// ── Displacement map from heightmap ───────────────────────────────
+
+function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(w, h);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      // Displacement: 0.5 = neutral, <0.5 = inward (craters), >0.5 = outward (rims)
+      const hVal = hmap[y * w + x];
+      const v = Math.round(Math.max(0, Math.min(1, hVal)) * 255);
+      const yy = (h - 1 - y);
+      const idx = (yy * w + x) * 4;
+      img.data[idx] = v;
+      img.data[idx + 1] = v;
+      img.data[idx + 2] = v;
+      img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
 // ── Public API ────────────────────────────────────────────────────
 
 export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurfaceMapSet {
@@ -513,20 +540,23 @@ export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurface
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
   const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
+  const displacementCanvas = heightmapToDisplacementCanvas(hmap, MAP_W, MAP_H);
 
   const normalMap = new THREE.CanvasTexture(normalCanvas);
   const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
   const aoMap = new THREE.CanvasTexture(aoCanvas);
   const albedoMap = new THREE.CanvasTexture(albedoCanvas);
+  const displacementMap = new THREE.CanvasTexture(displacementCanvas);
 
   setupDataTexture(normalMap);
   setupDataTexture(roughnessMap);
   setupDataTexture(aoMap);
   setupDataTexture(albedoMap);
+  setupDataTexture(displacementMap);
   // Albedo needs sRGB for correct color
   albedoMap.colorSpace = THREE.SRGBColorSpace;
 
-  const maps: LunarSurfaceMapSet = { normalMap, roughnessMap, aoMap, albedoMap };
+  const maps: LunarSurfaceMapSet = { normalMap, roughnessMap, aoMap, albedoMap, displacementMap };
   cache.set(key, maps);
   return maps;
 }
@@ -537,4 +567,5 @@ export function disposeLunarMaps(maps: LunarSurfaceMapSet) {
   maps.roughnessMap.dispose();
   maps.aoMap.dispose();
   maps.albedoMap.dispose();
+  maps.displacementMap.dispose();
 }
