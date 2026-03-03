@@ -312,7 +312,9 @@ export function useRingDesign() {
       } as InlayChannel;
     });
     setInlays(migratedChannels);
-    setLunarTextureRaw(pkg.craftState?.lunarTexture ?? { ...DEFAULT_LUNAR_TEXTURE });
+    // Backward-compat: merge saved lunar state with defaults so new fields get values
+    const savedLunar = pkg.craftState?.lunarTexture;
+    setLunarTextureRaw(savedLunar ? { ...DEFAULT_LUNAR_TEXTURE, ...savedLunar } : { ...DEFAULT_LUNAR_TEXTURE });
     craftStateRef.current = {
       baseRingParams: pkg.parameters,
       createdAt: pkg.craftState.createdAt,

@@ -74,12 +74,10 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
     if (currentWidth > 0.001) {
       const widthCorrection = targetWidth / currentWidth;
       // Clamp width correction to avoid extreme distortion
-      const clampedCorrection = Math.max(0.7, Math.min(1.4, widthCorrection));
+      const clampedCorrection = Math.max(0.5, Math.min(2.0, widthCorrection));
       if (Math.abs(clampedCorrection - 1.0) > 0.01) {
-        // Apply partial width correction — blend between uniform and target
-        // This keeps craters mostly round while adjusting width
-        const blend = 0.6; // 60% toward target width, 40% stays uniform
-        const finalCorrection = 1.0 + (clampedCorrection - 1.0) * blend;
+        // Full Y-axis width correction — wider clamp range for accurate sizing
+        const finalCorrection = clampedCorrection;
         const posAttr = geo.attributes.position;
         for (let i = 0; i < posAttr.count; i++) {
           posAttr.setY(i, posAttr.getY(i) * finalCorrection);
@@ -125,6 +123,9 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
     lunarTexture?.microDetail, lunarTexture?.rimSharpness,
     lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
+    lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
+    lunarTexture?.erosion, lunarTexture?.terrainRoughness,
+    lunarTexture?.craterVariation,
   ]);
 
   const normalScale = useMemo(() => {
