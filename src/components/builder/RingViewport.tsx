@@ -155,15 +155,25 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
       castShadow
       onPointerDown={handlePointerDown}
     >
-      <meshStandardMaterial
-        color={isWax ? "#4a7a3a" : metalColors[metalPreset]}
-        roughness={isWax ? 0.85 : 0.15}
-        metalness={isWax ? 0.0 : 0.95}
-        envMapIntensity={isWax ? 0.2 : 1.5}
-        normalMap={lunarMaps?.normalMap ?? undefined}
-        normalScale={normalScale}
-        roughnessMap={lunarMaps?.roughnessMap ?? undefined}
-      />
+      {isWax ? (
+        <meshStandardMaterial
+          color="#78A85B"
+          roughness={0.85}
+          metalness={0.05}
+          normalMap={lunarMaps?.normalMap ?? null}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
+          normalScale={normalScale}
+        />
+      ) : (
+        <meshStandardMaterial
+          color={metalColors[metalPreset] ?? "#C0C0C0"}
+          roughness={0.35}
+          metalness={0.9}
+          normalMap={lunarMaps?.normalMap ?? null}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
+          normalScale={normalScale}
+        />
+      )}
     </mesh>
   );
 }
