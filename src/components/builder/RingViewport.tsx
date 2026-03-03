@@ -69,34 +69,12 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
       }
     } else {
       points.push(new THREE.Vector2(innerRadius, -width / 2));
-      points.push(new THREE.Vector2(outerRadius, -width / 2));
-      points.push(new THREE.Vector2(outerRadius, width / 2));
-      points.push(new THREE.Vector2(innerRadius, width / 2));
     }
 
-    const lathe = new THREE.LatheGeometry(points, 64);
-
-    if (params.grooveCount > 0) {
-      const posAttr = lathe.attributes.position;
-      const count = posAttr.count;
-      for (let i = 0; i < count; i++) {
-        const x = posAttr.getX(i);
-        const y = posAttr.getY(i);
-        const z = posAttr.getZ(i);
-        const r = Math.sqrt(x * x + z * z);
-        for (let g = 0; g < params.grooveCount; g++) {
-          const grooveY = ((g + 1) / (params.grooveCount + 1) - 0.5) * width;
-          const dist = Math.abs(y - grooveY);
-          const grooveWidth = 0.02;
-          if (dist < grooveWidth) {
-            const depth = params.grooveDepth / 10 * (1 - dist / grooveWidth);
-            const scale = (r - depth) / r;
-            posAttr.setX(i, x * scale);
-            posAttr.setZ(i, z * scale);
-          }
-        }
-      }
-      posAttr.needsUpdate = true;
+    const lathe = new THREE.LatheGeometry(points, 128);
+    // Copy uv to uv2 so aoMap works (Three.js requires second UV set)
+    if (lathe.attributes.uv) {
+      lathe.setAttribute("uv2", lathe.attributes.uv);
     }
 
     lathe.computeVertexNormals();
@@ -116,8 +94,8 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
-    const strength = 0.5 + (lunarTexture.intensity / 100) * 1.5;
-    return new THREE.Vector2(strength, -strength); // negative Y to carve inward
+    const strength = 0.6 + (lunarTexture.intensity / 100) * 1.2;
+    return new THREE.Vector2(strength, -strength);
   }, [lunarTexture?.enabled, lunarTexture?.intensity]);
 
   const isWax = viewMode === "wax";
@@ -148,6 +126,8 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
+  const hasLunar = lunarTexture?.enabled && lunarMaps;
+
   return (
     <mesh
       geometry={geometry}
@@ -160,21 +140,27 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
           color="#78A85B"
           roughness={0.85}
           metalness={0.05}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
-          map={lunarMaps?.albedoMap ?? null}
+          normalMap={hasLunar ? lunarMaps.normalMap : null}
+          roughnessMap={hasLunar ? lunarMaps.roughnessMap : null}
+          aoMap={hasLunar ? lunarMaps.aoMap : null}
+          aoMapIntensity={1.5}
+          map={hasLunar ? lunarMaps.albedoMap : null}
           normalScale={normalScale}
         />
       ) : (
-        <meshStandardMaterial
+        <meshPhysicalMaterial
           color={metalColors[metalPreset] ?? "#C0C0C0"}
-          roughness={0.35}
-          metalness={0.9}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
+          roughness={hasLunar ? 0.55 : 0.35}
+          metalness={0.95}
+          normalMap={hasLunar ? lunarMaps.normalMap : null}
+          roughnessMap={hasLunar ? lunarMaps.roughnessMap : null}
+          aoMap={hasLunar ? lunarMaps.aoMap : null}
+          aoMapIntensity={2.0}
           normalScale={normalScale}
+          envMapIntensity={hasLunar ? 1.8 : 1.0}
+          clearcoat={hasLunar ? 0.15 : 0}
+          clearcoatRoughness={0.4}
+          reflectivity={0.9}
         />
       )}
     </mesh>
@@ -332,17 +318,25 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           shadows
           gl={{ preserveDrawingBuffer: true, antialias: true }}
         >
-          <ambientLight intensity={0.3} />
+          <ambientLight intensity={0.2} />
+          {/* Key light — rakes across craters to show relief */}
           <directionalLight
-            position={[5, 5, 5]}
-            intensity={1.2}
+            position={[4, 6, 3]}
+            intensity={1.6}
             castShadow
             color={viewMode === "wax" ? "#fff5e0" : "#ffffff"}
           />
+          {/* Fill light — softer, opposite side */}
+          <directionalLight
+            position={[-4, 2, -3]}
+            intensity={0.4}
+            color={viewMode === "wax" ? "#ffe8c0" : "#e8e8ff"}
+          />
+          {/* Rim light — highlights edges and crater rims */}
           <pointLight
-            position={[-3, 2, -2]}
-            intensity={0.5}
-            color={viewMode === "wax" ? "#ff8c00" : "#ffffff"}
+            position={[0, -3, 4]}
+            intensity={0.6}
+            color="#ffffff"
           />
 
           <RingMesh
