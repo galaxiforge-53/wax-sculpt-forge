@@ -14,6 +14,7 @@ import { CraftState, CraftAction } from "@/types/craft";
 import { WaxMark, WaxMarkType } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { slugFromUrl, findCodexMaterial } from "@/lib/codexMaterials";
+import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
@@ -45,6 +46,7 @@ export function useRingDesign() {
   const [craftActions, setCraftActions] = useState<CraftAction[]>([]);
   const [waxMarks, setWaxMarks] = useState<WaxMark[]>([]);
   const [inlays, setInlays] = useState<InlayChannel[]>([]);
+  const [lunarTexture, setLunarTextureRaw] = useState<LunarTextureState>(DEFAULT_LUNAR_TEXTURE);
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     type: "dent",
     radiusMm: 1.2,
@@ -194,6 +196,17 @@ export function useRingDesign() {
     logCraftAction("wax_marks_cleared", {});
   }, [logCraftAction]);
 
+  const setLunarTexture = useCallback((next: LunarTextureState) => {
+    setLunarTextureRaw(next);
+    logCraftAction("lunar_texture_updated", {
+      enabled: next.enabled,
+      intensity: next.intensity,
+      craterDensity: next.craterDensity,
+      craterSize: next.craterSize,
+      seed: next.seed,
+    });
+  }, [logCraftAction]);
+
   // --- Inlay helpers ---
   const addInlayChannel = useCallback((input: Omit<InlayChannel, "id" | "createdAt">) => {
     const channel: InlayChannel = {
@@ -232,6 +245,7 @@ export function useRingDesign() {
       actionLog: craftActions,
       waxMarks,
       inlays: { channels: inlays },
+      lunarTexture,
       createdAt: craftStateRef.current.createdAt,
       updatedAt: craftStateRef.current.updatedAt,
     };
@@ -249,7 +263,7 @@ export function useRingDesign() {
       castabilityReport,
       pipelineState,
     };
-  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions, inlays]);
+  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions, inlays, lunarTexture]);
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
@@ -279,6 +293,7 @@ export function useRingDesign() {
       } as InlayChannel;
     });
     setInlays(migratedChannels);
+    setLunarTextureRaw(pkg.craftState?.lunarTexture ?? { ...DEFAULT_LUNAR_TEXTURE });
     craftStateRef.current = {
       baseRingParams: pkg.parameters,
       createdAt: pkg.craftState.createdAt,
@@ -322,5 +337,7 @@ export function useRingDesign() {
     updateInlayChannel,
     removeInlayChannel,
     clearInlays,
+    lunarTexture,
+    setLunarTexture,
   };
 }

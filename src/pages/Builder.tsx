@@ -7,6 +7,7 @@ import PropertiesPanel from "@/components/builder/PropertiesPanel";
 import CastabilityPanel from "@/components/builder/CastabilityPanel";
 import ForgePipelinePanel from "@/components/builder/ForgePipelinePanel";
 import InlaysPanel from "@/components/builder/InlaysPanel";
+import LunarTexturePanel from "@/components/builder/LunarTexturePanel";
 import TemplatesPanel from "@/components/builder/TemplatesPanel";
 import TopBar from "@/components/builder/TopBar";
 import ForgeCinematicModal from "@/components/forge/ForgeCinematicModal";
@@ -40,6 +41,7 @@ export default function Builder() {
     waxMarks, addWaxMark, clearWaxMarks,
     stampSettings, setStampSettings,
     inlays, addInlayChannel, removeInlayChannel, clearInlays,
+    lunarTexture, setLunarTexture,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -169,7 +171,7 @@ export default function Builder() {
           <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
         </div>
         <div className="flex-1 p-2">
-          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} stampSettings={stampSettings} inlays={inlays} />
+          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} stampSettings={stampSettings} inlays={inlays} lunarTexture={lunarTexture} />
         </div>
         <div className="w-72 flex flex-col border-l border-border flex-shrink-0">
           <div className="flex-1 p-3 overflow-y-auto">
@@ -183,6 +185,9 @@ export default function Builder() {
           </div>
           <div className="border-t border-border p-3">
             <InlaysPanel inlays={inlays} onAdd={addInlayChannel} onRemove={removeInlayChannel} onClear={clearInlays} />
+          </div>
+          <div className="border-t border-border p-3">
+            <LunarTexturePanel state={lunarTexture} onChange={setLunarTexture} />
           </div>
           <div className="border-t border-border p-3 h-[25%] overflow-hidden">
             <TemplatesPanel onApply={applyTemplate} currentParams={params} />
