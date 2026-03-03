@@ -1,40 +1,77 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useMemo } from "react";
+
+// Pre-generate ember particles to avoid re-renders
+function useEmbers(count: number) {
+  return useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: 5 + Math.random() * 90,
+      bottom: -5 + Math.random() * 25,
+      size: 1 + Math.random() * 3,
+      blur: Math.random() > 0.6 ? 2 : 0,
+      yTravel: 250 + Math.random() * 500,
+      xDrift: (Math.random() - 0.5) * 80,
+      duration: 3 + Math.random() * 6,
+      delay: Math.random() * 8,
+      peak: 0.4 + Math.random() * 0.6,
+      color: Math.random() > 0.3
+        ? `hsl(${20 + Math.random() * 20}, 95%, ${50 + Math.random() * 20}%)`
+        : `hsl(${35 + Math.random() * 15}, 100%, ${55 + Math.random() * 15}%)`,
+    }));
+  }, [count]);
+}
 
 export default function Hero() {
   const navigate = useNavigate();
+  const embers = useEmbers(30);
 
   return (
     <section className="relative min-h-[85vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden cosmic-noise starfield">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-forge-dark via-background to-background" />
 
-      {/* Subtle cosmic nebula glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-48 sm:w-96 h-48 sm:h-96 bg-primary/[0.03] rounded-full blur-[80px] sm:blur-[120px]" />
-        <div className="absolute bottom-1/3 right-1/4 w-36 sm:w-72 h-36 sm:h-72 bg-accent/[0.02] rounded-full blur-[60px] sm:blur-[100px]" />
+      {/* Warm fire glow at the bottom */}
+      <div className="absolute inset-x-0 bottom-0 h-[45%] pointer-events-none z-[1]">
+        <div className="absolute inset-x-0 bottom-0 h-full bg-gradient-to-t from-[hsl(20_90%_12%/0.35)] via-[hsl(25_95%_25%/0.12)] to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[hsl(15_95%_45%/0.15)] to-transparent animate-flicker" />
+        {/* Glowing hearth line */}
+        <div className="absolute inset-x-[10%] bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[hsl(25_95%_53%/0.5)] to-transparent blur-[1px]" />
       </div>
 
-      {/* Ember particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(8)].map((_, i) => (
+      {/* Cosmic nebula glow */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-48 sm:w-96 h-48 sm:h-96 bg-primary/[0.04] rounded-full blur-[80px] sm:blur-[120px]" />
+        <div className="absolute bottom-1/3 right-1/4 w-36 sm:w-72 h-36 sm:h-72 bg-accent/[0.03] rounded-full blur-[60px] sm:blur-[100px]" />
+      </div>
+
+      {/* Ember particles — dense, varied, fire-like */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-[2]">
+        {embers.map((e) => (
           <motion.div
-            key={i}
-            className="absolute w-0.5 h-0.5 rounded-full bg-primary/80"
+            key={e.id}
+            className="absolute rounded-full"
             style={{
-              left: `${15 + Math.random() * 70}%`,
-              bottom: `${Math.random() * 30}%`,
+              left: `${e.left}%`,
+              bottom: `${e.bottom}%`,
+              width: e.size,
+              height: e.size,
+              backgroundColor: e.color,
+              filter: e.blur ? `blur(${e.blur}px)` : undefined,
+              boxShadow: `0 0 ${3 + e.size}px ${e.color}`,
             }}
             animate={{
-              y: [0, -200 - Math.random() * 300],
-              opacity: [0, 0.8, 0],
-              scale: [0.5, 1, 0.3],
+              y: [0, -e.yTravel],
+              x: [0, e.xDrift],
+              opacity: [0, e.peak, e.peak * 0.8, 0],
+              scale: [0.4, 1, 0.6, 0.2],
             }}
             transition={{
-              duration: 4 + Math.random() * 4,
+              duration: e.duration,
               repeat: Infinity,
-              delay: Math.random() * 5,
+              delay: e.delay,
               ease: "easeOut",
             }}
           />
