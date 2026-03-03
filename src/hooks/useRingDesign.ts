@@ -138,9 +138,11 @@ export function useRingDesign() {
   const setStage = useCallback((id: ForgeStageId) => {
     const stage = STAGES.find((s) => s.id === id);
     if (!stage) return;
-    setPipelineState((prev) => ({ ...prev, currentStage: id, updatedAt: new Date().toISOString() }));
+    setPipelineState((prev) => {
+      logCraftAction("stage_changed", { from: prev.currentStage, to: id });
+      return { ...prev, currentStage: id, updatedAt: new Date().toISOString() };
+    });
     setViewMode(stage.defaultViewMode);
-    logCraftAction("stage_changed", { stage: id });
   }, [setViewMode, logCraftAction]);
 
   const nextStage = useCallback(() => {
@@ -165,7 +167,7 @@ export function useRingDesign() {
       toolHistory,
       previews: [],
       craftState: { ...craftStateRef.current },
-      castabilityReport: evaluateCastability(params),
+      castabilityReport,
       pipelineState,
     };
   }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState]);
