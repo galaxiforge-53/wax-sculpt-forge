@@ -94,6 +94,19 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
         }
         break;
       }
+
+      case "lunar_preset_applied": {
+        const name = action.payload.presetName as string;
+        const seed = action.payload.seed as number;
+        lastLunar = `Lunar preset: ${name}, seed ${seed}`;
+        break;
+      }
+
+      case "lunar_randomized": {
+        const seed = action.payload.seed as number;
+        lastLunar = `Lunar randomized, seed ${seed}`;
+        break;
+      }
     }
   }
 

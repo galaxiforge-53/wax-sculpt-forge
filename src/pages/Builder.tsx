@@ -41,7 +41,7 @@ export default function Builder() {
     waxMarks, addWaxMark, clearWaxMarks,
     stampSettings, setStampSettings,
     inlays, addInlayChannel, removeInlayChannel, clearInlays,
-    lunarTexture, setLunarTexture,
+    lunarTexture, setLunarTexture, applyLunarPreset, randomizeLunar,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -187,7 +187,7 @@ export default function Builder() {
             <InlaysPanel inlays={inlays} onAdd={addInlayChannel} onRemove={removeInlayChannel} onClear={clearInlays} />
           </div>
           <div className="border-t border-border p-3">
-            <LunarTexturePanel state={lunarTexture} onChange={setLunarTexture} />
+            <LunarTexturePanel state={lunarTexture} onChange={setLunarTexture} onApplyPreset={applyLunarPreset} onRandomize={randomizeLunar} />
           </div>
           <div className="border-t border-border p-3 h-[25%] overflow-hidden">
             <TemplatesPanel onApply={applyTemplate} currentParams={params} />
