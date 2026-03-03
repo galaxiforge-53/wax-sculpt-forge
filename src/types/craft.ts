@@ -1,4 +1,5 @@
 import { RingParameters } from "./ring";
+import { WaxMark } from "./waxmarks";
 
 export interface CraftAction {
   id: string;
@@ -10,6 +11,7 @@ export interface CraftAction {
 export interface CraftState {
   baseRingParams: RingParameters;
   actionLog: CraftAction[];
+  waxMarks: WaxMark[];
   createdAt: string;
   updatedAt: string;
 }

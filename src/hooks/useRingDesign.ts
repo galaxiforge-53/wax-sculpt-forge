@@ -11,6 +11,7 @@ import {
   RING_SIZE_MAP,
 } from "@/types/ring";
 import { CraftState, CraftAction } from "@/types/craft";
+import { WaxMark } from "@/types/waxmarks";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
@@ -36,9 +37,11 @@ export function useRingDesign() {
   const craftStateRef = useRef<CraftState>({
     baseRingParams: DEFAULT_RING,
     actionLog: [],
+    waxMarks: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
+  const [waxMarks, setWaxMarks] = useState<WaxMark[]>([]);
 
   const logCraftAction = useCallback((type: string, payload: Record<string, unknown>) => {
     const action: CraftAction = { id: craftId(), type, timestamp: Date.now(), payload };
@@ -128,6 +131,9 @@ export function useRingDesign() {
         case "flatten":
           updateParams({ profile: "flat" });
           break;
+        case "stamp":
+          // stamp tool doesn't modify params; placement is handled in viewport
+          break;
         default:
           break;
       }
@@ -155,6 +161,30 @@ export function useRingDesign() {
     if (idx > 0) setStage(STAGES[idx - 1].id);
   }, [pipelineState.currentStage, setStage]);
 
+  const addWaxMark = useCallback((mark: Omit<WaxMark, "id" | "createdAt">) => {
+    const newMark: WaxMark = {
+      ...mark,
+      id: craftId(),
+      createdAt: new Date().toISOString(),
+    };
+    setWaxMarks((prev) => {
+      const updated = [...prev, newMark];
+      craftStateRef.current.waxMarks = updated;
+      return updated;
+    });
+    logCraftAction("wax_mark_added", {
+      type: mark.type,
+      radiusMm: mark.radiusMm,
+      intensity: mark.intensity,
+    });
+  }, [logCraftAction]);
+
+  const clearWaxMarks = useCallback(() => {
+    setWaxMarks([]);
+    craftStateRef.current.waxMarks = [];
+    logCraftAction("wax_marks_cleared", {});
+  }, [logCraftAction]);
+
   const generateDesignPackage = useCallback((): DesignPackage => {
     return {
       id: `WRB-${Date.now().toString(36).toUpperCase()}`,
@@ -166,11 +196,11 @@ export function useRingDesign() {
       finishPreset,
       toolHistory,
       previews: [],
-      craftState: { ...craftStateRef.current },
+      craftState: { ...craftStateRef.current, waxMarks },
       castabilityReport,
       pipelineState,
     };
-  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState]);
+  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks]);
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
@@ -184,6 +214,7 @@ export function useRingDesign() {
     setToolHistory(pkg.toolHistory);
     setPipelineState(pkg.pipelineState);
     craftStateRef.current = pkg.craftState;
+    setWaxMarks(pkg.craftState.waxMarks ?? []);
   }, []);
 
   return {
@@ -212,5 +243,8 @@ export function useRingDesign() {
     nextStage,
     prevStage,
     restoreDesign,
+    waxMarks,
+    addWaxMark,
+    clearWaxMarks,
   };
 }

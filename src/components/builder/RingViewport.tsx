@@ -1,8 +1,9 @@
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, ThreeEvent } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback } from "react";
 import * as THREE from "three";
-import { RingParameters, ViewMode, MetalPreset } from "@/types/ring";
+import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
+import { WaxMark } from "@/types/waxmarks";
 
 export interface RingViewportHandle {
   captureSnapshot(
@@ -21,9 +22,11 @@ interface RingMeshProps {
   params: RingParameters;
   viewMode: ViewMode;
   metalPreset: MetalPreset;
+  activeTool: ToolType | null;
+  onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
 }
 
-function RingMesh({ params, viewMode, metalPreset }: RingMeshProps) {
+function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark }: RingMeshProps) {
   const geometry = useMemo(() => {
     const innerRadius = params.innerDiameter / 2 / 10;
     const outerRadius = innerRadius + params.thickness / 10;
@@ -122,10 +125,74 @@ function RingMesh({ params, viewMode, metalPreset }: RingMeshProps) {
     );
   }, [viewMode, metalPreset]);
 
+  const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
+    if (viewMode !== "wax" || activeTool !== "stamp" || !onAddWaxMark) return;
+    e.stopPropagation();
+    const point = e.point;
+    const normal = e.face?.normal ?? new THREE.Vector3(0, 1, 0);
+    // Transform normal from local to world
+    const worldNormal = normal.clone();
+    if (e.object) {
+      worldNormal.transformDirection(e.object.matrixWorld);
+    }
+    onAddWaxMark({
+      type: "dent",
+      position: { x: point.x, y: point.y, z: point.z },
+      normal: { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z },
+      radiusMm: 1.2,
+      intensity: 0.65,
+    });
+  }, [viewMode, activeTool, onAddWaxMark]);
+
+  const isStampActive = viewMode === "wax" && activeTool === "stamp";
+
   return (
-    <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
+    <mesh
+      geometry={geometry}
+      rotation={[Math.PI / 2, 0, 0]}
+      castShadow
+      onPointerDown={handlePointerDown}
+    >
       {material}
     </mesh>
+  );
+}
+
+// Render wax marks as small decal-like circles
+function WaxMarkOverlays({ marks }: { marks: WaxMark[] }) {
+  const visible = marks.slice(-80);
+
+  return (
+    <>
+      {visible.map((mark) => {
+        const pos = new THREE.Vector3(mark.position.x, mark.position.y, mark.position.z);
+        const norm = new THREE.Vector3(mark.normal.x, mark.normal.y, mark.normal.z).normalize();
+        // offset slightly above surface
+        const offset = pos.clone().add(norm.clone().multiplyScalar(0.002));
+        // orient plane to face along normal
+        const quat = new THREE.Quaternion();
+        quat.setFromUnitVectors(new THREE.Vector3(0, 0, 1), norm);
+        const euler = new THREE.Euler().setFromQuaternion(quat);
+        const radius = mark.radiusMm / 10;
+
+        return (
+          <mesh
+            key={mark.id}
+            position={[offset.x, offset.y, offset.z]}
+            rotation={euler}
+          >
+            <circleGeometry args={[radius, 16]} />
+            <meshBasicMaterial
+              color="#2a4a22"
+              transparent
+              opacity={mark.intensity * 0.45}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        );
+      })}
+    </>
   );
 }
 
@@ -136,7 +203,6 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
   captureRef.current = useCallback(async (pos: [number, number, number]) => {
     const origPos = camera.position.clone();
     const origTarget = new THREE.Vector3();
-    // OrbitControls sets camera lookAt to 0,0,0 by default
     camera.position.set(...pos);
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
@@ -152,7 +218,6 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
       dataUrl = "";
     }
 
-    // restore
     camera.position.copy(origPos);
     camera.lookAt(origTarget);
     camera.updateProjectionMatrix();
@@ -160,7 +225,6 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
     return dataUrl;
   }, [gl, camera, scene]);
 
-  // expose capture function once on mount
   useMemo(() => {
     onReady({
       capture: (pos) => captureRef.current!(pos),
@@ -174,10 +238,13 @@ interface RingViewportProps {
   params: RingParameters;
   viewMode: ViewMode;
   metalPreset: MetalPreset;
+  activeTool?: ToolType | null;
+  onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
+  waxMarks?: WaxMark[];
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
@@ -216,7 +283,17 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             color={viewMode === "wax" ? "#ff8c00" : "#ffffff"}
           />
 
-          <RingMesh params={params} viewMode={viewMode} metalPreset={metalPreset} />
+          <RingMesh
+            params={params}
+            viewMode={viewMode}
+            metalPreset={metalPreset}
+            activeTool={activeTool ?? null}
+            onAddWaxMark={onAddWaxMark}
+          />
+
+          {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (
+            <WaxMarkOverlays marks={waxMarks} />
+          )}
 
           <ContactShadows
             position={[0, -0.8, 0]}

@@ -18,6 +18,7 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
   const toolCounts: Record<string, number> = {};
   const stageNotes: Partial<Record<ForgeStageId, string[]>> = {};
   let lastParams: Record<string, unknown> = {};
+  let waxMarkCount = 0;
 
   for (const action of actions) {
     switch (action.type) {
@@ -67,7 +68,17 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
         highlights.push(`Forge stage: ${formatStage(from)} → ${formatStage(to)}`);
         break;
       }
+
+      case "wax_mark_added": {
+        waxMarkCount++;
+        break;
+      }
     }
+  }
+
+  // Wax marks highlight
+  if (waxMarkCount > 0) {
+    highlights.push(`Wax marks added: ${waxMarkCount}`);
   }
 
   // Aggregate tool highlights
