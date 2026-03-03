@@ -256,8 +256,8 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
     cu = ((cu % 1) + 1) % 1;
     cv = Math.max(0.05, Math.min(0.95, cv));
 
-    const depth = (0.5 + rand() * 0.5) * depthScale * 1.4;
-    const rimH = (0.4 + rimSharp * 0.8) * depthScale * 1.3;
+    const depth = (0.35 + rand() * 0.5) * depthScale;
+    const rimH = (0.3 + rimSharp * 0.6) * depthScale;
 
     // Per-crater rim jitter for irregularity
     const rimCenterJitter = (rand() - 0.5) * 0.06;
@@ -279,7 +279,7 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
     const pitCount = Math.floor(600 + microFactor * 2000);
     const pitRadiusMin = 0.001;
     const pitRadiusMax = 0.008;
-    const pitDepth = 0.14 * depthScale * microFactor;
+    const pitDepth = 0.1 * depthScale * microFactor;
 
     for (let i = 0; i < pitCount; i++) {
       const pu = pitRng();
@@ -311,7 +311,7 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
   // ─── 5) High-frequency grain noise (break gradients) ───
   if (microFactor > 0) {
     const grainRng = seededRng(lunar.seed + 9999);
-    const strength = microFactor * 0.1 * depthScale;
+    const strength = microFactor * 0.07 * depthScale;
     for (let i = 0; i < hmap.length; i++) {
       const mask = edgeMask[i];
       hmap[i] += (grainRng() - 0.5) * strength * mask;
@@ -320,7 +320,7 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
 
   // ─── 6) Depth contrast boost ───────────────────────────
   for (let i = 0; i < hmap.length; i++) {
-    hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.4;
+    hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.2;
     hmap[i] = Math.max(0, Math.min(1, hmap[i]));
   }
 
@@ -383,7 +383,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const hVal = hmap[y * w + x];
-      let roughness = 0.98 - (hVal - 0.5) * 1.6;
+      let roughness = 0.92 - (hVal - 0.5) * 0.9;
       if (microFactor > 0) {
         roughness += (grainRng() - 0.5) * 0.12 * microFactor;
       }
@@ -509,7 +509,7 @@ export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurface
 
   const hmap = buildHeightmap(lunar);
 
-  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 3.0);
+  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.0);
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
   const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
