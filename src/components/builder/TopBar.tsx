@@ -17,6 +17,8 @@ interface TopBarProps {
   canUndo: boolean;
   canRedo: boolean;
   onExport: () => void;
+  onSave: () => void;
+  isSaving?: boolean;
 }
 
 const METALS: { value: MetalPreset; label: string }[] = [
@@ -37,7 +39,7 @@ const FINISHES: { value: FinishPreset; label: string }[] = [
 
 export default function TopBar({
   viewMode, onViewModeChange, metalPreset, onMetalChange,
-  finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport,
+  finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving,
 }: TopBarProps) {
   const embed = isEmbedMode();
 
@@ -113,8 +115,8 @@ export default function TopBar({
           </>
         )}
 
-        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-          <Save className="h-4 w-4 mr-1" /> Save
+        <Button variant="ghost" size="sm" onClick={onSave} disabled={isSaving} className="text-muted-foreground hover:text-foreground">
+          <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving…" : "Save"}
         </Button>
 
         <Button size="sm" onClick={onExport} className="bg-primary text-primary-foreground hover:bg-ember-glow">
