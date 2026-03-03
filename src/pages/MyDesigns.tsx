@@ -37,17 +37,17 @@ export default function MyDesigns() {
   };
 
   return (
-    <div className="min-h-screen bg-background px-6 py-16">
+    <div className="min-h-screen bg-background px-4 sm:px-6 py-10 sm:py-16">
       <div className="max-w-5xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="font-display text-3xl md:text-4xl mb-2">My Designs</h1>
-          <p className="text-muted-foreground text-sm mb-12">
+          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mb-2">My Designs</h1>
+          <p className="text-muted-foreground text-sm mb-8 sm:mb-12">
             Your saved ring designs.
           </p>
         </motion.div>
 
         {projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center">
             <span className="text-4xl mb-4 opacity-30">📂</span>
             <p className="text-sm text-muted-foreground">No saved designs yet.</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
@@ -55,7 +55,7 @@ export default function MyDesigns() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {projects.map((project, i) => (
               <motion.div
                 key={project.id}
@@ -78,7 +78,7 @@ export default function MyDesigns() {
                 </div>
 
                 {/* Info */}
-                <div className="p-4 space-y-3">
+                <div className="p-3 sm:p-4 space-y-3">
                   <div>
                     <h3 className="font-medium text-sm text-foreground truncate">{project.name}</h3>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -89,7 +89,7 @@ export default function MyDesigns() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge
                       variant="outline"
                       className={`text-[10px] px-1.5 py-0 ${scoreColor(

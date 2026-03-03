@@ -3,12 +3,7 @@ import { useRingDesign } from "@/hooks/useRingDesign";
 import { useEffect, useRef, useState } from "react";
 import RingViewport, { RingViewportHandle } from "@/components/builder/RingViewport";
 import ToolRail from "@/components/builder/ToolRail";
-import PropertiesPanel from "@/components/builder/PropertiesPanel";
-import CastabilityPanel from "@/components/builder/CastabilityPanel";
-import ForgePipelinePanel from "@/components/builder/ForgePipelinePanel";
-import InlaysPanel from "@/components/builder/InlaysPanel";
-import LunarTexturePanel from "@/components/builder/LunarTexturePanel";
-import TemplatesPanel from "@/components/builder/TemplatesPanel";
+import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import TopBar from "@/components/builder/TopBar";
 import ForgeCinematicModal from "@/components/forge/ForgeCinematicModal";
 import { isEmbedMode } from "@/config/galaxiforge";
@@ -16,16 +11,22 @@ import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
 import { getProject, saveProject } from "@/lib/projectsStore";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function Builder() {
   const navigate = useNavigate();
   const viewportRef = useRef<RingViewportHandle>(null);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [isSaving, setIsSaving] = useState(false);
   const [forgeModalOpen, setForgeModalOpen] = useState(false);
   const [livePreviews, setLivePreviews] = useState<DesignPreview[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState(false);
 
   const {
     params, updateParams, applyTemplate,
@@ -93,7 +94,6 @@ export default function Builder() {
       const castStages = ["POUR", "QUENCH", "FINISH"];
       const captureMode: ViewMode = castStages.includes(pipelineState.currentStage) ? "cast" : viewMode;
       const previews = await capturePreviewsAsync(captureMode);
-
       const pkg = generateDesignPackage();
       pkg.previews = previews;
 
@@ -109,15 +109,11 @@ export default function Builder() {
 
       const anglePrev = previews.find((p) => p.id === "angle");
       const thumbnail = anglePrev?.dataUrl ?? previews[0]?.dataUrl;
-
       const now = new Date().toISOString();
       saveProject({
-        id: id!,
-        name: name!,
+        id: id!, name: name!,
         createdAt: currentProjectId ? (getProject(currentProjectId)?.createdAt ?? now) : now,
-        updatedAt: now,
-        designPackage: pkg,
-        thumbnail,
+        updatedAt: now, designPackage: pkg, thumbnail,
       });
 
       setCurrentProjectId(id!);
@@ -132,7 +128,6 @@ export default function Builder() {
     const castStages = ["POUR", "QUENCH", "FINISH"];
     const captureMode: ViewMode = castStages.includes(pipelineState.currentStage) ? "cast" : viewMode;
     const previews = await capturePreviewsAsync(captureMode);
-
     const pkg = generateDesignPackage();
     pkg.previews = previews;
     sessionStorage.setItem("designPackage", JSON.stringify(pkg));
@@ -146,6 +141,32 @@ export default function Builder() {
     setLivePreviews(previews);
     setForgeModalOpen(true);
   };
+
+  const sidebarContent = (
+    <BuilderSidebar
+      params={params}
+      onUpdate={updateParams}
+      activeTool={activeTool}
+      viewMode={viewMode}
+      waxMarks={waxMarks}
+      onClearWaxMarks={clearWaxMarks}
+      stampSettings={stampSettings}
+      onStampSettingsChange={setStampSettings}
+      castabilityReport={castabilityReport}
+      pipelineState={pipelineState}
+      onNext={nextStage}
+      onPrev={prevStage}
+      inlays={inlays}
+      onAddInlay={addInlayChannel}
+      onRemoveInlay={removeInlayChannel}
+      onClearInlays={clearInlays}
+      lunarTexture={lunarTexture}
+      onLunarChange={setLunarTexture}
+      onApplyLunarPreset={applyLunarPreset}
+      onRandomizeLunar={randomizeLunar}
+      onApplyTemplate={applyTemplate}
+    />
+  );
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -166,36 +187,73 @@ export default function Builder() {
         onForgeNow={handleForgeNow}
       />
 
-      <div className="flex flex-1 min-h-0">
-        <div className="w-20 p-2 border-r border-border flex-shrink-0">
-          <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
+      <div className="flex flex-1 min-h-0 relative">
+        {/* Tool rail - compact on mobile */}
+        {!isMobile && (
+          <div className="w-16 p-1.5 border-r border-border flex-shrink-0">
+            <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
+          </div>
+        )}
+
+        {/* Viewport */}
+        <div className="flex-1 p-1 sm:p-2 relative">
+          <RingViewport
+            ref={viewportRef}
+            params={params}
+            viewMode={viewMode}
+            metalPreset={metalPreset}
+            activeTool={activeTool}
+            onAddWaxMark={addWaxMark}
+            waxMarks={waxMarks}
+            stampSettings={stampSettings}
+            inlays={inlays}
+            lunarTexture={lunarTexture}
+          />
+
+          {/* Mobile floating buttons */}
+          {isMobile && (
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+              {/* Tool selector as horizontal strip */}
+              <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-1 flex gap-0.5 overflow-x-auto max-w-[70%]">
+                <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
+              </div>
+
+              {/* Panel toggle */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setMobilePanel(true)}
+                className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-sm border-border shadow-lg"
+              >
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="flex-1 p-2">
-          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} stampSettings={stampSettings} inlays={inlays} lunarTexture={lunarTexture} />
-        </div>
-        <div className="w-72 flex flex-col border-l border-border flex-shrink-0">
-          <div className="flex-1 p-3 overflow-y-auto">
-            <PropertiesPanel params={params} onUpdate={updateParams} showMeasure={activeTool === "measure"} viewMode={viewMode} waxMarkCount={waxMarks.length} onClearWaxMarks={clearWaxMarks} stampSettings={stampSettings} onStampSettingsChange={setStampSettings} />
+
+        {/* Desktop sidebar */}
+        {!isMobile && (
+          <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
+            {sidebarContent}
           </div>
-          <div className="border-t border-border p-3">
-            <CastabilityPanel report={castabilityReport} />
-          </div>
-          <div className="border-t border-border p-3">
-            <ForgePipelinePanel pipelineState={pipelineState} onNext={nextStage} onPrev={prevStage} />
-          </div>
-          <div className="border-t border-border p-3">
-            <InlaysPanel inlays={inlays} onAdd={addInlayChannel} onRemove={removeInlayChannel} onClear={clearInlays} />
-          </div>
-          <div className="border-t border-border p-3">
-            <LunarTexturePanel state={lunarTexture} onChange={setLunarTexture} onApplyPreset={applyLunarPreset} onRandomize={randomizeLunar} />
-          </div>
-          <div className="border-t border-border p-3 h-[25%] overflow-hidden">
-            <TemplatesPanel onApply={applyTemplate} currentParams={params} />
-          </div>
-        </div>
+        )}
+
+        {/* Mobile bottom sheet */}
+        {isMobile && (
+          <Sheet open={mobilePanel} onOpenChange={setMobilePanel}>
+            <SheetContent side="bottom" className="h-[75vh] p-0 rounded-t-2xl">
+              <SheetHeader className="px-4 pt-4 pb-2">
+                <SheetTitle className="text-sm font-display tracking-wider">Controls</SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-hidden h-[calc(75vh-60px)]">
+                {sidebarContent}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
-      {!embed && (
+      {!embed && !isMobile && (
         <div className="px-4 py-1.5 border-t border-border text-[10px] text-muted-foreground text-center">
           Orbit: drag · Zoom: scroll · Select a tool and click to apply
         </div>

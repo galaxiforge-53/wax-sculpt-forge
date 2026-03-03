@@ -37,10 +37,7 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-card rounded-lg border border-border overflow-y-auto max-h-full">
-      <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-display">
-        Properties
-      </h3>
+    <div className="flex flex-col gap-4">
 
       {/* Ring Size */}
       <div className="space-y-2">

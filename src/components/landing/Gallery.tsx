@@ -9,21 +9,21 @@ const RINGS = [
 
 export default function Gallery() {
   return (
-    <section className="py-24 px-6 bg-forge-dark">
+    <section className="py-16 sm:py-24 px-5 sm:px-6 bg-forge-dark">
       <div className="max-w-5xl mx-auto">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="font-display text-3xl md:text-4xl text-center mb-4"
+          className="font-display text-2xl sm:text-3xl md:text-4xl text-center mb-3 sm:mb-4"
         >
           Gallery
         </motion.h2>
-        <p className="text-center text-muted-foreground mb-12 font-body">
+        <p className="text-center text-muted-foreground mb-8 sm:mb-12 font-body text-sm">
           Designs forged by our community
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
           {RINGS.map((ring, i) => (
             <motion.div
               key={ring.name}
@@ -31,11 +31,11 @@ export default function Gallery() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="bg-card border border-border rounded-lg p-6 text-center hover:border-primary/40 transition-colors group"
+              className="bg-card border border-border rounded-lg p-4 sm:p-6 text-center hover:border-primary/40 transition-colors group"
             >
-              <div className="text-4xl mb-3 group-hover:animate-float">{ring.img}</div>
-              <h4 className="font-display text-sm mb-1">{ring.name}</h4>
-              <p className="text-xs text-muted-foreground">{ring.metal}</p>
+              <div className="text-3xl sm:text-4xl mb-2 sm:mb-3 group-hover:animate-float">{ring.img}</div>
+              <h4 className="font-display text-xs sm:text-sm mb-1">{ring.name}</h4>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{ring.metal}</p>
             </motion.div>
           ))}
         </div>

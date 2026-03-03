@@ -21,10 +21,7 @@ export default function CastabilityPanel({ report }: CastabilityPanelProps) {
     .slice(0, 3);
 
   return (
-    <div className="flex flex-col gap-3 p-4 bg-card rounded-lg border border-border">
-      <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-display">
-        Castability
-      </h3>
+    <div className="flex flex-col gap-3">
 
       <div className="flex items-center gap-3">
         <div className="flex-1 space-y-1">

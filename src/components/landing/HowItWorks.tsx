@@ -9,19 +9,19 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24 px-6 bg-background">
+    <section id="how-it-works" className="py-16 sm:py-24 px-5 sm:px-6 bg-background">
       <div className="max-w-5xl mx-auto">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="font-display text-3xl md:text-4xl text-center mb-16"
+          className="font-display text-2xl sm:text-3xl md:text-4xl text-center mb-10 sm:mb-16"
         >
           From <span className="text-wax-green">Wax</span> to{" "}
           <span className="text-primary">Forge</span>
         </motion.h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
           {STEPS.map((step, i) => (
             <motion.div
               key={step.num}
@@ -31,9 +31,9 @@ export default function HowItWorks() {
               transition={{ delay: i * 0.15 }}
               className="relative text-center"
             >
-              <div className="text-5xl font-display text-primary/20 mb-3">{step.num}</div>
-              <h3 className="font-display text-lg mb-2">{step.title}</h3>
-              <p className="text-sm text-muted-foreground font-body">{step.desc}</p>
+              <div className="text-3xl sm:text-5xl font-display text-primary/20 mb-2 sm:mb-3">{step.num}</div>
+              <h3 className="font-display text-sm sm:text-lg mb-1 sm:mb-2">{step.title}</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground font-body">{step.desc}</p>
               {i < STEPS.length - 1 && (
                 <div className="hidden md:block absolute top-8 -right-4 w-8 text-border text-2xl">→</div>
               )}

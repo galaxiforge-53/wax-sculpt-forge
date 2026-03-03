@@ -9,16 +9,16 @@ const FAQ = [
 
 export default function Help() {
   return (
-    <div className="min-h-screen bg-background px-6 py-16">
+    <div className="min-h-screen bg-background px-4 sm:px-6 py-10 sm:py-16">
       <div className="max-w-2xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="font-display text-3xl md:text-4xl mb-2">Help</h1>
-          <p className="text-muted-foreground text-sm mb-12">
+          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mb-2">Help</h1>
+          <p className="text-muted-foreground text-sm mb-8 sm:mb-12">
             Frequently asked questions and guides.
           </p>
         </motion.div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {FAQ.map((item, i) => (
             <motion.div
               key={i}
