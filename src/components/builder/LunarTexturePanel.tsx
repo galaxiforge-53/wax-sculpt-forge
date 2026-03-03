@@ -1,4 +1,4 @@
-import { LunarTextureState, CraterDensity, CraterSize, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
+import { LunarTextureState, CraterDensity, CraterSize } from "@/types/lunar";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -32,22 +32,14 @@ export default function LunarTexturePanel({ state, onChange }: LunarTexturePanel
           {/* Intensity */}
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Intensity: {state.intensity}%</Label>
-            <Slider
-              value={[state.intensity]}
-              onValueChange={([v]) => patch({ intensity: v })}
-              min={0}
-              max={100}
-              step={1}
-            />
+            <Slider value={[state.intensity]} onValueChange={([v]) => patch({ intensity: v })} min={0} max={100} step={1} />
           </div>
 
           {/* Crater density */}
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Crater Density</Label>
             <Select value={state.craterDensity} onValueChange={(v) => patch({ craterDensity: v as CraterDensity })}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="low">Low</SelectItem>
                 <SelectItem value="med">Medium</SelectItem>
@@ -60,9 +52,7 @@ export default function LunarTexturePanel({ state, onChange }: LunarTexturePanel
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Crater Size</Label>
             <Select value={state.craterSize} onValueChange={(v) => patch({ craterSize: v as CraterSize })}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="small">Small</SelectItem>
                 <SelectItem value="med">Medium</SelectItem>
@@ -71,33 +61,36 @@ export default function LunarTexturePanel({ state, onChange }: LunarTexturePanel
             </Select>
           </div>
 
+          {/* Micro detail */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Micro Detail: {state.microDetail}%</Label>
+            <Slider value={[state.microDetail]} onValueChange={([v]) => patch({ microDetail: v })} min={0} max={100} step={1} />
+          </div>
+
+          {/* Rim sharpness */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Rim Sharpness: {state.rimSharpness}%</Label>
+            <Slider value={[state.rimSharpness]} onValueChange={([v]) => patch({ rimSharpness: v })} min={0} max={100} step={1} />
+          </div>
+
+          {/* Overlap intensity */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Overlap: {state.overlapIntensity}%</Label>
+            <Slider value={[state.overlapIntensity]} onValueChange={([v]) => patch({ overlapIntensity: v })} min={0} max={100} step={1} />
+          </div>
+
           {/* Smooth edges */}
           <div className="flex items-center justify-between">
             <Label className="text-[10px] text-muted-foreground">Smooth Edges</Label>
-            <Switch
-              checked={state.smoothEdges}
-              onCheckedChange={(v) => patch({ smoothEdges: v })}
-            />
+            <Switch checked={state.smoothEdges} onCheckedChange={(v) => patch({ smoothEdges: v })} />
           </div>
 
           {/* Seed */}
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Seed: {state.seed}</Label>
             <div className="flex gap-1.5">
-              <Slider
-                value={[state.seed]}
-                onValueChange={([v]) => patch({ seed: v })}
-                min={0}
-                max={9999}
-                step={1}
-                className="flex-1"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-[10px] px-2"
-                onClick={() => patch({ seed: Math.floor(Math.random() * 9999) })}
-              >
+              <Slider value={[state.seed]} onValueChange={([v]) => patch({ seed: v })} min={0} max={9999} step={1} className="flex-1" />
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => patch({ seed: Math.floor(Math.random() * 9999) })}>
                 <Shuffle className="w-3 h-3" />
               </Button>
             </div>

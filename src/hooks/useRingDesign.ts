@@ -204,6 +204,9 @@ export function useRingDesign() {
       craterDensity: next.craterDensity,
       craterSize: next.craterSize,
       seed: next.seed,
+      microDetail: next.microDetail,
+      rimSharpness: next.rimSharpness,
+      overlapIntensity: next.overlapIntensity,
     });
   }, [logCraftAction]);
 
