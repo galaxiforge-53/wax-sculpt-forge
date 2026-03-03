@@ -189,15 +189,20 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
   );
 }
 
-// ── Procedural ring mesh (non-lunar) ──────────────────────────────
+// ── Procedural ring mesh — high-poly with displacement when lunar enabled ──────
 function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
+  const hasLunar = !!lunarTexture?.enabled;
+
   const geometry = useMemo(() => {
     const innerRadius = params.innerDiameter / 2 / 10;
     const outerRadius = innerRadius + params.thickness / 10;
     const width = params.width / 10;
-    const points: THREE.Vector2[] = [];
-    const steps = 24;
     const bevel = params.bevelSize / 10;
+
+    // When lunar is enabled, use much higher subdivision for displacement to work
+    const steps = hasLunar ? 128 : 24;
+    const segments = hasLunar ? 512 : 128;
+    const points: THREE.Vector2[] = [];
 
     if (params.profile === "dome" || params.profile === "comfort") {
       for (let i = 0; i <= steps; i++) {
@@ -208,12 +213,26 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
         points.push(new THREE.Vector2(r, y));
       }
     } else if (params.profile === "flat") {
-      points.push(new THREE.Vector2(innerRadius, -width / 2));
-      points.push(new THREE.Vector2(outerRadius - bevel, -width / 2));
-      points.push(new THREE.Vector2(outerRadius, -width / 2 + bevel));
-      points.push(new THREE.Vector2(outerRadius, width / 2 - bevel));
-      points.push(new THREE.Vector2(outerRadius - bevel, width / 2));
-      points.push(new THREE.Vector2(innerRadius, width / 2));
+      // For flat profile with lunar, interpolate more points for smooth displacement
+      if (hasLunar) {
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const y = (t - 0.5) * width;
+          let r: number;
+          // Create flat profile with beveled edges using more points
+          const edgeDist = Math.min(t, 1 - t);
+          const bevelT = Math.min(1, edgeDist / (bevel / width + 0.01));
+          r = innerRadius + (outerRadius - innerRadius) * Math.min(1, bevelT);
+          points.push(new THREE.Vector2(r, y));
+        }
+      } else {
+        points.push(new THREE.Vector2(innerRadius, -width / 2));
+        points.push(new THREE.Vector2(outerRadius - bevel, -width / 2));
+        points.push(new THREE.Vector2(outerRadius, -width / 2 + bevel));
+        points.push(new THREE.Vector2(outerRadius, width / 2 - bevel));
+        points.push(new THREE.Vector2(outerRadius - bevel, width / 2));
+        points.push(new THREE.Vector2(innerRadius, width / 2));
+      }
     } else if (params.profile === "knife-edge") {
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
@@ -227,10 +246,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
       points.push(new THREE.Vector2(innerRadius, -width / 2));
     }
 
-    const lathe = new THREE.LatheGeometry(points, 128);
+    const lathe = new THREE.LatheGeometry(points, segments);
     lathe.computeVertexNormals();
     return lathe;
-  }, [params]);
+  }, [params, hasLunar]);
 
   const isWax = viewMode === "wax";
   const metalColors: Record<MetalPreset, string> = {
@@ -254,9 +273,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
-    const strength = 0.3 + (lunarTexture.intensity / 100) * 0.7;
+    // Strong normal mapping for visible crater relief
+    const strength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
     return new THREE.Vector2(strength, -strength);
   }, [lunarTexture?.enabled, lunarTexture?.intensity]);
+
+  // Displacement scale — aggressive for real 3D crater depth
+  const dispScale = useMemo(() => {
+    if (!hasLunar || !lunarTexture) return 0;
+    const outerR = params.innerDiameter / 2 / 10 + params.thickness / 10;
+    // 4-12% of outer radius creates dramatic, visible craters
+    return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10);
+  }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (viewMode !== "wax" || activeTool !== "stamp" || !onAddWaxMark) return;
@@ -274,8 +302,6 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
-  const hasLunar = !!lunarTexture?.enabled;
-
   return (
     <mesh
       geometry={geometry}
@@ -291,11 +317,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
           normalMap={lunarMaps?.normalMap ?? null}
           roughnessMap={lunarMaps?.roughnessMap ?? null}
           aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 1.2 : 0}
+          aoMapIntensity={hasLunar ? 1.4 : 0}
           normalScale={normalScale}
           displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
-          displacementScale={hasLunar ? 0.015 + (lunarTexture!.intensity / 100) * 0.04 : 0}
-          displacementBias={hasLunar ? -0.015 : 0}
+          displacementScale={dispScale}
+          displacementBias={-dispScale * 0.5}
         />
       ) : (
         <meshPhysicalMaterial
@@ -305,22 +331,22 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
           normalMap={lunarMaps?.normalMap ?? null}
           roughnessMap={lunarMaps?.roughnessMap ?? null}
           aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 1.8 : 0}
+          aoMapIntensity={hasLunar ? 2.0 : 0}
           normalScale={normalScale}
           envMapIntensity={hasLunar ? 2.0 : 1.0}
           clearcoat={hasLunar ? 0.08 : 0}
           clearcoatRoughness={0.3}
           reflectivity={hasLunar ? 0.95 : 0.9}
           displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
-          displacementScale={hasLunar ? 0.015 + (lunarTexture!.intensity / 100) * 0.04 : 0}
-          displacementBias={hasLunar ? -0.015 : 0}
+          displacementScale={dispScale}
+          displacementBias={-dispScale * 0.5}
         />
       )}
     </mesh>
   );
 }
 
-// ── Wrapper — always uses procedural mesh; lunar maps are applied as textures ──
+// ── Wrapper ───────────────────────────────────────────────────────
 function RingMesh(props: RingMeshProps) {
   return <ProceduralRingMesh {...props} />;
 }
