@@ -165,6 +165,11 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
       hmap[i] = Math.max(0, Math.min(1, hmap[i]));
     }
   }
+  // Increase depth contrast
+  for (let i = 0; i < hmap.length; i++) {
+    hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.15;
+    hmap[i] = Math.max(0, Math.min(1, hmap[i]));
+  }
 
   return hmap;
 }
@@ -227,7 +232,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
     for (let x = 0; x < w; x++) {
       const hVal = hmap[y * w + x];
       // Bowl (low h) = rough, rim (high h) = smoother (catches specular)
-      let roughness = 0.9 - (hVal - 0.5) * 0.6; // neutral 0.5 → 0.9, rim ~0.6, bowl ~1.0
+      let roughness = 0.95 - (hVal - 0.5) * 1.2;
       // Add micro grain speckle
       if (microFactor > 0) {
         roughness += (grainRng() - 0.5) * 0.12 * microFactor;
