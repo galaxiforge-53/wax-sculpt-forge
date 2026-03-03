@@ -1,5 +1,5 @@
 import { Canvas, useThree, ThreeEvent } from "@react-three/fiber";
-import { OrbitControls, Environment, ContactShadows, Decal } from "@react-three/drei";
+import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback } from "react";
 import * as THREE from "three";
 import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
@@ -7,7 +7,7 @@ import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { StampSettings } from "@/hooks/useRingDesign";
-import { getCraterMaps, getPitMaps, getGrainMaps } from "@/lib/lunarDecalTexture";
+import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
 
 export interface RingViewportHandle {
   captureSnapshot(
@@ -21,104 +21,6 @@ const CAMERA_PRESETS: Record<"front" | "angle" | "side", [number, number, number
   angle: [2.8, 2, 2.8],
   side: [4, 0, 0],
 };
-
-// ── Seeded RNG ────────────────────────────────────────────────────
-function seededRng(seed: number) {
-  let s = seed;
-  return () => { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
-}
-
-// ── Lunar decal data types ────────────────────────────────────────
-interface DecalDatum {
-  position: [number, number, number];
-  scale: [number, number, number];
-  roll: number;
-  opacity: number;
-  kind: "crater" | "pit" | "grain";
-}
-
-function generateLunarDecals(params: RingParameters, lunar: LunarTextureState): DecalDatum[] {
-  const innerRadius = params.innerDiameter / 2 / 10;
-  const outerRadius = innerRadius + params.thickness / 10;
-  const ringWidth = params.width / 10;
-  const surfaceR = outerRadius + 0.001; // tiny offset to avoid z-fight
-  const rand = seededRng(lunar.seed);
-  const overlapFactor = lunar.overlapIntensity / 100;
-  const microFactor = lunar.microDetail / 100;
-
-  const edgeFalloff = lunar.smoothEdges
-    ? (y: number) => { const t = Math.abs(y) / (ringWidth * 0.5); return Math.max(0, 1 - t * t); }
-    : () => 1;
-
-  const craterBase = lunar.craterDensity === "low" ? 12 : lunar.craterDensity === "med" ? 28 : 50;
-  const craterCount = Math.min(craterBase, 60);
-  const pitCount = Math.min(Math.round(20 + microFactor * 40), 60);
-  const grainCount = Math.min(Math.round(microFactor * 80), 80);
-  const baseSize = lunar.craterSize === "small" ? 0.025 : lunar.craterSize === "med" ? 0.045 : 0.07;
-
-  const decals: DecalDatum[] = [];
-  let lastAngle = 0;
-
-  // Large craters
-  for (let i = 0; i < craterCount; i++) {
-    const y = (rand() - 0.5) * ringWidth * 0.85;
-    const ef = edgeFalloff(y);
-    if (ef < 0.05) continue;
-    const angle = i > 0 && rand() < overlapFactor * 0.4
-      ? lastAngle + (rand() - 0.5) * 0.3
-      : rand() * Math.PI * 2;
-    lastAngle = angle;
-    const size = baseSize * (0.6 + rand() * 0.8) * ef;
-
-    // Position in mesh local space (LatheGeometry around Y)
-    const x = Math.cos(angle) * surfaceR;
-    const z = Math.sin(angle) * surfaceR;
-
-    decals.push({
-      position: [x, y, z],
-      scale: [size, size, size * 0.5],
-      roll: rand() * Math.PI * 2,
-      opacity: (0.4 + rand() * 0.4) * ef,
-      kind: "crater",
-    });
-  }
-
-  // Mid-scale pits
-  for (let i = 0; i < pitCount; i++) {
-    const y = (rand() - 0.5) * ringWidth * 0.9;
-    const ef = edgeFalloff(y);
-    if (ef < 0.05) continue;
-    const angle = rand() * Math.PI * 2;
-    const size = 0.012 + rand() * 0.015;
-
-    decals.push({
-      position: [Math.cos(angle) * surfaceR, y, Math.sin(angle) * surfaceR],
-      scale: [size * ef, size * ef, size * 0.4],
-      roll: rand() * Math.PI * 2,
-      opacity: (0.25 + rand() * 0.25) * ef,
-      kind: "pit",
-    });
-  }
-
-  // Micro grain
-  for (let i = 0; i < grainCount; i++) {
-    const y = (rand() - 0.5) * ringWidth * 0.95;
-    const ef = edgeFalloff(y);
-    if (ef < 0.05) continue;
-    const angle = rand() * Math.PI * 2;
-    const size = 0.005 + rand() * 0.008;
-
-    decals.push({
-      position: [Math.cos(angle) * surfaceR, y, Math.sin(angle) * surfaceR],
-      scale: [size * ef, size * ef, size * 0.3],
-      roll: rand() * Math.PI * 2,
-      opacity: (0.15 + rand() * 0.15) * ef,
-      kind: "grain",
-    });
-  }
-
-  return decals;
-}
 
 // ── Ring Mesh ─────────────────────────────────────────────────────
 
@@ -201,14 +103,36 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
     return lathe;
   }, [params]);
 
+  // Generate UV-space lunar surface maps (normalMap + roughnessMap)
+  const lunarMaps = useMemo(() => {
+    if (!lunarTexture?.enabled) return null;
+    return generateLunarSurfaceMaps(lunarTexture);
+  }, [
+    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
+    lunarTexture?.craterDensity, lunarTexture?.craterSize,
+    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
+    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
+  ]);
+
+  const normalScale = useMemo(() => {
+    if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
+    const strength = 0.4 + (lunarTexture.intensity / 100) * 1.6; // 0.4–2.0
+    return new THREE.Vector2(strength, strength);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity]);
+
   const material = useMemo(() => {
-    if (viewMode === "wax") {
+    const isWax = viewMode === "wax";
+
+    if (isWax) {
       return (
         <meshStandardMaterial
           color="#4a7a3a"
           roughness={0.85}
           metalness={0.0}
           envMapIntensity={0.2}
+          normalMap={lunarMaps?.normalMap ?? null}
+          normalScale={normalScale}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
         />
       );
     }
@@ -227,9 +151,12 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
         roughness={0.15}
         metalness={0.95}
         envMapIntensity={1.5}
+        normalMap={lunarMaps?.normalMap ?? null}
+        normalScale={normalScale}
+        roughnessMap={lunarMaps?.roughnessMap ?? null}
       />
     );
-  }, [viewMode, metalPreset]);
+  }, [viewMode, metalPreset, lunarMaps, normalScale]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (viewMode !== "wax" || activeTool !== "stamp" || !onAddWaxMark) return;
@@ -249,25 +176,6 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
-  // Generate lunar decals (memoized, seeded)
-  const lunarDecals = useMemo(() => {
-    if (!lunarTexture?.enabled) return [];
-    return generateLunarDecals(params, lunarTexture);
-  }, [
-    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
-    lunarTexture?.craterDensity, lunarTexture?.craterSize,
-    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
-    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
-    params,
-  ]);
-
-  const globalOpacity = (lunarTexture?.intensity ?? 50) / 100;
-  const rimSharpnessNorm = (lunarTexture?.rimSharpness ?? 50) / 100;
-  const microDetailNorm = (lunarTexture?.microDetail ?? 40) / 100;
-  const isWaxMode = viewMode === "wax";
-  // Normal map strength scales with intensity
-  const normalStrength = 0.6 + globalOpacity * 0.8; // 0.6–1.4
-
   return (
     <mesh
       geometry={geometry}
@@ -276,40 +184,6 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
       onPointerDown={handlePointerDown}
     >
       {material}
-
-      {/* Lunar decals projected onto ring surface */}
-      {lunarDecals.map((d, i) => {
-        const maps = d.kind === "crater"
-          ? getCraterMaps(rimSharpnessNorm)
-          : d.kind === "pit"
-            ? getPitMaps()
-            : getGrainMaps(microDetailNorm * 100);
-
-        return (
-          <Decal
-            key={`lunar-${d.kind}-${i}`}
-            position={d.position}
-            rotation={d.roll as any}
-            scale={d.scale}
-          >
-            <meshStandardMaterial
-              transparent
-              depthWrite={false}
-              depthTest
-              polygonOffset
-              polygonOffsetFactor={-2}
-              alphaMap={maps.alphaMap}
-              normalMap={maps.normalMap}
-              normalScale={new THREE.Vector2(normalStrength, normalStrength)}
-              roughnessMap={maps.roughnessMap}
-              roughness={isWaxMode ? 0.85 : 0.45}
-              metalness={isWaxMode ? 0 : 0.3}
-              color="#2a2a2a"
-              opacity={globalOpacity * d.opacity}
-            />
-          </Decal>
-        );
-      })}
     </mesh>
   );
 }
@@ -323,9 +197,7 @@ function WaxMarkOverlays({ marks }: { marks: WaxMark[] }) {
       {visible.map((mark) => {
         const pos = new THREE.Vector3(mark.position.x, mark.position.y, mark.position.z);
         const norm = new THREE.Vector3(mark.normal.x, mark.normal.y, mark.normal.z).normalize();
-        // offset slightly above surface
         const offset = pos.clone().add(norm.clone().multiplyScalar(0.002));
-        // orient plane to face along normal
         const quat = new THREE.Quaternion();
         quat.setFromUnitVectors(new THREE.Vector3(0, 0, 1), norm);
         const euler = new THREE.Euler().setFromQuaternion(quat);
