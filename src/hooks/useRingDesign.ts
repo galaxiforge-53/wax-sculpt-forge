@@ -13,6 +13,7 @@ import {
 import { CraftState, CraftAction } from "@/types/craft";
 import { WaxMark, WaxMarkType } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
+import { slugFromUrl, findCodexMaterial } from "@/lib/codexMaterials";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
@@ -202,8 +203,8 @@ export function useRingDesign() {
     };
     setInlays((prev) => [...prev, channel]);
     logCraftAction("inlay_added", {
+      codexId: input.codexId,
       materialType: input.materialType,
-      displayName: input.displayName,
       placement: input.placement,
       width: input.channelWidthMm,
       depth: input.channelDepthMm,
@@ -263,7 +264,21 @@ export function useRingDesign() {
     setPipelineState(pkg.pipelineState);
     setCraftActions(pkg.craftState.actionLog ?? []);
     setWaxMarks(pkg.craftState.waxMarks ?? []);
-    setInlays(pkg.craftState?.inlays?.channels ?? []);
+    // Backwards-compat: migrate legacy inlays missing codexId
+    const rawChannels = pkg.craftState?.inlays?.channels ?? [];
+    const migratedChannels = rawChannels.map((ch: any) => {
+      if (ch.codexId) return ch as InlayChannel;
+      const slug = slugFromUrl(ch.codexUrl ?? "");
+      const found = findCodexMaterial(slug);
+      return {
+        ...ch,
+        codexId: found?.id ?? (slug || "legacy"),
+        codexUrl: ch.codexUrl ?? "",
+        materialImage: found?.image,
+        displayName: ch.displayName || found?.name || "Legacy Material",
+      } as InlayChannel;
+    });
+    setInlays(migratedChannels);
     craftStateRef.current = {
       baseRingParams: pkg.parameters,
       createdAt: pkg.craftState.createdAt,

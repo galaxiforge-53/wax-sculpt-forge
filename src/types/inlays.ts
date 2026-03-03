@@ -6,7 +6,9 @@ export interface InlayChannel {
   id: string;
   materialType: InlayMaterialType;
   displayName: string;
+  codexId: string;
   codexUrl: string;
+  materialImage?: string;
   placement: InlayPlacement;
   channelWidthMm: number;
   channelDepthMm: number;
