@@ -157,128 +157,120 @@ const METALS: MetalDef[] = [
   { id: "wax", label: "Wax", color: "#4a7a3a", roughness: 0.85, metalness: 0.0, envIntensity: 0.2 },
 ];
 
-// ── Inlay band torus ─────────────────────────────────────────────
+// ── Helper: compute ring outer radius at a given Y position ─────
 
-function InlayBand({
+function getOuterRadiusAtY(
+  profile: RingDesign["profile"],
+  innerR: number,
+  outerR: number,
+  w: number,
+  bevel: number,
+  y: number,
+): number {
+  const t = (y / w) + 0.5; // normalize 0..1
+  const clamped = Math.max(0, Math.min(1, t));
+  const angle = clamped * Math.PI;
+
+  switch (profile) {
+    case "dome":
+    case "comfort":
+      return innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
+    case "knife":
+      return innerR + (outerR - innerR) * Math.pow(Math.sin(angle), 0.45);
+    case "runic": {
+      const stepped = Math.sin(angle) * 0.7 + Math.sin(angle * 3) * 0.15 + Math.sin(angle * 5) * 0.05;
+      return innerR + (outerR - innerR) * Math.max(0, stepped);
+    }
+    case "cosmic": {
+      const base = Math.sin(angle);
+      const concave = base - 0.08 * Math.sin(angle * 2);
+      return innerR + (outerR - innerR) * Math.max(0, concave);
+    }
+    case "flat":
+    default: {
+      const b = bevel / 10;
+      if (y < -w / 2 + b) {
+        const frac = (y - (-w / 2)) / b;
+        return innerR + (outerR - innerR) * Math.max(0, frac);
+      }
+      if (y > w / 2 - b) {
+        const frac = (w / 2 - y) / b;
+        return innerR + (outerR - innerR) * Math.max(0, frac);
+      }
+      return outerR;
+    }
+  }
+}
+
+// ── Inlay channel as LatheGeometry strip ─────────────────────────
+// Creates a thin ring strip that sits flush on the ring surface
+
+function InlayChannel({
   inlay,
-  ringInnerR,
-  ringOuterR,
+  design,
+  innerR,
+  outerR,
   ringWidth,
 }: {
   inlay: InlayDef;
-  ringInnerR: number;
-  ringOuterR: number;
+  design: RingDesign;
+  innerR: number;
+  outerR: number;
   ringWidth: number;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const midRadius = (ringInnerR + ringOuterR) / 2 + 0.003;
-  const bandWidth = inlay.widthMm / 10;
-  const yOffset = inlay.placement * ringWidth;
+  const bandHalf = (inlay.widthMm / 10) / 2;
+  const yCenter = inlay.placement * ringWidth;
 
-  // Subtle shimmer for opals and crystals
+  // Build a thin lathe strip that follows the ring outer surface
+  const geometry = useMemo(() => {
+    const steps = 12;
+    const points: THREE.Vector2[] = [];
+    const inset = 0.005; // slight inset below surface for channel effect
+    const raise = 0.002; // outer face sits just above to be visible
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const y = yCenter - bandHalf + t * bandHalf * 2;
+      const surfaceR = getOuterRadiusAtY(design.profile, innerR, outerR, ringWidth, design.bevel, y);
+      // Channel sits between inner surface and outer surface
+      const channelR = surfaceR - inset + raise;
+      points.push(new THREE.Vector2(Math.max(innerR + 0.01, channelR), y));
+    }
+
+    return new THREE.LatheGeometry(points, 96);
+  }, [inlay, design, innerR, outerR, ringWidth, yCenter, bandHalf]);
+
+  // Animate emissive for opals/crystals
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
+    const t = clock.getElapsedTime();
+
     if (inlay.material === "opal") {
-      const t = clock.getElapsedTime();
-      const hueShift = Math.sin(t * 0.8) * 0.15;
-      const baseColor = new THREE.Color(inlay.color);
-      const shiftColor = new THREE.Color(inlay.emissive);
-      mat.emissive.lerpColors(baseColor, shiftColor, 0.5 + hueShift);
-      mat.emissiveIntensity = inlay.emissiveIntensity * (0.8 + Math.sin(t * 1.2) * 0.2);
+      // Prismatic color shift
+      const phase = t * 0.6 + inlay.placement * 3;
+      const r = Math.sin(phase) * 0.5 + 0.5;
+      const g = Math.sin(phase + 2.1) * 0.5 + 0.5;
+      const b = Math.sin(phase + 4.2) * 0.5 + 0.5;
+      mat.emissive.setRGB(r * 0.3, g * 0.4, b * 0.5);
+      mat.emissiveIntensity = inlay.emissiveIntensity * (0.7 + Math.sin(t * 1.5) * 0.3);
     } else if (inlay.material === "crystal") {
-      const t = clock.getElapsedTime();
-      mat.emissiveIntensity = inlay.emissiveIntensity * (0.85 + Math.sin(t * 0.6 + inlay.placement * 5) * 0.15);
+      mat.emissiveIntensity = inlay.emissiveIntensity * (0.8 + Math.sin(t * 0.5 + inlay.placement * 5) * 0.2);
     }
   });
 
   return (
-    <mesh
-      ref={meshRef}
-      rotation={[Math.PI / 2, 0, 0]}
-      position={[0, yOffset, 0]}
-    >
-      <torusGeometry args={[midRadius, bandWidth / 2, 16, 96]} />
+    <mesh ref={meshRef} geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
       <meshStandardMaterial
         color={inlay.color}
         emissive={inlay.emissive}
         emissiveIntensity={inlay.emissiveIntensity}
         roughness={inlay.roughness}
         metalness={inlay.metalness}
-        transparent
+        transparent={inlay.opacity < 1}
         opacity={inlay.opacity}
-        envMapIntensity={inlay.material === "opal" ? 2.0 : inlay.material === "crystal" ? 1.5 : 0.8}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  );
-}
-
-// ── Meteorite texture (procedural Widmanstätten) ────────────────
-
-function MeteoriteBand({
-  inlay,
-  ringInnerR,
-  ringOuterR,
-  ringWidth,
-}: {
-  inlay: InlayDef;
-  ringInnerR: number;
-  ringOuterR: number;
-  ringWidth: number;
-}) {
-  const midRadius = (ringInnerR + ringOuterR) / 2 + 0.003;
-  const bandWidth = inlay.widthMm / 10;
-  const yOffset = inlay.placement * ringWidth;
-
-  // Generate a procedural Widmanstätten-like normal map
-  const normalMap = useMemo(() => {
-    const size = 128;
-    const data = new Uint8Array(size * size * 4);
-    // Seed-based procedural cross-hatch pattern
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const idx = (y * size + x) * 4;
-        const angle1 = (x + y * 0.7) * 0.15;
-        const angle2 = (x * 0.8 - y * 0.5) * 0.12;
-        const angle3 = (x * 0.3 + y * 1.1) * 0.09;
-        const v1 = Math.sin(angle1) * 0.5 + 0.5;
-        const v2 = Math.sin(angle2) * 0.3 + 0.5;
-        const v3 = Math.sin(angle3) * 0.2 + 0.5;
-        const combined = (v1 + v2 + v3) / 3;
-        // edge detection for Widmanstätten lines
-        const edge = Math.abs(Math.sin(angle1 * 3)) < 0.15 || Math.abs(Math.sin(angle2 * 4)) < 0.12 ? 0.3 : 0;
-        const nx = 128 + (combined - 0.5) * 60 + edge * 40;
-        const ny = 128 + (v2 - 0.5) * 50;
-        data[idx] = Math.min(255, Math.max(0, nx));
-        data[idx + 1] = Math.min(255, Math.max(0, ny));
-        data[idx + 2] = 255;
-        data[idx + 3] = 255;
-      }
-    }
-    const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-    tex.colorSpace = THREE.NoColorSpace;
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.needsUpdate = true;
-    return tex;
-  }, []);
-
-  return (
-    <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, yOffset, 0]}>
-      <torusGeometry args={[midRadius, bandWidth / 2, 16, 96]} />
-      <meshStandardMaterial
-        color={inlay.color}
-        emissive={inlay.emissive}
-        emissiveIntensity={inlay.emissiveIntensity}
-        roughness={inlay.roughness}
-        metalness={inlay.metalness}
-        normalMap={normalMap}
-        normalScale={new THREE.Vector2(0.6, 0.6)}
-        envMapIntensity={0.8}
-        opacity={inlay.opacity}
-        transparent
-        side={THREE.DoubleSide}
+        envMapIntensity={inlay.material === "opal" ? 2.5 : inlay.material === "crystal" ? 1.8 : 0.9}
       />
     </mesh>
   );
@@ -337,6 +329,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
         points.push(new THREE.Vector2(r, (t - 0.5) * w));
       }
     } else {
+      // flat
       points.push(new THREE.Vector2(innerR, -w / 2));
       points.push(new THREE.Vector2(outerR - bevel, -w / 2));
       points.push(new THREE.Vector2(outerR, -w / 2 + bevel));
@@ -347,6 +340,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 
     const lathe = new THREE.LatheGeometry(points, 128);
 
+    // Carve grooves into the geometry
     if (design.grooves > 0) {
       const posAttr = lathe.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
@@ -381,40 +375,23 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
       <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <meshStandardMaterial
           color={metal.color}
-          roughness={metal.roughness}
-          metalness={metal.metalness}
-          envMapIntensity={metal.envIntensity}
+          roughness={isWax ? 0.85 : metal.roughness}
+          metalness={isWax ? 0.0 : metal.metalness}
+          envMapIntensity={isWax ? 0.15 : metal.envIntensity}
         />
       </mesh>
 
-      {/* Inlay bands */}
-      {design.inlays.map((inlay, i) =>
-        inlay.material === "meteorite" ? (
-          <MeteoriteBand
-            key={`${design.id}-inlay-${i}`}
-            inlay={inlay}
-            ringInnerR={innerR}
-            ringOuterR={outerR}
-            ringWidth={w}
-          />
-        ) : (
-          <InlayBand
-            key={`${design.id}-inlay-${i}`}
-            inlay={inlay}
-            ringInnerR={innerR}
-            ringOuterR={outerR}
-            ringWidth={w}
-          />
-        )
-      )}
-
-      {/* Inner glow rim for wax mode */}
-      {isWax && (
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[innerR + 0.005, 0.003, 8, 64]} />
-          <meshBasicMaterial color="#6b8a5a" transparent opacity={0.3} />
-        </mesh>
-      )}
+      {/* Inlay channels - LatheGeometry strips that sit flush on ring surface */}
+      {design.inlays.map((inlay, i) => (
+        <InlayChannel
+          key={`${design.id}-inlay-${i}`}
+          inlay={inlay}
+          design={design}
+          innerR={innerR}
+          outerR={outerR}
+          ringWidth={w}
+        />
+      ))}
     </group>
   );
 }
@@ -424,11 +401,11 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef }) {
   return (
     <>
-      <ambientLight intensity={0.2} />
+      <ambientLight intensity={0.25} />
       <directionalLight position={[4, 5, 5]} intensity={1.5} castShadow color="#ffffff" />
       <directionalLight position={[-3, 2, -4]} intensity={0.6} color="#ff8c00" />
       <pointLight position={[0, -2, 3]} intensity={0.4} color="#6B8AFF" />
-      {/* Subtle rim light to catch inlay sparkle */}
+      {/* Extra lights to catch inlay sparkle */}
       <pointLight position={[2, 0, -3]} intensity={0.3} color="#e879f9" />
       <pointLight position={[-2, 1, 2]} intensity={0.25} color="#38bdf8" />
 
