@@ -210,6 +210,22 @@ export function useRingDesign() {
     });
   }, [logCraftAction]);
 
+  const applyLunarPreset = useCallback((next: LunarTextureState, presetName: string) => {
+    setLunarTextureRaw(next);
+    logCraftAction("lunar_preset_applied", {
+      presetName,
+      seed: next.seed,
+      density: next.craterDensity,
+      size: next.craterSize,
+      intensity: next.intensity,
+    });
+  }, [logCraftAction]);
+
+  const randomizeLunar = useCallback((next: LunarTextureState) => {
+    setLunarTextureRaw(next);
+    logCraftAction("lunar_randomized", { seed: next.seed });
+  }, [logCraftAction]);
+
   // --- Inlay helpers ---
   const addInlayChannel = useCallback((input: Omit<InlayChannel, "id" | "createdAt">) => {
     const channel: InlayChannel = {
@@ -342,5 +358,7 @@ export function useRingDesign() {
     clearInlays,
     lunarTexture,
     setLunarTexture,
+    applyLunarPreset,
+    randomizeLunar,
   };
 }

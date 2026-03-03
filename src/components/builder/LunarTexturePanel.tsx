@@ -4,15 +4,97 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Moon, Shuffle } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw } from "lucide-react";
+
+// ── Presets ───────────────────────────────────────────────────────
+
+interface LunarPreset {
+  name: string;
+  build: () => LunarTextureState;
+}
+
+const newSeed = () => Math.floor(Math.random() * 9999);
+const randBetween = (lo: number, hi: number) => Math.round(lo + Math.random() * (hi - lo));
+
+const LUNAR_PRESETS: LunarPreset[] = [
+  {
+    name: "Moon Craters Classic",
+    build: () => ({
+      enabled: true, intensity: 55, craterDensity: "med", craterSize: "med",
+      microDetail: 40, rimSharpness: 50, overlapIntensity: 25, smoothEdges: true, seed: newSeed(),
+    }),
+  },
+  {
+    name: "Heavy Impact",
+    build: () => ({
+      enabled: true, intensity: 80, craterDensity: "high", craterSize: "large",
+      microDetail: 30, rimSharpness: 85, overlapIntensity: 75, smoothEdges: false, seed: newSeed(),
+    }),
+  },
+  {
+    name: "Ancient Mare",
+    build: () => ({
+      enabled: true, intensity: 40, craterDensity: "low", craterSize: "med",
+      microDetail: 55, rimSharpness: 20, overlapIntensity: 10, smoothEdges: true, seed: newSeed(),
+    }),
+  },
+  {
+    name: "Micro Regolith",
+    build: () => ({
+      enabled: true, intensity: 60, craterDensity: "low", craterSize: "small",
+      microDetail: 90, rimSharpness: 30, overlapIntensity: 15, smoothEdges: true, seed: newSeed(),
+    }),
+  },
+  {
+    name: "Rugged Terminator",
+    build: () => ({
+      enabled: true, intensity: 85, craterDensity: "med", craterSize: "large",
+      microDetail: 50, rimSharpness: 95, overlapIntensity: 45, smoothEdges: false, seed: newSeed(),
+    }),
+  },
+  {
+    name: "Random Chaos",
+    build: () => ({
+      enabled: true,
+      intensity: randBetween(30, 100),
+      craterDensity: (["low", "med", "high"] as const)[Math.floor(Math.random() * 3)],
+      craterSize: (["small", "med", "large"] as const)[Math.floor(Math.random() * 3)],
+      microDetail: randBetween(10, 100),
+      rimSharpness: randBetween(10, 100),
+      overlapIntensity: randBetween(0, 100),
+      smoothEdges: Math.random() > 0.5,
+      seed: newSeed(),
+    }),
+  },
+];
+
+// ── Panel ─────────────────────────────────────────────────────────
 
 interface LunarTexturePanelProps {
   state: LunarTextureState;
   onChange: (state: LunarTextureState) => void;
+  onApplyPreset: (state: LunarTextureState, presetName: string) => void;
+  onRandomize: (state: LunarTextureState) => void;
 }
 
-export default function LunarTexturePanel({ state, onChange }: LunarTexturePanelProps) {
+export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRandomize }: LunarTexturePanelProps) {
   const patch = (p: Partial<LunarTextureState>) => onChange({ ...state, ...p });
+
+  const handlePreset = (name: string) => {
+    const preset = LUNAR_PRESETS.find((p) => p.name === name);
+    if (!preset) return;
+    const next = preset.build();
+    onApplyPreset(next, name);
+  };
+
+  const handleRandomize = () => {
+    const chaos = LUNAR_PRESETS.find((p) => p.name === "Random Chaos")!;
+    onRandomize(chaos.build());
+  };
+
+  const handleReseed = () => {
+    onChange({ ...state, seed: newSeed() });
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -29,6 +111,31 @@ export default function LunarTexturePanel({ state, onChange }: LunarTexturePanel
 
       {state.enabled && (
         <div className="space-y-3 pt-1">
+          {/* Presets */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Preset</Label>
+            <Select value="" onValueChange={handlePreset}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue placeholder="Apply preset…" />
+              </SelectTrigger>
+              <SelectContent>
+                {LUNAR_PRESETS.map((p) => (
+                  <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex gap-1.5">
+            <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleRandomize}>
+              <Dices className="w-3 h-3 mr-1" /> Randomize
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleReseed}>
+              <RotateCcw className="w-3 h-3 mr-1" /> Reseed
+            </Button>
+          </div>
+
           {/* Intensity */}
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Intensity: {state.intensity}%</Label>
@@ -90,7 +197,7 @@ export default function LunarTexturePanel({ state, onChange }: LunarTexturePanel
             <Label className="text-[10px] text-muted-foreground">Seed: {state.seed}</Label>
             <div className="flex gap-1.5">
               <Slider value={[state.seed]} onValueChange={([v]) => patch({ seed: v })} min={0} max={9999} step={1} className="flex-1" />
-              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => patch({ seed: Math.floor(Math.random() * 9999) })}>
+              <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={handleReseed}>
                 <Shuffle className="w-3 h-3" />
               </Button>
             </div>
