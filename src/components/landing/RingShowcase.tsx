@@ -3,7 +3,7 @@ import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import { useMemo, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Sparkles, Gem } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, Gem, Diamond } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,20 @@ interface InlayDef {
   roughness: number;
   metalness: number;
   opacity: number;
-  depthMm?: number; // channel depth for realism
+  depthMm?: number;
+}
+
+// ── Stone setting definition ─────────────────────────────────────
+
+interface StoneSetting {
+  shape: "cabochon" | "faceted" | "emerald-cut";
+  name: string;
+  sizeMm: number;
+  color: string;
+  emissive: string;
+  emissiveIntensity: number;
+  opacity: number;
+  angleFromTop: number; // radians, 0 = top dead center
 }
 
 // ── Design definitions ───────────────────────────────────────────
@@ -38,6 +51,7 @@ interface RingDesign {
   width: number;
   thickness: number;
   inlays: InlayDef[];
+  stones?: StoneSetting[];
 }
 
 interface MetalDef {
@@ -49,7 +63,9 @@ interface MetalDef {
   envIntensity: number;
 }
 
-const DESIGNS: RingDesign[] = [
+// ── Band designs (existing) ──────────────────────────────────────
+
+const BAND_DESIGNS: RingDesign[] = [
   {
     id: "yggdrasil",
     name: "Yggdrasil Band",
@@ -156,6 +172,87 @@ const DESIGNS: RingDesign[] = [
   },
 ];
 
+// ── Bespoke stone-set designs ────────────────────────────────────
+
+const STONE_DESIGNS: RingDesign[] = [
+  {
+    id: "celestial-cabochon",
+    name: "Celestial Cabochon",
+    tagline: "Cosmic Orb of Power",
+    lore: "A polished amethyst cabochon crowns this comfort-fit band, flanked by twin sapphire accents — a cosmic talisman forged in fire.",
+    profile: "comfort",
+    grooves: 0,
+    grooveDepth: 0,
+    bevel: 0,
+    width: 7,
+    thickness: 2.2,
+    inlays: [],
+    stones: [
+      { shape: "cabochon", name: "Amethyst Cabochon", sizeMm: 5.0, color: "#9333ea", emissive: "#7e22ce", emissiveIntensity: 0.9, opacity: 0.85, angleFromTop: 0 },
+      { shape: "cabochon", name: "Blue Sapphire", sizeMm: 2.5, color: "#3b82f6", emissive: "#1d4ed8", emissiveIntensity: 0.7, opacity: 0.8, angleFromTop: -0.5 },
+      { shape: "cabochon", name: "Blue Sapphire", sizeMm: 2.5, color: "#3b82f6", emissive: "#1d4ed8", emissiveIntensity: 0.7, opacity: 0.8, angleFromTop: 0.5 },
+    ],
+  },
+  {
+    id: "crown-solitaire",
+    name: "Crown Solitaire",
+    tagline: "Brilliant Beyond Measure",
+    lore: "A single brilliant-cut diamond set in a raised cathedral bezel — the pinnacle of precision craftsmanship, every facet engineered to capture light.",
+    profile: "knife",
+    grooves: 0,
+    grooveDepth: 0,
+    bevel: 0.2,
+    width: 5,
+    thickness: 2.0,
+    inlays: [],
+    stones: [
+      { shape: "faceted", name: "Brilliant Diamond", sizeMm: 6.0, color: "#f0f9ff", emissive: "#e0f2fe", emissiveIntensity: 1.2, opacity: 0.75, angleFromTop: 0 },
+    ],
+  },
+  {
+    id: "serpents-eye",
+    name: "Serpent's Eye",
+    tagline: "Ancient Gaze Awakened",
+    lore: "An amber cabochon glows like a serpent's eye atop a runic band, flanked by twin emerald accents. Meteorite iron courses through the band's veins.",
+    profile: "runic",
+    grooves: 2,
+    grooveDepth: 0.3,
+    bevel: 0.2,
+    width: 8,
+    thickness: 2.4,
+    inlays: [
+      { material: "meteorite", name: "Gibeon", placement: 0.0, widthMm: 1.2, color: "#a1a1aa", emissive: "#71717a", emissiveIntensity: 0.1, roughness: 0.5, metalness: 0.8, opacity: 0.95, depthMm: 0.3 },
+    ],
+    stones: [
+      { shape: "cabochon", name: "Baltic Amber", sizeMm: 5.5, color: "#f59e0b", emissive: "#d97706", emissiveIntensity: 1.0, opacity: 0.88, angleFromTop: 0 },
+      { shape: "cabochon", name: "Emerald", sizeMm: 2.0, color: "#22c55e", emissive: "#15803d", emissiveIntensity: 0.6, opacity: 0.78, angleFromTop: -0.6 },
+      { shape: "cabochon", name: "Emerald", sizeMm: 2.0, color: "#22c55e", emissive: "#15803d", emissiveIntensity: 0.6, opacity: 0.78, angleFromTop: 0.6 },
+    ],
+  },
+  {
+    id: "radiant-cluster",
+    name: "Radiant Cluster",
+    tagline: "A Constellation in Metal",
+    lore: "Five faceted gems — ruby, sapphire, emerald, topaz, and amethyst — set in a sweeping arc across a wide comfort band. Each stone a star in a private constellation.",
+    profile: "comfort",
+    grooves: 0,
+    grooveDepth: 0,
+    bevel: 0,
+    width: 10,
+    thickness: 2.6,
+    inlays: [],
+    stones: [
+      { shape: "faceted", name: "Ruby", sizeMm: 3.0, color: "#ef4444", emissive: "#b91c1c", emissiveIntensity: 0.9, opacity: 0.82, angleFromTop: -0.5 },
+      { shape: "faceted", name: "Sapphire", sizeMm: 3.5, color: "#3b82f6", emissive: "#1e40af", emissiveIntensity: 0.85, opacity: 0.8, angleFromTop: -0.2 },
+      { shape: "faceted", name: "Emerald", sizeMm: 4.0, color: "#22c55e", emissive: "#166534", emissiveIntensity: 0.8, opacity: 0.78, angleFromTop: 0 },
+      { shape: "faceted", name: "Topaz", sizeMm: 3.5, color: "#f59e0b", emissive: "#b45309", emissiveIntensity: 0.85, opacity: 0.8, angleFromTop: 0.2 },
+      { shape: "faceted", name: "Amethyst", sizeMm: 3.0, color: "#a855f7", emissive: "#7e22ce", emissiveIntensity: 0.9, opacity: 0.82, angleFromTop: 0.5 },
+    ],
+  },
+];
+
+const DESIGNS: RingDesign[] = [...BAND_DESIGNS, ...STONE_DESIGNS];
+
 const METALS: MetalDef[] = [
   { id: "silver", label: "Silver", color: "#C0C0C0", roughness: 0.12, metalness: 0.95, envIntensity: 1.6 },
   { id: "gold", label: "Gold", color: "#FFD700", roughness: 0.1, metalness: 0.98, envIntensity: 1.8 },
@@ -219,7 +316,6 @@ function useMeteoriteTexture(seed: number) {
     let s = seed | 0 || 1;
     const rng = () => { s = (s * 16807) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
 
-    // Base grey
     for (let i = 0; i < size * size; i++) {
       const v = 140 + rng() * 30;
       data[i * 4] = v;
@@ -228,7 +324,6 @@ function useMeteoriteTexture(seed: number) {
       data[i * 4 + 3] = 255;
     }
 
-    // Widmanstätten cross-hatch lines
     const lineCount = 8 + Math.floor(rng() * 8);
     for (let l = 0; l < lineCount; l++) {
       const angle = rng() * Math.PI;
@@ -295,10 +390,8 @@ function InlayChannel({
       const t = i / steps;
       const y = yCenter - bandHalf + t * bandHalf * 2;
       const surfaceR = getOuterRadiusAtY(design.profile, innerR, outerR, ringWidth, design.bevel, y);
-
-      // Create a U-channel shape: edges at surface, center sunk
-      const edgeDist = Math.abs(t - 0.5) * 2; // 0 center, 1 edge
-      const channelCurve = 1 - Math.pow(edgeDist, 2.5); // steep walls
+      const edgeDist = Math.abs(t - 0.5) * 2;
+      const channelCurve = 1 - Math.pow(edgeDist, 2.5);
       const r = surfaceR - channelDepth * channelCurve + 0.001;
       points.push(new THREE.Vector2(Math.max(innerR + 0.01, r), y));
     }
@@ -306,7 +399,6 @@ function InlayChannel({
     return new THREE.LatheGeometry(points, 128);
   }, [inlay, design, innerR, outerR, ringWidth, yCenter, bandHalf]);
 
-  // Glow halo geometry (slightly above surface)
   const glowGeometry = useMemo(() => {
     if (inlay.material === "meteorite") return null;
     const steps = 8;
@@ -320,14 +412,12 @@ function InlayChannel({
     return new THREE.LatheGeometry(points, 96);
   }, [inlay, design, innerR, outerR, ringWidth, yCenter, bandHalf]);
 
-  // Animate effects
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const mat = meshRef.current.material as THREE.MeshStandardMaterial;
     const t = clock.getElapsedTime();
 
     if (inlay.material === "opal") {
-      // Prismatic color cycling — full RGB shift
       const phase = t * 0.8 + inlay.placement * 4;
       const r = Math.sin(phase) * 0.5 + 0.5;
       const g = Math.sin(phase + 2.1) * 0.5 + 0.5;
@@ -335,14 +425,11 @@ function InlayChannel({
       mat.emissive.setRGB(r * 0.4, g * 0.5, b * 0.6);
       mat.emissiveIntensity = inlay.emissiveIntensity * (0.6 + Math.sin(t * 2.0) * 0.4);
     } else if (inlay.material === "crystal") {
-      // Deep pulsing glow
       const pulse = Math.sin(t * 0.7 + idx * 2.0) * 0.3 + 0.7;
       mat.emissiveIntensity = inlay.emissiveIntensity * pulse;
-      // Subtle sparkle via roughness fluctuation
       mat.roughness = inlay.roughness + Math.sin(t * 3 + idx) * 0.03;
     }
 
-    // Glow halo animation
     if (glowRef.current && inlay.material !== "meteorite") {
       const gMat = glowRef.current.material as THREE.MeshBasicMaterial;
       gMat.opacity = 0.08 + Math.sin(t * 1.5 + idx) * 0.06;
@@ -351,7 +438,6 @@ function InlayChannel({
 
   return (
     <group>
-      {/* Main inlay material */}
       <mesh ref={meshRef} geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <meshStandardMaterial
           color={inlay.color}
@@ -366,7 +452,6 @@ function InlayChannel({
         />
       </mesh>
 
-      {/* Glow halo for crystals and opals */}
       {glowGeometry && inlay.material !== "meteorite" && (
         <mesh ref={glowRef} geometry={glowGeometry} rotation={[Math.PI / 2, 0, 0]}>
           <meshBasicMaterial
@@ -378,6 +463,123 @@ function InlayChannel({
           />
         </mesh>
       )}
+    </group>
+  );
+}
+
+// ── Gemstone with bezel setting ──────────────────────────────────
+// Renders a bezel cup + gemstone (cabochon dome or faceted octahedron)
+// positioned on the ring's outer surface at a given angle from top.
+
+function GemStoneGroup({
+  stone,
+  outerR,
+  metalColor,
+  isWax,
+  idx,
+}: {
+  stone: StoneSetting;
+  outerR: number;
+  metalColor: string;
+  isWax: boolean;
+  idx: number;
+}) {
+  const gemRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+
+  const stoneR = stone.sizeMm / 10 / 2;
+  const bezelH = stoneR * 0.8;
+  const θ = stone.angleFromTop;
+
+  // Position on the outer surface of the ring (in group space after mesh rotation PI/2 around X)
+  const surfaceR = outerR + bezelH * 0.15;
+  const px = surfaceR * Math.sin(θ);
+  const py = surfaceR * Math.cos(θ);
+
+  // Animate gem glow
+  useFrame(({ clock }) => {
+    if (!gemRef.current) return;
+    const mat = gemRef.current.material as THREE.MeshStandardMaterial;
+    const t = clock.getElapsedTime();
+
+    if (stone.shape === "cabochon") {
+      // Warm inner glow pulse
+      mat.emissiveIntensity = stone.emissiveIntensity * (0.6 + Math.sin(t * 0.6 + idx * 2.5) * 0.4);
+    } else {
+      // Faceted sparkle — rapid emissive flicker
+      const sparkle = Math.sin(t * 2.5 + idx * 1.7) * 0.3 + Math.sin(t * 4.1 + idx * 3.2) * 0.15;
+      mat.emissiveIntensity = stone.emissiveIntensity * (0.55 + sparkle);
+    }
+
+    if (glowRef.current) {
+      const gMat = glowRef.current.material as THREE.MeshBasicMaterial;
+      gMat.opacity = 0.12 + Math.sin(t * 1.2 + idx) * 0.08;
+    }
+  });
+
+  return (
+    <group position={[px, py, 0]} rotation={[0, 0, -θ]}>
+      {/* Bezel cup — short tapered cylinder */}
+      <mesh position={[0, bezelH * 0.2, 0]} castShadow>
+        <cylinderGeometry args={[stoneR + 0.008, stoneR + 0.014, bezelH * 0.55, 32]} />
+        <meshStandardMaterial
+          color={isWax ? "#78A85B" : metalColor}
+          roughness={isWax ? 0.85 : 0.12}
+          metalness={isWax ? 0.05 : 0.95}
+          envMapIntensity={isWax ? 0.2 : 1.5}
+        />
+      </mesh>
+
+      {/* Gemstone */}
+      {stone.shape === "cabochon" ? (
+        // Cabochon: smooth dome (squashed sphere)
+        <mesh ref={gemRef} position={[0, bezelH * 0.45, 0]} scale={[1, 0.55, 1]} castShadow>
+          <sphereGeometry args={[stoneR, 32, 24]} />
+          <meshStandardMaterial
+            color={stone.color}
+            emissive={stone.emissive}
+            emissiveIntensity={stone.emissiveIntensity}
+            roughness={0.04}
+            metalness={0.02}
+            transparent
+            opacity={stone.opacity}
+            envMapIntensity={3.5}
+          />
+        </mesh>
+      ) : (
+        // Faceted: octahedron (diamond cut)
+        <mesh
+          ref={gemRef}
+          position={[0, bezelH * 0.55, 0]}
+          scale={[1, 0.75, 1]}
+          rotation={[0, Math.PI / 4, 0]}
+          castShadow
+        >
+          <octahedronGeometry args={[stoneR, 1]} />
+          <meshStandardMaterial
+            color={stone.color}
+            emissive={stone.emissive}
+            emissiveIntensity={stone.emissiveIntensity}
+            roughness={0.02}
+            metalness={0.03}
+            transparent
+            opacity={stone.opacity}
+            envMapIntensity={4.0}
+          />
+        </mesh>
+      )}
+
+      {/* Glow halo beneath stone */}
+      <mesh ref={glowRef} position={[0, bezelH * 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[stoneR * 0.3, stoneR * 1.4, 32]} />
+        <meshBasicMaterial
+          color={stone.emissive}
+          transparent
+          opacity={0.15}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
     </group>
   );
 }
@@ -445,7 +647,6 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 
     const lathe = new THREE.LatheGeometry(points, 128);
 
-    // Carve grooves
     if (design.grooves > 0) {
       const posAttr = lathe.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
@@ -498,6 +699,18 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
           idx={i}
         />
       ))}
+
+      {/* Gemstone settings */}
+      {design.stones?.map((stone, i) => (
+        <GemStoneGroup
+          key={`${design.id}-stone-${i}`}
+          stone={stone}
+          outerR={outerR}
+          metalColor={metal.color}
+          isWax={isWax}
+          idx={i}
+        />
+      ))}
     </group>
   );
 }
@@ -510,7 +723,6 @@ function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef 
       <ambientLight intensity={0.2} />
       <directionalLight position={[4, 5, 5]} intensity={1.6} castShadow color="#ffffff" />
       <directionalLight position={[-3, 2, -4]} intensity={0.5} color="#ff8c00" />
-      {/* Key fill for inlays */}
       <pointLight position={[0, 0, 3]} intensity={0.6} color="#ffffff" />
       <pointLight position={[2, -1, -3]} intensity={0.4} color="#e879f9" />
       <pointLight position={[-2, 1, 2]} intensity={0.35} color="#38bdf8" />
@@ -531,25 +743,30 @@ function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef 
   );
 }
 
-// ── Inlay badge ──────────────────────────────────────────────────
+// ── Badges ───────────────────────────────────────────────────────
 
 function InlayBadge({ inlay }: { inlay: InlayDef }) {
-  const icons: Record<string, string> = {
-    crystal: "💎",
-    opal: "🔮",
-    meteorite: "☄️",
-  };
+  const icons: Record<string, string> = { crystal: "💎", opal: "🔮", meteorite: "☄️" };
   return (
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium border"
-      style={{
-        borderColor: inlay.color + "40",
-        backgroundColor: inlay.color + "15",
-        color: inlay.color,
-      }}
+      style={{ borderColor: inlay.color + "40", backgroundColor: inlay.color + "15", color: inlay.color }}
     >
       <span>{icons[inlay.material]}</span>
       {inlay.name}
+    </span>
+  );
+}
+
+function StoneBadge({ stone }: { stone: StoneSetting }) {
+  const icon = stone.shape === "cabochon" ? "🔵" : "💎";
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium border"
+      style={{ borderColor: stone.color + "40", backgroundColor: stone.color + "15", color: stone.color }}
+    >
+      <span>{icon}</span>
+      {stone.name}
     </span>
   );
 }
@@ -570,6 +787,10 @@ export default function RingShowcase() {
   const nextDesign = useCallback(() => {
     setDesignIdx((i) => (i + 1) % DESIGNS.length);
   }, []);
+
+  const hasStones = (design.stones?.length ?? 0) > 0;
+  const hasInlays = design.inlays.length > 0;
+  const featureCount = design.inlays.length + (design.stones?.length ?? 0);
 
   return (
     <section className="relative py-16 sm:py-24 bg-forge-dark overflow-hidden">
@@ -594,7 +815,7 @@ export default function RingShowcase() {
             Forged <span className="text-primary">Creations</span>
           </h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto font-body">
-            Real crystals, opals &amp; meteorite inlays — rendered live. Click metals, orbit the ring, cycle designs.
+            Bespoke rings with gemstone settings, crystal inlays &amp; meteorite channels — rendered live in 3D.
           </p>
         </motion.div>
 
@@ -607,7 +828,6 @@ export default function RingShowcase() {
             viewport={{ once: true }}
             className="relative aspect-square max-h-[500px] w-full rounded-2xl overflow-hidden border border-border/50 bg-gradient-to-br from-forge-dark via-card to-forge-dark"
           >
-            {/* Subtle grid overlay */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
               style={{
                 backgroundImage: `linear-gradient(hsl(var(--border)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)`,
@@ -645,12 +865,15 @@ export default function RingShowcase() {
               </span>
             </div>
 
-            {/* Inlay indicator */}
-            {design.inlays.length > 0 && (
+            {/* Feature indicator */}
+            {featureCount > 0 && (
               <div className="absolute top-4 right-4 flex items-center gap-1 px-2 py-1 rounded-md bg-card/60 backdrop-blur-sm border border-border/30">
-                <Gem className="w-3 h-3 text-primary/70" />
+                {hasStones && <Diamond className="w-3 h-3 text-primary/70" />}
+                {hasInlays && <Gem className="w-3 h-3 text-primary/70" />}
                 <span className="text-[10px] text-muted-foreground">
-                  {design.inlays.length} inlay{design.inlays.length > 1 ? "s" : ""}
+                  {hasStones && `${design.stones!.length} stone${design.stones!.length > 1 ? "s" : ""}`}
+                  {hasStones && hasInlays && " · "}
+                  {hasInlays && `${design.inlays.length} inlay${design.inlays.length > 1 ? "s" : ""}`}
                 </span>
               </div>
             )}
@@ -707,8 +930,30 @@ export default function RingShowcase() {
               </motion.p>
             </AnimatePresence>
 
+            {/* Stone settings */}
+            {hasStones && (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={design.id + "-stones"}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-1.5"
+                >
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                    <Diamond className="w-3 h-3" /> Gemstone Settings
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {design.stones!.map((stone, i) => (
+                      <StoneBadge key={i} stone={stone} />
+                    ))}
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            )}
+
             {/* Inlay materials */}
-            {design.inlays.length > 0 && (
+            {hasInlays && (
               <AnimatePresence mode="wait">
                 <motion.div
                   key={design.id + "-inlays"}
@@ -744,7 +989,7 @@ export default function RingShowcase() {
                   { label: "Thickness", value: `${design.thickness}mm` },
                   { label: "Profile", value: design.profile },
                   { label: "Grooves", value: String(design.grooves) },
-                  { label: "Bevel", value: `${design.bevel}mm` },
+                  { label: "Stones", value: String(design.stones?.length ?? 0) },
                   { label: "Metal", value: metal.label },
                 ].map((spec) => (
                   <div key={spec.label} className="p-2 rounded-lg bg-card/50 border border-border/50">
@@ -800,30 +1045,33 @@ export default function RingShowcase() {
 
         {/* Design thumbnails strip */}
         <div className="mt-8 sm:mt-12 flex gap-2 sm:gap-3 justify-center flex-wrap">
-          {DESIGNS.map((d, i) => (
-            <button
-              key={d.id}
-              onClick={() => setDesignIdx(i)}
-              className={cn(
-                "px-3 py-2 rounded-lg border text-left transition-all min-w-[120px]",
-                designIdx === i
-                  ? "border-primary/50 bg-primary/5"
-                  : "border-border/50 bg-card/30 hover:border-border hover:bg-card/50"
-              )}
-            >
-              <p className={cn(
-                "text-[11px] font-display leading-tight transition-colors",
-                designIdx === i ? "text-primary" : "text-foreground/70"
-              )}>
-                {d.name}
-              </p>
-              <p className="text-[9px] text-muted-foreground/60 mt-0.5">
-                {d.inlays.length > 0
-                  ? `${d.inlays.map((il) => il.name).join(" · ")}`
-                  : d.profile}
-              </p>
-            </button>
-          ))}
+          {DESIGNS.map((d, i) => {
+            const stoneNames = d.stones?.map((s) => s.name) ?? [];
+            const inlayNames = d.inlays.map((il) => il.name);
+            const allNames = [...new Set([...stoneNames, ...inlayNames])];
+            return (
+              <button
+                key={d.id}
+                onClick={() => setDesignIdx(i)}
+                className={cn(
+                  "px-3 py-2 rounded-lg border text-left transition-all min-w-[120px]",
+                  designIdx === i
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-border/50 bg-card/30 hover:border-border hover:bg-card/50"
+                )}
+              >
+                <p className={cn(
+                  "text-[11px] font-display leading-tight transition-colors",
+                  designIdx === i ? "text-primary" : "text-foreground/70"
+                )}>
+                  {d.name}
+                </p>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                  {allNames.length > 0 ? allNames.join(" · ") : d.profile}
+                </p>
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>
