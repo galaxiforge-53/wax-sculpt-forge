@@ -48,29 +48,47 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
   const preparedGeometry = useMemo(() => {
     const geo = stlGeometry.clone();
 
-    // Center and measure the STL
+    // Center the STL at origin
     geo.computeBoundingBox();
     const box = geo.boundingBox!;
     const center = new THREE.Vector3();
     box.getCenter(center);
     geo.translate(-center.x, -center.y, -center.z);
 
-    // Measure STL dimensions
+    // Measure STL reference dimensions
     geo.computeBoundingBox();
     const bb = geo.boundingBox!;
-    const stlWidth = bb.max.y - bb.min.y;  // Y = ring width axis
+    const stlWidth = bb.max.y - bb.min.y;
     const stlDiamX = bb.max.x - bb.min.x;
     const stlDiamZ = bb.max.z - bb.min.z;
     const stlOuterR = Math.max(stlDiamX, stlDiamZ) / 2;
 
-    // Scale to match target ring dimensions
-    const scaleR = targetMidR / (stlOuterR * 0.85); // 0.85 to approximate mid-radius
-    const scaleW = targetWidth / stlWidth;
+    // UNIFORM scale based on outer radius to preserve crater proportions
+    const uniformScale = targetOuterR / stlOuterR;
+    geo.scale(uniformScale, uniformScale, uniformScale);
 
-    const mat = new THREE.Matrix4().makeScale(scaleR, scaleW, scaleR);
-    geo.applyMatrix4(mat);
+    // Now adjust width independently by scaling only Y
+    // to match target width while keeping craters round in XZ
+    geo.computeBoundingBox();
+    const currentWidth = geo.boundingBox!.max.y - geo.boundingBox!.min.y;
+    if (currentWidth > 0.001) {
+      const widthCorrection = targetWidth / currentWidth;
+      // Clamp width correction to avoid extreme distortion
+      const clampedCorrection = Math.max(0.7, Math.min(1.4, widthCorrection));
+      if (Math.abs(clampedCorrection - 1.0) > 0.01) {
+        // Apply partial width correction — blend between uniform and target
+        // This keeps craters mostly round while adjusting width
+        const blend = 0.6; // 60% toward target width, 40% stays uniform
+        const finalCorrection = 1.0 + (clampedCorrection - 1.0) * blend;
+        const posAttr = geo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          posAttr.setY(i, posAttr.getY(i) * finalCorrection);
+        }
+        posAttr.needsUpdate = true;
+      }
+    }
 
-    // Generate UVs for the STL (cylindrical projection)
+    // Generate UVs (cylindrical projection)
     const pos = geo.attributes.position;
     const uvs = new Float32Array(pos.count * 2);
     geo.computeBoundingBox();
@@ -80,9 +98,7 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
       const x = pos.getX(i);
       const y = pos.getY(i);
       const z = pos.getZ(i);
-      // U = angle around Y axis (circumference)
       const u = (Math.atan2(z, x) / (Math.PI * 2) + 0.5) % 1;
-      // V = position along Y (width)
       const v = (y - finalBB.min.y) / (finalBB.max.y - finalBB.min.y);
       uvs[i * 2] = u;
       uvs[i * 2 + 1] = v;
@@ -92,7 +108,7 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
 
     geo.computeVertexNormals();
     return geo;
-  }, [stlGeometry, targetMidR, targetWidth]);
+  }, [stlGeometry, targetOuterR, targetWidth]);
 
   const isWax = viewMode === "wax";
   const metalColors: Record<MetalPreset, string> = {
