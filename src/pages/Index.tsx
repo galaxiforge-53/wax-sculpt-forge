@@ -1,6 +1,6 @@
 import Hero from "@/components/landing/Hero";
 import HowItWorks from "@/components/landing/HowItWorks";
-import Gallery from "@/components/landing/Gallery";
+import RingShowcase from "@/components/landing/RingShowcase";
 import { isEmbedMode } from "@/config/galaxiforge";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,7 +16,7 @@ export default function Index() {
     <div className="min-h-screen bg-background">
       <Hero />
       <HowItWorks />
-      <Gallery />
+      <RingShowcase />
 
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-border text-center">
