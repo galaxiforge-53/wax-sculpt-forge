@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Undo2, Redo2, Save, Send } from "lucide-react";
+import { Undo2, Redo2, Save, Send, Flame } from "lucide-react";
 import { isEmbedMode, getReturnUrl } from "@/config/galaxiforge";
 
 interface TopBarProps {
@@ -19,6 +19,7 @@ interface TopBarProps {
   onExport: () => void;
   onSave: () => void;
   isSaving?: boolean;
+  onForgeNow: () => void;
 }
 
 const METALS: { value: MetalPreset; label: string }[] = [
@@ -39,7 +40,7 @@ const FINISHES: { value: FinishPreset; label: string }[] = [
 
 export default function TopBar({
   viewMode, onViewModeChange, metalPreset, onMetalChange,
-  finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving,
+  finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving, onForgeNow,
 }: TopBarProps) {
   const embed = isEmbedMode();
 
@@ -114,6 +115,15 @@ export default function TopBar({
             </Select>
           </>
         )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onForgeNow}
+          className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary animate-ember-pulse"
+        >
+          <Flame className="h-4 w-4 mr-1" /> Forge Now
+        </Button>
 
         <Button variant="ghost" size="sm" onClick={onSave} disabled={isSaving} className="text-muted-foreground hover:text-foreground">
           <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving…" : "Save"}

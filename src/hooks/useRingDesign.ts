@@ -207,6 +207,7 @@ export function useRingDesign() {
     generateDesignPackage,
     toolHistory,
     pipelineState,
+    setStage,
     nextStage,
     prevStage,
     restoreDesign,
