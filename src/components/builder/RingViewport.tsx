@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
+import { LunarTextureState } from "@/types/lunar";
 import { StampSettings } from "@/hooks/useRingDesign";
 
 export interface RingViewportHandle {
@@ -236,6 +237,59 @@ function InlayBandMarkers({ inlays, params }: { inlays: InlayChannel[]; params: 
   );
 }
 
+// Procedural lunar crater overlay — generates crater-like bumps on the ring surface
+function LunarSurfaceOverlay({ params, lunar }: { params: RingParameters; lunar: LunarTextureState }) {
+  const innerRadius = params.innerDiameter / 2 / 10;
+  const outerRadius = innerRadius + params.thickness / 10;
+  const midRadius = (innerRadius + outerRadius) / 2;
+  const ringWidth = params.width / 10;
+
+  const craterCount = lunar.craterDensity === "low" ? 20 : lunar.craterDensity === "med" ? 45 : 80;
+  const baseSize = lunar.craterSize === "small" ? 0.012 : lunar.craterSize === "med" ? 0.025 : 0.04;
+  const opacity = (lunar.intensity / 100) * 0.5;
+
+  // Seeded pseudo-random
+  const craters = useMemo(() => {
+    let s = lunar.seed;
+    const rand = () => { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
+    const result: { angle: number; y: number; size: number; depth: number }[] = [];
+    for (let i = 0; i < craterCount; i++) {
+      result.push({
+        angle: rand() * Math.PI * 2,
+        y: (rand() - 0.5) * ringWidth * 0.9,
+        size: baseSize * (0.5 + rand()),
+        depth: 0.3 + rand() * 0.7,
+      });
+    }
+    return result;
+  }, [lunar.seed, craterCount, baseSize, ringWidth]);
+
+  const surfaceR = outerRadius + 0.003;
+
+  return (
+    <group rotation={[Math.PI / 2, 0, 0]}>
+      {craters.map((c, i) => {
+        const x = Math.cos(c.angle) * surfaceR;
+        const z = Math.sin(c.angle) * surfaceR;
+        // orient crater to face outward
+        const lookAngle = c.angle + Math.PI / 2;
+        return (
+          <mesh key={i} position={[x, c.y, z]} rotation={[0, -c.angle, 0]}>
+            <circleGeometry args={[c.size, lunar.smoothEdges ? 16 : 6]} />
+            <meshBasicMaterial
+              color="#1a2a12"
+              transparent
+              opacity={opacity * c.depth}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
 function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, number, number]) => Promise<string> }) => void }) {
   const { gl, camera, scene } = useThree();
   const captureRef = useRef<(pos: [number, number, number]) => Promise<string>>();
@@ -283,10 +337,11 @@ interface RingViewportProps {
   waxMarks?: WaxMark[];
   stampSettings?: StampSettings;
   inlays?: InlayChannel[];
+  lunarTexture?: LunarTextureState;
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
@@ -340,6 +395,10 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           {viewMode === "wax" && inlays && inlays.length > 0 && (
             <InlayBandMarkers inlays={inlays} params={params} />
+          )}
+
+          {lunarTexture?.enabled && (
+            <LunarSurfaceOverlay params={params} lunar={lunarTexture} />
           )}
 
           <ContactShadows

@@ -1,6 +1,7 @@
 import { RingParameters } from "./ring";
 import { WaxMark } from "./waxmarks";
 import { InlayState } from "./inlays";
+import { LunarTextureState } from "./lunar";
 
 export interface CraftAction {
   id: string;
@@ -14,6 +15,7 @@ export interface CraftState {
   actionLog: CraftAction[];
   waxMarks: WaxMark[];
   inlays?: InlayState;
+  lunarTexture?: LunarTextureState;
   createdAt: string;
   updatedAt: string;
 }

@@ -20,6 +20,7 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
   let lastParams: Record<string, unknown> = {};
   let waxMarkCount = 0;
   const inlayCounts: Record<string, number> = {};
+  let lastLunar: string | null = null;
 
   for (const action of actions) {
     switch (action.type) {
@@ -80,6 +81,18 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
         inlayCounts[mt] = (inlayCounts[mt] || 0) + 1;
         break;
       }
+
+      case "lunar_texture_updated": {
+        const enabled = action.payload.enabled as boolean;
+        if (enabled) {
+          const density = action.payload.craterDensity as string;
+          const seed = action.payload.seed as number;
+          lastLunar = `Lunar texture: ${density} density, seed ${seed}`;
+        } else {
+          lastLunar = null;
+        }
+        break;
+      }
     }
   }
 
@@ -93,6 +106,11 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
   if (inlayEntries.length > 0) {
     const inlayStr = inlayEntries.map(([t, c]) => `${c} ${t}`).join(", ");
     highlights.push(`Inlays: ${inlayStr}`);
+  }
+
+  // Lunar texture highlight
+  if (lastLunar) {
+    highlights.push(lastLunar);
   }
 
   // Aggregate tool highlights
