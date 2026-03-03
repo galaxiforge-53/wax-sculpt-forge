@@ -199,7 +199,8 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
       ny /= len;
       nz /= len;
 
-      const idx = (y * w + x) * 4;
+      const yy = (h - 1 - y);
+      const idx = (yy * w + x) * 4;
       img.data[idx] = Math.round((nx * 0.5 + 0.5) * 255);
       img.data[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
       img.data[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
@@ -234,7 +235,8 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
       roughness = Math.max(0.2, Math.min(1.0, roughness));
 
       const v = Math.round(roughness * 255);
-      const idx = (y * w + x) * 4;
+      const yy = (h - 1 - y);
+      const idx = (yy * w + x) * 4;
       img.data[idx] = v;
       img.data[idx + 1] = v;
       img.data[idx + 2] = v;
@@ -262,7 +264,7 @@ export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurface
   normalMap.flipY = false;
   normalMap.wrapS = THREE.RepeatWrapping;
   normalMap.wrapT = THREE.ClampToEdgeWrapping;
-  normalMap.minFilter = THREE.LinearMipmapLinearFilter;
+  normalMap.minFilter = THREE.LinearMipMapLinearFilter;
   normalMap.magFilter = THREE.LinearFilter;
   normalMap.needsUpdate = true;
 
@@ -271,7 +273,7 @@ export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurface
   roughnessMap.flipY = false;
   roughnessMap.wrapS = THREE.RepeatWrapping;
   roughnessMap.wrapT = THREE.ClampToEdgeWrapping;
-  roughnessMap.minFilter = THREE.LinearMipmapLinearFilter;
+  roughnessMap.minFilter = THREE.LinearMipMapLinearFilter;
   roughnessMap.magFilter = THREE.LinearFilter;
   roughnessMap.needsUpdate = true;
 
