@@ -174,6 +174,18 @@ export function useRingDesign() {
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
+  const restoreDesign = useCallback((pkg: DesignPackage) => {
+    setParams(pkg.parameters);
+    setHistory([pkg.parameters]);
+    setHistoryIndex(0);
+    setViewMode(pkg.viewMode);
+    setMetalPreset(pkg.metalPreset);
+    setFinishPreset(pkg.finishPreset);
+    setToolHistory(pkg.toolHistory);
+    setPipelineState(pkg.pipelineState);
+    craftStateRef.current = pkg.craftState;
+  }, []);
+
   return {
     castabilityReport,
     params,
@@ -197,5 +209,6 @@ export function useRingDesign() {
     pipelineState,
     nextStage,
     prevStage,
+    restoreDesign,
   };
 }
