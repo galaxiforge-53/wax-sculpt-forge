@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { InlayChannel, InlayMaterialType, InlayPlacement } from "@/types/inlays";
+import { CodexMaterial, CodexMaterialType } from "@/types/codex";
+import { CODEX_MATERIALS } from "@/lib/codexMaterials";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -7,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { X, Plus, ExternalLink, Gem } from "lucide-react";
+import { X, Plus, Gem, Search, Star } from "lucide-react";
 
 interface InlaysPanelProps {
   inlays: InlayChannel[];
@@ -15,12 +17,6 @@ interface InlaysPanelProps {
   onRemove: (id: string) => void;
   onClear: () => void;
 }
-
-const MATERIAL_LABELS: Record<InlayMaterialType, string> = {
-  crystal: "Crystal",
-  opal: "Opal",
-  meteorite: "Meteorite",
-};
 
 const MATERIAL_COLORS: Record<InlayMaterialType, string> = {
   crystal: "bg-primary/20 text-primary",
@@ -34,52 +30,53 @@ const PLACEMENT_LABELS: Record<InlayPlacement, string> = {
   edgeRight: "Right Edge",
 };
 
-const OPAL_PRESETS = [
-  { name: "White Opal", url: "https://galaxiforge.com/crystal-codex/opal/white" },
-  { name: "Black Opal", url: "https://galaxiforge.com/crystal-codex/opal/black" },
-  { name: "Boulder Opal", url: "https://galaxiforge.com/crystal-codex/opal/boulder" },
-  { name: "Fire Opal", url: "https://galaxiforge.com/crystal-codex/opal/fire" },
-];
+const RARITY_COLORS: Record<string, string> = {
+  common: "text-muted-foreground",
+  rare: "text-primary",
+  "ultra-rare": "text-yellow-500",
+};
 
 export default function InlaysPanel({ inlays, onAdd, onRemove, onClear }: InlaysPanelProps) {
   const [addOpen, setAddOpen] = useState(false);
-  const [codexOpen, setCodexOpen] = useState(false);
-
-  // Add form state
-  const [materialType, setMaterialType] = useState<InlayMaterialType>("crystal");
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<CodexMaterialType | "all">("all");
+  const [selectedMaterial, setSelectedMaterial] = useState<CodexMaterial | null>(null);
   const [placement, setPlacement] = useState<InlayPlacement>("center");
   const [width, setWidth] = useState(1.5);
   const [depth, setDepth] = useState(0.8);
-  const [codexUrl, setCodexUrl] = useState("");
-  const [displayName, setDisplayName] = useState("");
+
+  const filteredMaterials = useMemo(() => {
+    return CODEX_MATERIALS.filter((m) => {
+      if (filterType !== "all" && m.type !== filterType) return false;
+      if (search && !m.name.toLowerCase().includes(search.toLowerCase()) &&
+          !(m.tags ?? []).some((t) => t.toLowerCase().includes(search.toLowerCase()))) return false;
+      return true;
+    });
+  }, [search, filterType]);
 
   const resetForm = () => {
-    setMaterialType("crystal");
+    setSelectedMaterial(null);
     setPlacement("center");
     setWidth(1.5);
     setDepth(0.8);
-    setCodexUrl("");
-    setDisplayName("");
+    setSearch("");
+    setFilterType("all");
   };
 
   const handleAdd = () => {
-    const name = displayName.trim() || parseDisplayName(codexUrl) || `${MATERIAL_LABELS[materialType]} Inlay`;
-    const url = codexUrl.trim() || `https://galaxiforge.com/crystal-codex/${materialType}`;
+    if (!selectedMaterial) return;
     onAdd({
-      materialType,
-      displayName: name,
-      codexUrl: url,
+      materialType: selectedMaterial.type as InlayMaterialType,
+      displayName: selectedMaterial.name,
+      codexId: selectedMaterial.id,
+      codexUrl: selectedMaterial.canonicalUrl,
+      materialImage: selectedMaterial.image,
       placement,
       channelWidthMm: width,
       channelDepthMm: depth,
     });
     resetForm();
     setAddOpen(false);
-  };
-
-  const applyOpalPreset = (preset: { name: string; url: string }) => {
-    setDisplayName(preset.name);
-    setCodexUrl(preset.url);
   };
 
   return (
@@ -98,7 +95,7 @@ export default function InlaysPanel({ inlays, onAdd, onRemove, onClear }: Inlays
           {inlays.map((ch) => (
             <div key={ch.id} className="flex items-center gap-1.5 p-1.5 rounded bg-secondary border border-border/50 text-[10px]">
               <Badge variant="outline" className={`${MATERIAL_COLORS[ch.materialType]} text-[9px] px-1 py-0`}>
-                {MATERIAL_LABELS[ch.materialType]}
+                {ch.materialType}
               </Badge>
               <span className="flex-1 truncate text-foreground">{ch.displayName}</span>
               <span className="text-muted-foreground">{PLACEMENT_LABELS[ch.placement]}</span>
@@ -126,24 +123,33 @@ export default function InlaysPanel({ inlays, onAdd, onRemove, onClear }: Inlays
       </div>
 
       {/* Add Channel Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) resetForm(); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-sm">Add Inlay Channel</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              Configure an inlay channel with a GalaxiForge Codex material.
+              Select a material from the Crystal Codex, then configure placement and dimensions.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 pt-2">
-            {/* Material type */}
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Material Type</Label>
-              <Select value={materialType} onValueChange={(v) => setMaterialType(v as InlayMaterialType)}>
-                <SelectTrigger className="h-7 text-xs">
+            {/* Search + Filter */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search materials..."
+                  className="h-7 text-xs pl-7"
+                />
+              </div>
+              <Select value={filterType} onValueChange={(v) => setFilterType(v as CodexMaterialType | "all")}>
+                <SelectTrigger className="h-7 text-xs w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="crystal">Crystal</SelectItem>
                   <SelectItem value="opal">Opal</SelectItem>
                   <SelectItem value="meteorite">Meteorite</SelectItem>
@@ -151,23 +157,47 @@ export default function InlaysPanel({ inlays, onAdd, onRemove, onClear }: Inlays
               </Select>
             </div>
 
-            {/* Opal quick picks */}
-            {materialType === "opal" && (
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Quick Select</Label>
-                <div className="flex flex-wrap gap-1">
-                  {OPAL_PRESETS.map((p) => (
-                    <Button
-                      key={p.name}
-                      variant="outline"
-                      size="sm"
-                      className="text-[10px] h-6 px-2"
-                      onClick={() => applyOpalPreset(p)}
-                    >
-                      {p.name}
-                    </Button>
-                  ))}
+            {/* Material Grid */}
+            <div className="grid grid-cols-3 gap-1.5 max-h-40 overflow-y-auto">
+              {filteredMaterials.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedMaterial(m)}
+                  className={`flex flex-col items-center gap-1 p-2 rounded border text-[10px] transition-all ${
+                    selectedMaterial?.id === m.id
+                      ? "border-primary bg-primary/10 ring-1 ring-primary"
+                      : "border-border/50 bg-secondary hover:border-border hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                    <Gem className="w-3.5 h-3.5 text-muted-foreground" />
+                  </div>
+                  <span className="text-foreground font-medium truncate w-full text-center leading-tight">{m.name}</span>
+                  <div className="flex items-center gap-0.5">
+                    {m.rarity === "ultra-rare" && <Star className="w-2 h-2 text-yellow-500 fill-yellow-500" />}
+                    {m.rarity === "rare" && <Star className="w-2 h-2 text-primary" />}
+                    <span className={`${RARITY_COLORS[m.rarity ?? "common"]}`}>{m.rarity ?? "common"}</span>
+                  </div>
+                </button>
+              ))}
+              {filteredMaterials.length === 0 && (
+                <div className="col-span-3 text-center text-[10px] text-muted-foreground py-4">
+                  No materials match your search.
                 </div>
+              )}
+            </div>
+
+            {/* Selected material info */}
+            {selectedMaterial && (
+              <div className="flex items-center gap-2 p-2 rounded bg-primary/5 border border-primary/20 text-xs">
+                <Gem className="w-4 h-4 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground">{selectedMaterial.name}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">{selectedMaterial.canonicalUrl}</div>
+                </div>
+                <Badge variant="outline" className={`${MATERIAL_COLORS[selectedMaterial.type as InlayMaterialType]} text-[9px]`}>
+                  {selectedMaterial.type}
+                </Badge>
               </div>
             )}
 
@@ -198,78 +228,16 @@ export default function InlaysPanel({ inlays, onAdd, onRemove, onClear }: Inlays
               <Slider value={[depth]} onValueChange={([v]) => setDepth(v)} min={0.3} max={2.0} step={0.1} />
             </div>
 
-            {/* Codex URL */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-[10px] text-muted-foreground">Codex Link</Label>
-                <button
-                  onClick={() => setCodexOpen(true)}
-                  className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
-                >
-                  <ExternalLink className="w-2.5 h-2.5" /> Browse Codex
-                </button>
-              </div>
-              <Input
-                value={codexUrl}
-                onChange={(e) => setCodexUrl(e.target.value)}
-                placeholder="https://galaxiforge.com/crystal-codex/..."
-                className="h-7 text-xs"
-              />
-            </div>
-
-            {/* Display name */}
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Display Name</Label>
-              <Input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder={`${MATERIAL_LABELS[materialType]} Inlay`}
-                className="h-7 text-xs"
-              />
-            </div>
-
-            <Button className="w-full text-xs h-8" onClick={handleAdd}>
-              Add Inlay Channel
+            <Button
+              className="w-full text-xs h-8"
+              onClick={handleAdd}
+              disabled={!selectedMaterial}
+            >
+              {selectedMaterial ? `Add ${selectedMaterial.name} Channel` : "Select a Material"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Crystal Codex Browser Dialog */}
-      <Dialog open={codexOpen} onOpenChange={setCodexOpen}>
-        <DialogContent className="max-w-2xl h-[70vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-sm">GalaxiForge Crystal Codex</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Browse the Codex library. Copy the URL of your selection and paste it into the Codex Link field.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 rounded border border-border overflow-hidden">
-            <iframe
-              src="https://galaxiforge.com/crystal-codex/library"
-              className="w-full h-full"
-              title="Crystal Codex Library"
-              sandbox="allow-scripts allow-same-origin allow-popups"
-            />
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setCodexOpen(false)} className="self-end text-xs">
-            Done
-          </Button>
-        </DialogContent>
-      </Dialog>
     </div>
   );
-}
-
-function parseDisplayName(url: string): string {
-  if (!url) return "";
-  try {
-    const u = new URL(url);
-    const crystalParam = u.searchParams.get("crystal");
-    if (crystalParam) return crystalParam.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    const segments = u.pathname.split("/").filter(Boolean);
-    const last = segments[segments.length - 1];
-    if (last && last !== "library") return last.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  } catch { /* ignore */ }
-  return "Codex Item";
 }
