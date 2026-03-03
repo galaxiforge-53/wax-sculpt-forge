@@ -2,8 +2,15 @@ import { Button } from "@/components/ui/button";
 import { ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Undo2, Redo2, Save, Send, Flame } from "lucide-react";
+import { Undo2, Redo2, Save, Send, Flame, MoreVertical } from "lucide-react";
 import { isEmbedMode, getReturnUrl } from "@/config/galaxiforge";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface TopBarProps {
   viewMode: ViewMode;
@@ -43,31 +50,32 @@ export default function TopBar({
   finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving, onForgeNow,
 }: TopBarProps) {
   const embed = isEmbedMode();
+  const isMobile = useIsMobile();
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-card border-b border-border">
-      <div className="flex items-center gap-2">
-        {!embed && (
-          <h1 className="font-display text-sm text-primary mr-4 tracking-[0.15em]">
+    <div className="flex items-center justify-between px-2 sm:px-4 py-2 bg-card border-b border-border gap-1">
+      <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+        {!embed && !isMobile && (
+          <h1 className="font-display text-sm text-primary mr-2 tracking-[0.15em] whitespace-nowrap">
             Forge<span className="text-foreground">Lab</span>
             <span className="text-[9px] text-muted-foreground ml-2 font-body tracking-normal">Ring Builder</span>
           </h1>
         )}
 
         {/* Undo / Redo */}
-        <Button variant="ghost" size="icon" onClick={onUndo} disabled={!canUndo} className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={onUndo} disabled={!canUndo} className="text-muted-foreground hover:text-foreground h-8 w-8">
           <Undo2 className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onRedo} disabled={!canRedo} className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={onRedo} disabled={!canRedo} className="text-muted-foreground hover:text-foreground h-8 w-8">
           <Redo2 className="h-4 w-4" />
         </Button>
 
         {/* Wax / Cast Toggle */}
-        <div className="flex items-center bg-secondary rounded-md ml-2">
+        <div className="flex items-center bg-secondary rounded-md ml-1">
           <button
             onClick={() => onViewModeChange("wax")}
             className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+              "px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all",
               viewMode === "wax"
                 ? "bg-wax-green text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -78,7 +86,7 @@ export default function TopBar({
           <button
             onClick={() => onViewModeChange("cast")}
             className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+              "px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all",
               viewMode === "cast"
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -89,9 +97,9 @@ export default function TopBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Metal & Finish (only in cast mode) */}
-        {viewMode === "cast" && (
+      <div className="flex items-center gap-1 sm:gap-3">
+        {/* Metal & Finish (only in cast mode, hidden on mobile) */}
+        {viewMode === "cast" && !isMobile && (
           <>
             <Select value={metalPreset} onValueChange={(v) => onMetalChange(v as MetalPreset)}>
               <SelectTrigger className="w-28 h-8 text-xs bg-secondary border-border">
@@ -116,29 +124,89 @@ export default function TopBar({
           </>
         )}
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onForgeNow}
-          className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary animate-ember-pulse"
-        >
-          <Flame className="h-4 w-4 mr-1" /> Forge Now
-        </Button>
+        {/* Desktop actions */}
+        {!isMobile && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onForgeNow}
+              className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary animate-ember-pulse"
+            >
+              <Flame className="h-4 w-4 mr-1" /> Forge Now
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onSave} disabled={isSaving} className="text-muted-foreground hover:text-foreground">
+              <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving…" : "Save"}
+            </Button>
+            <Button size="sm" onClick={onExport} className="bg-primary text-primary-foreground hover:bg-ember-glow">
+              <Send className="h-4 w-4 mr-1" /> Send to GalaxiForge
+            </Button>
+          </>
+        )}
 
-        <Button variant="ghost" size="sm" onClick={onSave} disabled={isSaving} className="text-muted-foreground hover:text-foreground">
-          <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving…" : "Save"}
-        </Button>
-
-        <Button size="sm" onClick={onExport} className="bg-primary text-primary-foreground hover:bg-ember-glow">
-          <Send className="h-4 w-4 mr-1" /> Send to GalaxiForge
-        </Button>
+        {/* Mobile overflow menu */}
+        {isMobile && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onForgeNow}
+              className="border-primary/50 text-primary hover:bg-primary/10 h-8 px-2"
+            >
+              <Flame className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {viewMode === "cast" && (
+                  <>
+                    <DropdownMenuItem className="text-xs text-muted-foreground" disabled>
+                      Metal & Finish
+                    </DropdownMenuItem>
+                    {METALS.map((m) => (
+                      <DropdownMenuItem
+                        key={m.value}
+                        onClick={() => onMetalChange(m.value)}
+                        className={cn("text-xs", metalPreset === m.value && "text-primary font-medium")}
+                      >
+                        {m.label}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuItem className="text-xs text-muted-foreground" disabled>
+                      Finish
+                    </DropdownMenuItem>
+                    {FINISHES.map((f) => (
+                      <DropdownMenuItem
+                        key={f.value}
+                        onClick={() => onFinishChange(f.value)}
+                        className={cn("text-xs", finishPreset === f.value && "text-primary font-medium")}
+                      >
+                        {f.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+                <DropdownMenuItem onClick={onSave} disabled={isSaving} className="text-xs">
+                  <Save className="h-3.5 w-3.5 mr-2" /> {isSaving ? "Saving…" : "Save"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExport} className="text-xs">
+                  <Send className="h-3.5 w-3.5 mr-2" /> Send to GalaxiForge
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
 
         {embed && (
           <a
             href={getReturnUrl()}
             className="text-xs text-muted-foreground hover:text-primary transition-colors ml-2"
           >
-            ← Return to GalaxiForge
+            ← Return
           </a>
         )}
       </div>

@@ -31,10 +31,7 @@ export default function TemplatesPanel({ onApply, currentParams }: TemplatesPane
     t.params.grooveCount === currentParams.grooveCount;
 
   return (
-    <div className="flex flex-col gap-3 h-full">
-      <h3 className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-display px-1">
-        Templates
-      </h3>
+    <div className="flex flex-col gap-3">
 
       {/* Category filter */}
       <div className="flex gap-1 flex-wrap">

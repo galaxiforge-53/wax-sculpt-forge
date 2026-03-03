@@ -20,10 +20,7 @@ export default function ForgePipelinePanel({
   const stage = STAGES[currentIndex];
 
   return (
-    <div className="flex flex-col gap-3 p-4 bg-card rounded-lg border border-border">
-      <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-display">
-        Forge Stage
-      </h3>
+    <div className="flex flex-col gap-3">
 
       {/* Mini progress dots */}
       <div className="flex items-center gap-1.5 justify-center">
