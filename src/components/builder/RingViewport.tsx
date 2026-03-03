@@ -4,6 +4,7 @@ import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback } from "r
 import * as THREE from "three";
 import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
+import { StampSettings } from "@/hooks/useRingDesign";
 
 export interface RingViewportHandle {
   captureSnapshot(
@@ -24,9 +25,10 @@ interface RingMeshProps {
   metalPreset: MetalPreset;
   activeTool: ToolType | null;
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
+  stampSettings?: StampSettings;
 }
 
-function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark }: RingMeshProps) {
+function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, stampSettings }: RingMeshProps) {
   const geometry = useMemo(() => {
     const innerRadius = params.innerDiameter / 2 / 10;
     const outerRadius = innerRadius + params.thickness / 10;
@@ -130,19 +132,18 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark }: R
     e.stopPropagation();
     const point = e.point;
     const normal = e.face?.normal ?? new THREE.Vector3(0, 1, 0);
-    // Transform normal from local to world
     const worldNormal = normal.clone();
     if (e.object) {
       worldNormal.transformDirection(e.object.matrixWorld);
     }
     onAddWaxMark({
-      type: "dent",
+      type: stampSettings?.type ?? "dent",
       position: { x: point.x, y: point.y, z: point.z },
       normal: { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z },
-      radiusMm: 1.2,
-      intensity: 0.65,
+      radiusMm: stampSettings?.radiusMm ?? 1.2,
+      intensity: stampSettings?.intensity ?? 0.65,
     });
-  }, [viewMode, activeTool, onAddWaxMark]);
+  }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
   const isStampActive = viewMode === "wax" && activeTool === "stamp";
 
@@ -241,10 +242,11 @@ interface RingViewportProps {
   activeTool?: ToolType | null;
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   waxMarks?: WaxMark[];
+  stampSettings?: StampSettings;
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
@@ -289,6 +291,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             metalPreset={metalPreset}
             activeTool={activeTool ?? null}
             onAddWaxMark={onAddWaxMark}
+            stampSettings={stampSettings}
           />
 
           {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (

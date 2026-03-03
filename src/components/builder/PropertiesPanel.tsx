@@ -1,4 +1,6 @@
 import { RingParameters, RingProfile, RING_SIZE_MAP, ViewMode } from "@/types/ring";
+import { WaxMarkType } from "@/types/waxmarks";
+import { StampSettings } from "@/hooks/useRingDesign";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -12,6 +14,8 @@ interface PropertiesPanelProps {
   viewMode?: ViewMode;
   waxMarkCount?: number;
   onClearWaxMarks?: () => void;
+  stampSettings?: StampSettings;
+  onStampSettingsChange?: (s: StampSettings) => void;
 }
 
 const PROFILES: { value: RingProfile; label: string }[] = [
@@ -22,7 +26,14 @@ const PROFILES: { value: RingProfile; label: string }[] = [
   { value: "knife-edge", label: "Knife Edge" },
 ];
 
-export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks }: PropertiesPanelProps) {
+const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
+  { value: "dent", label: "Dent" },
+  { value: "scratch", label: "Scratch" },
+  { value: "chisel", label: "Chisel" },
+  { value: "heat-soften", label: "Heat Soften" },
+];
+
+export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
 
   return (
@@ -133,14 +144,63 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
       )}
 
       {/* Wax Marks section (wax mode only) */}
-      {viewMode === "wax" && waxMarkCount !== undefined && waxMarkCount > 0 && (
-        <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-2">
-          <h4 className="text-xs font-display text-primary uppercase tracking-wider">Wax Marks</h4>
-          <p className="text-xs text-muted-foreground">{waxMarkCount} mark{waxMarkCount !== 1 ? "s" : ""} placed</p>
-          {onClearWaxMarks && (
-            <Button variant="outline" size="sm" onClick={onClearWaxMarks} className="w-full text-xs h-7">
-              Clear Marks
-            </Button>
+      {viewMode === "wax" && (
+        <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-3">
+          <h4 className="text-xs font-display text-primary uppercase tracking-wider">Stamp Settings</h4>
+
+          {/* Stamp type */}
+          {stampSettings && onStampSettingsChange && (
+            <>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Mark Type</Label>
+                <Select
+                  value={stampSettings.type}
+                  onValueChange={(v) => onStampSettingsChange({ ...stampSettings, type: v as WaxMarkType })}
+                >
+                  <SelectTrigger className="bg-card border-border h-7 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAMP_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Radius: {stampSettings.radiusMm.toFixed(1)}mm</Label>
+                <Slider
+                  value={[stampSettings.radiusMm]}
+                  onValueChange={([v]) => onStampSettingsChange({ ...stampSettings, radiusMm: v })}
+                  min={0.4}
+                  max={3.0}
+                  step={0.1}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Intensity: {(stampSettings.intensity * 100).toFixed(0)}%</Label>
+                <Slider
+                  value={[stampSettings.intensity]}
+                  onValueChange={([v]) => onStampSettingsChange({ ...stampSettings, intensity: v })}
+                  min={0.1}
+                  max={1.0}
+                  step={0.05}
+                />
+              </div>
+            </>
+          )}
+
+          {waxMarkCount !== undefined && waxMarkCount > 0 && (
+            <div className="pt-2 border-t border-border/50 space-y-2">
+              <p className="text-xs text-muted-foreground">{waxMarkCount} mark{waxMarkCount !== 1 ? "s" : ""} placed</p>
+              {onClearWaxMarks && (
+                <Button variant="outline" size="sm" onClick={onClearWaxMarks} className="w-full text-xs h-7">
+                  Clear Marks
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}

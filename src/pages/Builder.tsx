@@ -35,8 +35,9 @@ export default function Builder() {
     generateDesignPackage,
     castabilityReport,
     pipelineState, setStage, nextStage, prevStage,
-    restoreDesign, craftState,
+    restoreDesign, craftActions,
     waxMarks, addWaxMark, clearWaxMarks,
+    stampSettings, setStampSettings,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -166,11 +167,11 @@ export default function Builder() {
           <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
         </div>
         <div className="flex-1 p-2">
-          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} />
+          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} stampSettings={stampSettings} />
         </div>
         <div className="w-72 flex flex-col border-l border-border flex-shrink-0">
           <div className="flex-1 p-3 overflow-y-auto">
-            <PropertiesPanel params={params} onUpdate={updateParams} showMeasure={activeTool === "measure"} viewMode={viewMode} waxMarkCount={waxMarks.length} onClearWaxMarks={clearWaxMarks} />
+            <PropertiesPanel params={params} onUpdate={updateParams} showMeasure={activeTool === "measure"} viewMode={viewMode} waxMarkCount={waxMarks.length} onClearWaxMarks={clearWaxMarks} stampSettings={stampSettings} onStampSettingsChange={setStampSettings} />
           </div>
           <div className="border-t border-border p-3">
             <CastabilityPanel report={castabilityReport} />
@@ -202,7 +203,7 @@ export default function Builder() {
         finishPreset={finishPreset}
         viewMode={viewMode}
         castabilityReport={castabilityReport}
-        craftActions={craftState.actionLog}
+        craftActions={craftActions}
         onSave={() => { setForgeModalOpen(false); handleSave(); }}
         onSendToGalaxiForge={() => { setForgeModalOpen(false); handleExport(); }}
       />
