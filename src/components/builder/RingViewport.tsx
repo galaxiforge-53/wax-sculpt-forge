@@ -116,7 +116,7 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
-    const strength = 0.8 + (lunarTexture.intensity / 100) * 2.2;
+    const strength = 1.2 + (lunarTexture.intensity / 100) * 3.0;
     return new THREE.Vector2(strength, -strength); // negative Y to carve inward
   }, [lunarTexture?.enabled, lunarTexture?.intensity]);
 
