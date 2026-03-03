@@ -15,6 +15,7 @@ const TOOLS: { id: ToolType; name: string; icon: string; tip: string }[] = [
   { id: "groove", name: "Groove", icon: "═", tip: "Cut channels into the band" },
   { id: "flatten", name: "Flatten", icon: "▬", tip: "Create flat profile" },
   { id: "measure", name: "Measure", icon: "📐", tip: "View exact dimensions" },
+  { id: "stamp", name: "Stamp", icon: "⊙", tip: "Add wax tool marks by clicking the ring (wax mode)" },
 ];
 
 export default function ToolRail({ activeTool, onSelectTool, onApplyTool }: ToolRailProps) {
@@ -31,7 +32,7 @@ export default function ToolRail({ activeTool, onSelectTool, onApplyTool }: Tool
               <button
                 onClick={() => {
                   onSelectTool(tool.id);
-                  if (tool.id !== "measure") onApplyTool(tool.id);
+                  if (tool.id !== "measure" && tool.id !== "stamp") onApplyTool(tool.id);
                 }}
                 className={cn(
                   "flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-md transition-all text-sm",

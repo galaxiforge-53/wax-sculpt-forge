@@ -36,6 +36,7 @@ export default function Builder() {
     castabilityReport,
     pipelineState, setStage, nextStage, prevStage,
     restoreDesign, craftState,
+    waxMarks, addWaxMark, clearWaxMarks,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -165,11 +166,11 @@ export default function Builder() {
           <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
         </div>
         <div className="flex-1 p-2">
-          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} />
+          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} />
         </div>
         <div className="w-72 flex flex-col border-l border-border flex-shrink-0">
           <div className="flex-1 p-3 overflow-y-auto">
-            <PropertiesPanel params={params} onUpdate={updateParams} showMeasure={activeTool === "measure"} />
+            <PropertiesPanel params={params} onUpdate={updateParams} showMeasure={activeTool === "measure"} viewMode={viewMode} waxMarkCount={waxMarks.length} onClearWaxMarks={clearWaxMarks} />
           </div>
           <div className="border-t border-border p-3">
             <CastabilityPanel report={castabilityReport} />

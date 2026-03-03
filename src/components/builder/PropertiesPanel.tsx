@@ -1,13 +1,17 @@
-import { RingParameters, RingProfile, RING_SIZE_MAP } from "@/types/ring";
+import { RingParameters, RingProfile, RING_SIZE_MAP, ViewMode } from "@/types/ring";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface PropertiesPanelProps {
   params: RingParameters;
   onUpdate: (updates: Partial<RingParameters>) => void;
   showMeasure: boolean;
+  viewMode?: ViewMode;
+  waxMarkCount?: number;
+  onClearWaxMarks?: () => void;
 }
 
 const PROFILES: { value: RingProfile; label: string }[] = [
@@ -18,7 +22,7 @@ const PROFILES: { value: RingProfile; label: string }[] = [
   { value: "knife-edge", label: "Knife Edge" },
 ];
 
-export default function PropertiesPanel({ params, onUpdate, showMeasure }: PropertiesPanelProps) {
+export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
 
   return (
@@ -125,6 +129,19 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure }: Prope
           <p className="text-xs text-muted-foreground">Width: {params.width}mm</p>
           <p className="text-xs text-muted-foreground">Thickness: {params.thickness}mm</p>
           <p className="text-xs text-muted-foreground">Profile: {params.profile}</p>
+        </div>
+      )}
+
+      {/* Wax Marks section (wax mode only) */}
+      {viewMode === "wax" && waxMarkCount !== undefined && waxMarkCount > 0 && (
+        <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-2">
+          <h4 className="text-xs font-display text-primary uppercase tracking-wider">Wax Marks</h4>
+          <p className="text-xs text-muted-foreground">{waxMarkCount} mark{waxMarkCount !== 1 ? "s" : ""} placed</p>
+          {onClearWaxMarks && (
+            <Button variant="outline" size="sm" onClick={onClearWaxMarks} className="w-full text-xs h-7">
+              Clear Marks
+            </Button>
+          )}
         </div>
       )}
     </div>
