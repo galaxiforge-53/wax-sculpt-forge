@@ -8,6 +8,9 @@ export interface LunarTextureState {
   craterSize: CraterSize;
   smoothEdges: boolean;
   seed: number;
+  microDetail: number;     // 0–100
+  rimSharpness: number;    // 0–100
+  overlapIntensity: number; // 0–100
 }
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
@@ -17,4 +20,7 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   craterSize: "med",
   smoothEdges: true,
   seed: Math.floor(Math.random() * 9999),
+  microDetail: 40,
+  rimSharpness: 50,
+  overlapIntensity: 30,
 };

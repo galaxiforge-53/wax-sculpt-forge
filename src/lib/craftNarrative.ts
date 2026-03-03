@@ -86,8 +86,9 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
         const enabled = action.payload.enabled as boolean;
         if (enabled) {
           const density = action.payload.craterDensity as string;
+          const size = action.payload.craterSize as string ?? "";
           const seed = action.payload.seed as number;
-          lastLunar = `Lunar texture: ${density} density, seed ${seed}`;
+          lastLunar = `Lunar texture: ${density}, ${size}, seed ${seed}`;
         } else {
           lastLunar = null;
         }

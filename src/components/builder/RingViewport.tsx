@@ -237,53 +237,137 @@ function InlayBandMarkers({ inlays, params }: { inlays: InlayChannel[]; params: 
   );
 }
 
-// Procedural lunar crater overlay — generates crater-like bumps on the ring surface
+// ── Layered Lunar Surface v2 ──────────────────────────────────────
+// Three non-destructive overlay layers: micro grain, mid pitting, large craters with rims.
+// All seeded for deterministic output. Performance-clamped.
+
+interface CraterData {
+  angle: number; y: number; size: number; depth: number;
+  rimSize: number; rimOpacity: number;
+}
+interface PitData { angle: number; y: number; size: number; opacity: number; }
+interface GrainData { angle: number; y: number; size: number; opacity: number; }
+
+function seededRng(seed: number) {
+  let s = seed;
+  return () => { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
+}
+
 function LunarSurfaceOverlay({ params, lunar }: { params: RingParameters; lunar: LunarTextureState }) {
   const innerRadius = params.innerDiameter / 2 / 10;
   const outerRadius = innerRadius + params.thickness / 10;
-  const midRadius = (innerRadius + outerRadius) / 2;
   const ringWidth = params.width / 10;
+  const surfaceR = outerRadius + 0.003;
+  const globalOpacity = lunar.intensity / 100;
+  const rimFactor = lunar.rimSharpness / 100;
+  const overlapFactor = lunar.overlapIntensity / 100;
+  const microFactor = lunar.microDetail / 100;
 
-  const craterCount = lunar.craterDensity === "low" ? 20 : lunar.craterDensity === "med" ? 45 : 80;
+  // Clamp counts for performance
+  const craterBase = lunar.craterDensity === "low" ? 12 : lunar.craterDensity === "med" ? 28 : 50;
+  const craterCount = Math.min(craterBase, 60);
+  const pitCount = Math.min(Math.round(20 + microFactor * 40), 60);
+  const grainCount = Math.min(Math.round(microFactor * 80), 80);
   const baseSize = lunar.craterSize === "small" ? 0.012 : lunar.craterSize === "med" ? 0.025 : 0.04;
-  const opacity = (lunar.intensity / 100) * 0.5;
+  const segments = lunar.smoothEdges ? 16 : 6;
 
-  // Seeded pseudo-random
-  const craters = useMemo(() => {
-    let s = lunar.seed;
-    const rand = () => { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
-    const result: { angle: number; y: number; size: number; depth: number }[] = [];
+  const { craters, pits, grains } = useMemo(() => {
+    const rand = seededRng(lunar.seed);
+    const halfW = ringWidth * 0.45;
+    const edgeFalloff = lunar.smoothEdges
+      ? (y: number) => { const t = Math.abs(y) / (ringWidth * 0.5); return 1 - t * t; }
+      : (_y: number) => 1;
+
+    // Large craters with rim
+    const craters: CraterData[] = [];
     for (let i = 0; i < craterCount; i++) {
-      result.push({
-        angle: rand() * Math.PI * 2,
-        y: (rand() - 0.5) * ringWidth * 0.9,
-        size: baseSize * (0.5 + rand()),
-        depth: 0.3 + rand() * 0.7,
+      const y = (rand() - 0.5) * ringWidth * 0.9;
+      const size = baseSize * (0.6 + rand() * 0.8);
+      // overlap: allow some craters to cluster near previous ones
+      const clusterAngle = i > 0 && rand() < overlapFactor * 0.4
+        ? craters[craters.length - 1].angle + (rand() - 0.5) * 0.3
+        : rand() * Math.PI * 2;
+      const ef = edgeFalloff(y);
+      craters.push({
+        angle: clusterAngle,
+        y,
+        size: size * ef,
+        depth: (0.4 + rand() * 0.6) * ef,
+        rimSize: size * (1.15 + rimFactor * 0.35),
+        rimOpacity: (0.15 + rimFactor * 0.25) * ef,
       });
     }
-    return result;
-  }, [lunar.seed, craterCount, baseSize, ringWidth]);
 
-  const surfaceR = outerRadius + 0.003;
+    // Mid-scale pits
+    const pits: PitData[] = [];
+    for (let i = 0; i < pitCount; i++) {
+      const y = (rand() - 0.5) * ringWidth * 0.95;
+      pits.push({
+        angle: rand() * Math.PI * 2,
+        y,
+        size: 0.006 + rand() * 0.008,
+        opacity: (0.15 + rand() * 0.2) * edgeFalloff(y),
+      });
+    }
+
+    // Micro grain
+    const grains: GrainData[] = [];
+    for (let i = 0; i < grainCount; i++) {
+      const y = (rand() - 0.5) * ringWidth * 0.98;
+      grains.push({
+        angle: rand() * Math.PI * 2,
+        y,
+        size: 0.002 + rand() * 0.004,
+        opacity: (0.08 + rand() * 0.12) * edgeFalloff(y),
+      });
+    }
+
+    return { craters, pits, grains };
+  }, [lunar.seed, craterCount, pitCount, grainCount, baseSize, ringWidth, lunar.smoothEdges, rimFactor, overlapFactor]);
 
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
+      {/* Layer 1: Micro grain (fine regolith) */}
+      {grains.map((g, i) => {
+        const x = Math.cos(g.angle) * (surfaceR + 0.001);
+        const z = Math.sin(g.angle) * (surfaceR + 0.001);
+        return (
+          <mesh key={`g${i}`} position={[x, g.y, z]} rotation={[0, -g.angle, 0]}>
+            <circleGeometry args={[g.size, 4]} />
+            <meshBasicMaterial color="#1a2a12" transparent opacity={globalOpacity * g.opacity * microFactor} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        );
+      })}
+
+      {/* Layer 2: Mid-scale pitting */}
+      {pits.map((p, i) => {
+        const x = Math.cos(p.angle) * surfaceR;
+        const z = Math.sin(p.angle) * surfaceR;
+        return (
+          <mesh key={`p${i}`} position={[x, p.y, z]} rotation={[0, -p.angle, 0]}>
+            <circleGeometry args={[p.size, segments]} />
+            <meshBasicMaterial color="#162010" transparent opacity={globalOpacity * p.opacity * 0.7} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+        );
+      })}
+
+      {/* Layer 3: Large craters with raised rim ring */}
       {craters.map((c, i) => {
         const x = Math.cos(c.angle) * surfaceR;
         const z = Math.sin(c.angle) * surfaceR;
-        // orient crater to face outward
-        const lookAngle = c.angle + Math.PI / 2;
         return (
-          <mesh key={i} position={[x, c.y, z]} rotation={[0, -c.angle, 0]}>
-            <circleGeometry args={[c.size, lunar.smoothEdges ? 16 : 6]} />
-            <meshBasicMaterial
-              color="#1a2a12"
-              transparent
-              opacity={opacity * c.depth}
-              depthWrite={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
+          <group key={`c${i}`} position={[x, c.y, z]} rotation={[0, -c.angle, 0]}>
+            {/* Inner bowl (dark depression) */}
+            <mesh>
+              <circleGeometry args={[c.size, segments]} />
+              <meshBasicMaterial color="#0e1a08" transparent opacity={globalOpacity * c.depth * 0.55} depthWrite={false} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Raised rim ring */}
+            <mesh position={[0, 0, -0.0005]}>
+              <ringGeometry args={[c.size * 0.85, c.rimSize, segments]} />
+              <meshBasicMaterial color="#3a5a2a" transparent opacity={globalOpacity * c.rimOpacity} depthWrite={false} side={THREE.DoubleSide} />
+            </mesh>
+          </group>
         );
       })}
     </group>
