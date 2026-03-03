@@ -1,0 +1,491 @@
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
+import { useMemo, useRef, useState, useCallback } from "react";
+import * as THREE from "three";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { useFrame } from "@react-three/fiber";
+
+// ── Design definitions ───────────────────────────────────────────
+
+interface RingDesign {
+  id: string;
+  name: string;
+  tagline: string;
+  lore: string;
+  profile: "dome" | "flat" | "knife" | "comfort" | "runic" | "cosmic";
+  grooves: number;
+  grooveDepth: number;
+  bevel: number;
+  width: number;
+  thickness: number;
+}
+
+interface MetalDef {
+  id: string;
+  label: string;
+  color: string;
+  roughness: number;
+  metalness: number;
+  envIntensity: number;
+}
+
+const DESIGNS: RingDesign[] = [
+  {
+    id: "yggdrasil",
+    name: "Yggdrasil Band",
+    tagline: "Roots of the World Tree",
+    lore: "Inspired by the cosmic ash tree that connects the Nine Realms. Deep grooves echo the bark of eternity.",
+    profile: "runic",
+    grooves: 4,
+    grooveDepth: 0.35,
+    bevel: 0.3,
+    width: 8,
+    thickness: 2.2,
+  },
+  {
+    id: "nebula-edge",
+    name: "Nebula Edge",
+    tagline: "Born from Stellar Dust",
+    lore: "A knife-edge silhouette channeling the sharp geometry of collapsing stars. Minimal. Lethal. Beautiful.",
+    profile: "knife",
+    grooves: 1,
+    grooveDepth: 0.2,
+    bevel: 0.1,
+    width: 6,
+    thickness: 2.0,
+  },
+  {
+    id: "mjolnir-forge",
+    name: "Mjölnir Forge",
+    tagline: "Hammered by Thunder",
+    lore: "Thick, brutal, unapologetic. Triple grooves represent Odin's ravens and the echo of the anvil.",
+    profile: "flat",
+    grooves: 3,
+    grooveDepth: 0.4,
+    bevel: 0.5,
+    width: 10,
+    thickness: 2.8,
+  },
+  {
+    id: "aurora-comfort",
+    name: "Aurora Comfort",
+    tagline: "Northern Light's Embrace",
+    lore: "Smooth dome profile with a single channel — like the horizon line between sky and ice.",
+    profile: "dome",
+    grooves: 1,
+    grooveDepth: 0.15,
+    bevel: 0.0,
+    width: 7,
+    thickness: 2.0,
+  },
+  {
+    id: "voidwalker",
+    name: "Voidwalker",
+    tagline: "Between Dimensions",
+    lore: "Five parallel channels carved into cosmic geometry. For those who walk the space between stars.",
+    profile: "cosmic",
+    grooves: 5,
+    grooveDepth: 0.25,
+    bevel: 0.2,
+    width: 9,
+    thickness: 2.4,
+  },
+  {
+    id: "fenrir-claw",
+    name: "Fenrir's Claw",
+    tagline: "Unbound Fury",
+    lore: "Broad, flat, with twin claw marks. The wolf-god's mark on a band of dark metal.",
+    profile: "flat",
+    grooves: 2,
+    grooveDepth: 0.5,
+    bevel: 0.6,
+    width: 12,
+    thickness: 3.0,
+  },
+];
+
+const METALS: MetalDef[] = [
+  { id: "silver", label: "Silver", color: "#C0C0C0", roughness: 0.12, metalness: 0.95, envIntensity: 1.6 },
+  { id: "gold", label: "Gold", color: "#FFD700", roughness: 0.1, metalness: 0.98, envIntensity: 1.8 },
+  { id: "rose-gold", label: "Rose Gold", color: "#E8A090", roughness: 0.15, metalness: 0.92, envIntensity: 1.5 },
+  { id: "titanium", label: "Titanium", color: "#878681", roughness: 0.2, metalness: 0.88, envIntensity: 1.3 },
+  { id: "tungsten", label: "Tungsten", color: "#555555", roughness: 0.08, metalness: 0.97, envIntensity: 1.4 },
+  { id: "wax", label: "Wax", color: "#4a7a3a", roughness: 0.85, metalness: 0.0, envIntensity: 0.2 },
+];
+
+// ── 3D Ring Mesh ─────────────────────────────────────────────────
+
+function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  useFrame((_, delta) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += delta * 0.3;
+    }
+  });
+
+  const geometry = useMemo(() => {
+    const innerR = 0.85;
+    const outerR = innerR + design.thickness / 10;
+    const w = design.width / 10;
+    const bevel = design.bevel / 10;
+    const points: THREE.Vector2[] = [];
+    const steps = 32;
+
+    if (design.profile === "dome" || design.profile === "comfort") {
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const angle = t * Math.PI;
+        const r = innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
+        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+      }
+    } else if (design.profile === "knife") {
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const angle = t * Math.PI;
+        const bulge = Math.pow(Math.sin(angle), 0.45);
+        const r = innerR + (outerR - innerR) * bulge;
+        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+      }
+    } else if (design.profile === "runic") {
+      // Stepped/angular profile
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const angle = t * Math.PI;
+        const stepped = Math.sin(angle) * 0.7 + Math.sin(angle * 3) * 0.15 + Math.sin(angle * 5) * 0.05;
+        const r = innerR + (outerR - innerR) * Math.max(0, stepped);
+        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+      }
+    } else if (design.profile === "cosmic") {
+      // Slightly concave outer surface
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const angle = t * Math.PI;
+        const base = Math.sin(angle);
+        const concave = base - 0.08 * Math.sin(angle * 2);
+        const r = innerR + (outerR - innerR) * Math.max(0, concave);
+        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+      }
+    } else {
+      // flat
+      points.push(new THREE.Vector2(innerR, -w / 2));
+      points.push(new THREE.Vector2(outerR - bevel, -w / 2));
+      points.push(new THREE.Vector2(outerR, -w / 2 + bevel));
+      points.push(new THREE.Vector2(outerR, w / 2 - bevel));
+      points.push(new THREE.Vector2(outerR - bevel, w / 2));
+      points.push(new THREE.Vector2(innerR, w / 2));
+    }
+
+    const lathe = new THREE.LatheGeometry(points, 96);
+
+    // Apply grooves
+    if (design.grooves > 0) {
+      const posAttr = lathe.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        const z = posAttr.getZ(i);
+        const r = Math.sqrt(x * x + z * z);
+        for (let g = 0; g < design.grooves; g++) {
+          const grooveY = ((g + 1) / (design.grooves + 1) - 0.5) * w;
+          const dist = Math.abs(y - grooveY);
+          const grooveW = 0.015;
+          if (dist < grooveW) {
+            const depth = (design.grooveDepth / 10) * (1 - dist / grooveW);
+            const scale = (r - depth) / r;
+            posAttr.setX(i, x * scale);
+            posAttr.setZ(i, z * scale);
+          }
+        }
+      }
+      posAttr.needsUpdate = true;
+    }
+
+    lathe.computeVertexNormals();
+    return lathe;
+  }, [design]);
+
+  return (
+    <mesh ref={meshRef} geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
+      <meshStandardMaterial
+        color={metal.color}
+        roughness={metal.roughness}
+        metalness={metal.metalness}
+        envMapIntensity={metal.envIntensity}
+      />
+    </mesh>
+  );
+}
+
+// ── Scene wrapper ────────────────────────────────────────────────
+
+function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef }) {
+  return (
+    <>
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[4, 5, 5]} intensity={1.4} castShadow color="#ffffff" />
+      <directionalLight position={[-3, 2, -4]} intensity={0.5} color="#ff8c00" />
+      <pointLight position={[0, -2, 3]} intensity={0.3} color="#6B8AFF" />
+
+      <ShowcaseRing design={design} metal={metal} />
+
+      <ContactShadows position={[0, -0.7, 0]} opacity={0.4} scale={4} blur={2.5} far={3} />
+      <Environment preset="studio" />
+      <OrbitControls
+        enablePan={false}
+        enableZoom={false}
+        autoRotate={false}
+        minPolarAngle={Math.PI / 3}
+        maxPolarAngle={Math.PI / 1.8}
+      />
+    </>
+  );
+}
+
+// ── Main Showcase Component ──────────────────────────────────────
+
+export default function RingShowcase() {
+  const navigate = useNavigate();
+  const [designIdx, setDesignIdx] = useState(0);
+  const [metalIdx, setMetalIdx] = useState(0);
+
+  const design = DESIGNS[designIdx];
+  const metal = METALS[metalIdx];
+
+  const prevDesign = useCallback(() => {
+    setDesignIdx((i) => (i - 1 + DESIGNS.length) % DESIGNS.length);
+  }, []);
+  const nextDesign = useCallback(() => {
+    setDesignIdx((i) => (i + 1) % DESIGNS.length);
+  }, []);
+  const cycleMetal = useCallback(() => {
+    setMetalIdx((i) => (i + 1) % METALS.length);
+  }, []);
+
+  return (
+    <section className="relative py-16 sm:py-24 bg-forge-dark overflow-hidden">
+      {/* Background atmosphere */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary/[0.03] rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[300px] h-[300px] bg-accent/[0.02] rounded-full blur-[100px]" />
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10">
+        {/* Section header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-8 sm:mb-12"
+        >
+          <p className="text-[10px] uppercase tracking-[0.3em] text-primary/70 mb-3 font-body">
+            Interactive Showcase
+          </p>
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl mb-3">
+            Forged <span className="text-primary">Creations</span>
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto font-body">
+            Explore our signature designs. Click the metal swatch to cycle through finishes, 
+            or drag the ring to orbit.
+          </p>
+        </motion.div>
+
+        {/* Main showcase grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-center">
+          {/* 3D Viewport */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="relative aspect-square max-h-[500px] w-full rounded-2xl overflow-hidden border border-border/50 bg-gradient-to-br from-forge-dark via-card to-forge-dark"
+          >
+            {/* Subtle grid overlay */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
+              style={{
+                backgroundImage: `linear-gradient(hsl(var(--border)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)`,
+                backgroundSize: '40px 40px',
+              }}
+            />
+
+            <Canvas
+              camera={{ position: [0, 1.5, 3.5], fov: 35 }}
+              shadows
+              gl={{ antialias: true, alpha: true }}
+              dpr={[1, 2]}
+            >
+              <ShowcaseScene design={design} metal={metal} />
+            </Canvas>
+
+            {/* Metal cycle button */}
+            <button
+              onClick={cycleMetal}
+              className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-card/80 backdrop-blur-md border border-border/50 hover:border-primary/40 transition-all group"
+            >
+              <div
+                className="w-4 h-4 rounded-full border border-border/50 shadow-inner transition-colors"
+                style={{ backgroundColor: metal.color }}
+              />
+              <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                {metal.label}
+              </span>
+            </button>
+
+            {/* Design counter */}
+            <div className="absolute top-4 left-4 px-2 py-1 rounded-md bg-card/60 backdrop-blur-sm border border-border/30">
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {String(designIdx + 1).padStart(2, '0')}/{String(DESIGNS.length).padStart(2, '0')}
+              </span>
+            </div>
+          </motion.div>
+
+          {/* Design info panel */}
+          <div className="flex flex-col gap-6">
+            {/* Navigation arrows + name */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={prevDesign}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={design.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.25 }}
+                  className="flex-1 min-w-0"
+                >
+                  <h3 className="font-display text-xl sm:text-2xl text-foreground leading-tight">
+                    {design.name}
+                  </h3>
+                  <p className="text-xs text-primary/80 font-body mt-0.5 tracking-wide">
+                    {design.tagline}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+
+              <button
+                onClick={nextDesign}
+                className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Lore */}
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={design.id + "-lore"}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, delay: 0.05 }}
+                className="text-sm text-muted-foreground font-body leading-relaxed"
+              >
+                {design.lore}
+              </motion.p>
+            </AnimatePresence>
+
+            {/* Specs grid */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={design.id + "-specs"}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, delay: 0.1 }}
+                className="grid grid-cols-3 gap-3"
+              >
+                {[
+                  { label: "Width", value: `${design.width}mm` },
+                  { label: "Thickness", value: `${design.thickness}mm` },
+                  { label: "Profile", value: design.profile },
+                  { label: "Grooves", value: String(design.grooves) },
+                  { label: "Bevel", value: `${design.bevel}mm` },
+                  { label: "Metal", value: metal.label },
+                ].map((spec) => (
+                  <div key={spec.label} className="p-2.5 rounded-lg bg-card/50 border border-border/50">
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70 mb-0.5">{spec.label}</p>
+                    <p className="text-xs font-medium text-foreground capitalize">{spec.value}</p>
+                  </div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Metal swatches */}
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
+                Select Metal
+              </p>
+              <div className="flex gap-2">
+                {METALS.map((m, i) => (
+                  <button
+                    key={m.id}
+                    onClick={() => setMetalIdx(i)}
+                    className={cn(
+                      "w-8 h-8 rounded-full border-2 transition-all hover:scale-110",
+                      metalIdx === i
+                        ? "border-primary shadow-[0_0_12px_hsl(25_95%_53%/0.4)] scale-110"
+                        : "border-border/50 hover:border-border"
+                    )}
+                    style={{ backgroundColor: m.color }}
+                    title={m.label}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                onClick={() => navigate("/builder")}
+                className="bg-primary text-primary-foreground hover:bg-ember-glow px-6 font-display tracking-wider text-xs"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-2" />
+                Build Your Own
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/templates")}
+                className="border-border text-muted-foreground hover:text-foreground hover:bg-secondary text-xs"
+              >
+                Browse Templates
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Design thumbnails strip */}
+        <div className="mt-8 sm:mt-12 flex gap-2 sm:gap-3 justify-center flex-wrap">
+          {DESIGNS.map((d, i) => (
+            <button
+              key={d.id}
+              onClick={() => setDesignIdx(i)}
+              className={cn(
+                "px-3 py-2 rounded-lg border text-left transition-all min-w-[120px]",
+                designIdx === i
+                  ? "border-primary/50 bg-primary/5"
+                  : "border-border/50 bg-card/30 hover:border-border hover:bg-card/50"
+              )}
+            >
+              <p className={cn(
+                "text-[11px] font-display leading-tight transition-colors",
+                designIdx === i ? "text-primary" : "text-foreground/70"
+              )}>
+                {d.name}
+              </p>
+              <p className="text-[9px] text-muted-foreground/60 mt-0.5">{d.profile}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
