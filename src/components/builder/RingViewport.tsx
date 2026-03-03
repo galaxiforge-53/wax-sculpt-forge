@@ -117,46 +117,18 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const strength = 0.4 + (lunarTexture.intensity / 100) * 1.6; // 0.4–2.0
-    return new THREE.Vector2(strength, strength);
+    return new THREE.Vector2(strength, -strength); // negative Y to carve inward
   }, [lunarTexture?.enabled, lunarTexture?.intensity]);
 
-  const material = useMemo(() => {
-    const isWax = viewMode === "wax";
+  const isWax = viewMode === "wax";
 
-    if (isWax) {
-      return (
-        <meshStandardMaterial
-          color="#4a7a3a"
-          roughness={0.85}
-          metalness={0.0}
-          envMapIntensity={0.2}
-          normalMap={lunarMaps?.normalMap ?? null}
-          normalScale={normalScale}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-        />
-      );
-    }
-
-    const metalColors: Record<MetalPreset, string> = {
-      silver: "#C0C0C0",
-      gold: "#FFD700",
-      "rose-gold": "#E8A090",
-      titanium: "#878681",
-      tungsten: "#6B6B6B",
-    };
-
-    return (
-      <meshStandardMaterial
-        color={metalColors[metalPreset]}
-        roughness={0.15}
-        metalness={0.95}
-        envMapIntensity={1.5}
-        normalMap={lunarMaps?.normalMap ?? null}
-        normalScale={normalScale}
-        roughnessMap={lunarMaps?.roughnessMap ?? null}
-      />
-    );
-  }, [viewMode, metalPreset, lunarMaps, normalScale]);
+  const metalColors: Record<MetalPreset, string> = {
+    silver: "#C0C0C0",
+    gold: "#FFD700",
+    "rose-gold": "#E8A090",
+    titanium: "#878681",
+    tungsten: "#6B6B6B",
+  };
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (viewMode !== "wax" || activeTool !== "stamp" || !onAddWaxMark) return;
@@ -183,7 +155,15 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
       castShadow
       onPointerDown={handlePointerDown}
     >
-      {material}
+      <meshStandardMaterial
+        color={isWax ? "#4a7a3a" : metalColors[metalPreset]}
+        roughness={isWax ? 0.85 : 0.15}
+        metalness={isWax ? 0.0 : 0.95}
+        envMapIntensity={isWax ? 0.2 : 1.5}
+        normalMap={lunarMaps?.normalMap ?? undefined}
+        normalScale={normalScale}
+        roughnessMap={lunarMaps?.roughnessMap ?? undefined}
+      />
     </mesh>
   );
 }
