@@ -238,6 +238,26 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
     titanium: "#878681", tungsten: "#6B6B6B",
   };
 
+  // Generate lunar procedural maps for ANY ring shape
+  const lunarMaps = useMemo(() => {
+    if (!lunarTexture?.enabled) return null;
+    return generateLunarSurfaceMaps(lunarTexture);
+  }, [
+    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
+    lunarTexture?.craterDensity, lunarTexture?.craterSize,
+    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
+    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
+    lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
+    lunarTexture?.erosion, lunarTexture?.terrainRoughness,
+    lunarTexture?.craterVariation,
+  ]);
+
+  const normalScale = useMemo(() => {
+    if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
+    const strength = 0.3 + (lunarTexture.intensity / 100) * 0.7;
+    return new THREE.Vector2(strength, -strength);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity]);
+
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (viewMode !== "wax" || activeTool !== "stamp" || !onAddWaxMark) return;
     e.stopPropagation();
@@ -254,6 +274,8 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
+  const hasLunar = !!lunarTexture?.enabled;
+
   return (
     <mesh
       geometry={geometry}
@@ -262,32 +284,44 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
       onPointerDown={handlePointerDown}
     >
       {isWax ? (
-        <meshStandardMaterial color="#78A85B" roughness={0.85} metalness={0.05} />
+        <meshStandardMaterial
+          color="#78A85B"
+          roughness={hasLunar ? 0.82 : 0.85}
+          metalness={0.05}
+          normalMap={lunarMaps?.normalMap ?? null}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
+          aoMap={lunarMaps?.aoMap ?? null}
+          aoMapIntensity={hasLunar ? 1.2 : 0}
+          normalScale={normalScale}
+          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementScale={hasLunar ? 0.015 + (lunarTexture!.intensity / 100) * 0.04 : 0}
+          displacementBias={hasLunar ? -0.015 : 0}
+        />
       ) : (
         <meshPhysicalMaterial
           color={metalColors[metalPreset] ?? "#C0C0C0"}
-          roughness={0.35}
+          roughness={hasLunar ? 0.45 : 0.35}
           metalness={0.95}
-          envMapIntensity={1.0}
-          reflectivity={0.9}
+          normalMap={lunarMaps?.normalMap ?? null}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
+          aoMap={lunarMaps?.aoMap ?? null}
+          aoMapIntensity={hasLunar ? 1.8 : 0}
+          normalScale={normalScale}
+          envMapIntensity={hasLunar ? 2.0 : 1.0}
+          clearcoat={hasLunar ? 0.08 : 0}
+          clearcoatRoughness={0.3}
+          reflectivity={hasLunar ? 0.95 : 0.9}
+          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementScale={hasLunar ? 0.015 + (lunarTexture!.intensity / 100) * 0.04 : 0}
+          displacementBias={hasLunar ? -0.015 : 0}
         />
       )}
     </mesh>
   );
 }
 
-// ── Wrapper that picks STL vs procedural ──────────────────────────
+// ── Wrapper — always uses procedural mesh; lunar maps are applied as textures ──
 function RingMesh(props: RingMeshProps) {
-  const hasLunar = !!props.lunarTexture?.enabled;
-
-  if (hasLunar) {
-    return (
-      <Suspense fallback={<ProceduralRingMesh {...props} />}>
-        <LunarSTLMesh {...props} />
-      </Suspense>
-    );
-  }
-
   return <ProceduralRingMesh {...props} />;
 }
 
