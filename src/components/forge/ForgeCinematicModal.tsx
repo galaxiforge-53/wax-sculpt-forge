@@ -35,6 +35,7 @@ interface ForgeCinematicModalProps {
   viewMode: ViewMode;
   castabilityReport: CastabilityReport;
   craftActions: CraftAction[];
+  hasInlays?: boolean;
   onSave: () => void;
   onSendToGalaxiForge: () => void;
 }
@@ -89,6 +90,7 @@ export default function ForgeCinematicModal({
   finishPreset,
   castabilityReport,
   craftActions,
+  hasInlays,
   onSave,
   onSendToGalaxiForge,
 }: ForgeCinematicModalProps) {
@@ -101,9 +103,9 @@ export default function ForgeCinematicModal({
   // Narrative
   const narrative = useMemo(() => {
     const base = summarizeCraftActions(craftActions);
-    const enriched = enrichStageNotes(base.stageNotes, metalPreset, finishPreset);
+    const enriched = enrichStageNotes(base.stageNotes, metalPreset, finishPreset, hasInlays);
     return { ...base, stageNotes: enriched };
-  }, [craftActions, metalPreset, finishPreset]);
+  }, [craftActions, metalPreset, finishPreset, hasInlays]);
 
   const currentIndex = STAGES.findIndex((s) => s.id === pipelineState.currentStage);
   const stage = STAGES[currentIndex] ?? STAGES[0];

@@ -12,6 +12,7 @@ import {
 } from "@/types/ring";
 import { CraftState, CraftAction } from "@/types/craft";
 import { WaxMark, WaxMarkType } from "@/types/waxmarks";
+import { InlayChannel } from "@/types/inlays";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
@@ -42,6 +43,7 @@ export function useRingDesign() {
   });
   const [craftActions, setCraftActions] = useState<CraftAction[]>([]);
   const [waxMarks, setWaxMarks] = useState<WaxMark[]>([]);
+  const [inlays, setInlays] = useState<InlayChannel[]>([]);
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     type: "dent",
     radiusMm: 1.2,
@@ -191,11 +193,44 @@ export function useRingDesign() {
     logCraftAction("wax_marks_cleared", {});
   }, [logCraftAction]);
 
+  // --- Inlay helpers ---
+  const addInlayChannel = useCallback((input: Omit<InlayChannel, "id" | "createdAt">) => {
+    const channel: InlayChannel = {
+      ...input,
+      id: craftId(),
+      createdAt: new Date().toISOString(),
+    };
+    setInlays((prev) => [...prev, channel]);
+    logCraftAction("inlay_added", {
+      materialType: input.materialType,
+      displayName: input.displayName,
+      placement: input.placement,
+      width: input.channelWidthMm,
+      depth: input.channelDepthMm,
+    });
+  }, [logCraftAction]);
+
+  const updateInlayChannel = useCallback((id: string, patch: Partial<InlayChannel>) => {
+    setInlays((prev) => prev.map((ch) => ch.id === id ? { ...ch, ...patch } : ch));
+    logCraftAction("inlay_updated", { id, patchKeys: Object.keys(patch) });
+  }, [logCraftAction]);
+
+  const removeInlayChannel = useCallback((id: string) => {
+    setInlays((prev) => prev.filter((ch) => ch.id !== id));
+    logCraftAction("inlay_removed", { id });
+  }, [logCraftAction]);
+
+  const clearInlays = useCallback(() => {
+    setInlays([]);
+    logCraftAction("inlays_cleared", {});
+  }, [logCraftAction]);
+
   const generateDesignPackage = useCallback((): DesignPackage => {
     const craftState: CraftState = {
       baseRingParams: craftStateRef.current.baseRingParams,
       actionLog: craftActions,
       waxMarks,
+      inlays: { channels: inlays },
       createdAt: craftStateRef.current.createdAt,
       updatedAt: craftStateRef.current.updatedAt,
     };
@@ -213,7 +248,7 @@ export function useRingDesign() {
       castabilityReport,
       pipelineState,
     };
-  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions]);
+  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions, inlays]);
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
@@ -228,6 +263,7 @@ export function useRingDesign() {
     setPipelineState(pkg.pipelineState);
     setCraftActions(pkg.craftState.actionLog ?? []);
     setWaxMarks(pkg.craftState.waxMarks ?? []);
+    setInlays(pkg.craftState?.inlays?.channels ?? []);
     craftStateRef.current = {
       baseRingParams: pkg.parameters,
       createdAt: pkg.craftState.createdAt,
@@ -266,5 +302,10 @@ export function useRingDesign() {
     clearWaxMarks,
     stampSettings,
     setStampSettings,
+    inlays,
+    addInlayChannel,
+    updateInlayChannel,
+    removeInlayChannel,
+    clearInlays,
   };
 }

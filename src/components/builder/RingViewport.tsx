@@ -4,6 +4,7 @@ import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback } from "r
 import * as THREE from "three";
 import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
+import { InlayChannel } from "@/types/inlays";
 import { StampSettings } from "@/hooks/useRingDesign";
 
 export interface RingViewportHandle {
@@ -197,6 +198,44 @@ function WaxMarkOverlays({ marks }: { marks: WaxMark[] }) {
   );
 }
 
+// Render inlay channel band markers as translucent rings
+function InlayBandMarkers({ inlays, params }: { inlays: InlayChannel[]; params: RingParameters }) {
+  const innerRadius = params.innerDiameter / 2 / 10;
+  const outerRadius = innerRadius + params.thickness / 10;
+  const midRadius = (innerRadius + outerRadius) / 2 + 0.002;
+  const ringWidth = params.width / 10;
+
+  const materialColor: Record<string, string> = {
+    crystal: "#88ccff",
+    opal: "#ffaadd",
+    meteorite: "#aaaaaa",
+  };
+
+  return (
+    <>
+      {inlays.slice(0, 20).map((ch) => {
+        const yOffset =
+          ch.placement === "center" ? 0
+          : ch.placement === "edgeLeft" ? -ringWidth * 0.35
+          : ringWidth * 0.35;
+        const bandWidth = ch.channelWidthMm / 10;
+        return (
+          <mesh key={ch.id} rotation={[Math.PI / 2, 0, 0]} position={[0, yOffset, 0]}>
+            <torusGeometry args={[midRadius, bandWidth / 2, 8, 64]} />
+            <meshBasicMaterial
+              color={materialColor[ch.materialType] ?? "#88ccff"}
+              transparent
+              opacity={0.35}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        );
+      })}
+    </>
+  );
+}
+
 function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, number, number]) => Promise<string> }) => void }) {
   const { gl, camera, scene } = useThree();
   const captureRef = useRef<(pos: [number, number, number]) => Promise<string>>();
@@ -243,10 +282,11 @@ interface RingViewportProps {
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   waxMarks?: WaxMark[];
   stampSettings?: StampSettings;
+  inlays?: InlayChannel[];
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
@@ -296,6 +336,10 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (
             <WaxMarkOverlays marks={waxMarks} />
+          )}
+
+          {viewMode === "wax" && inlays && inlays.length > 0 && (
+            <InlayBandMarkers inlays={inlays} params={params} />
           )}
 
           <ContactShadows

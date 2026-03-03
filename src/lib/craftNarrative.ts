@@ -19,6 +19,7 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
   const stageNotes: Partial<Record<ForgeStageId, string[]>> = {};
   let lastParams: Record<string, unknown> = {};
   let waxMarkCount = 0;
+  const inlayCounts: Record<string, number> = {};
 
   for (const action of actions) {
     switch (action.type) {
@@ -73,12 +74,25 @@ export function summarizeCraftActions(actions: CraftAction[]): CraftNarrative {
         waxMarkCount++;
         break;
       }
+
+      case "inlay_added": {
+        const mt = (action.payload.materialType as string) ?? "unknown";
+        inlayCounts[mt] = (inlayCounts[mt] || 0) + 1;
+        break;
+      }
     }
   }
 
   // Wax marks highlight
   if (waxMarkCount > 0) {
     highlights.push(`Wax marks added: ${waxMarkCount}`);
+  }
+
+  // Inlay highlights
+  const inlayEntries = Object.entries(inlayCounts);
+  if (inlayEntries.length > 0) {
+    const inlayStr = inlayEntries.map(([t, c]) => `${c} ${t}`).join(", ");
+    highlights.push(`Inlays: ${inlayStr}`);
   }
 
   // Aggregate tool highlights
@@ -111,11 +125,14 @@ export function enrichStageNotes(
   notes: Partial<Record<ForgeStageId, string[]>>,
   metalPreset: string,
   finishPreset: string,
+  hasInlays?: boolean,
 ): Partial<Record<ForgeStageId, string[]>> {
   const enriched = { ...notes };
   enriched.POUR = [...(enriched.POUR ?? []), `Molten ${capitalize(metalPreset)} poured into cavity`];
   enriched.QUENCH = [...(enriched.QUENCH ?? []), "Casting cooled — investment broken away"];
-  enriched.FINISH = [...(enriched.FINISH ?? []), `${capitalize(finishPreset)} finish applied`];
+  const finishLines = [`${capitalize(finishPreset)} finish applied`];
+  if (hasInlays) finishLines.push("Inlays set and sealed");
+  enriched.FINISH = [...(enriched.FINISH ?? []), ...finishLines];
   return enriched;
 }
 

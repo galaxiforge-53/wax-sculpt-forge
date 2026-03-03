@@ -6,6 +6,7 @@ import ToolRail from "@/components/builder/ToolRail";
 import PropertiesPanel from "@/components/builder/PropertiesPanel";
 import CastabilityPanel from "@/components/builder/CastabilityPanel";
 import ForgePipelinePanel from "@/components/builder/ForgePipelinePanel";
+import InlaysPanel from "@/components/builder/InlaysPanel";
 import TemplatesPanel from "@/components/builder/TemplatesPanel";
 import TopBar from "@/components/builder/TopBar";
 import ForgeCinematicModal from "@/components/forge/ForgeCinematicModal";
@@ -38,6 +39,7 @@ export default function Builder() {
     restoreDesign, craftActions,
     waxMarks, addWaxMark, clearWaxMarks,
     stampSettings, setStampSettings,
+    inlays, addInlayChannel, removeInlayChannel, clearInlays,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -167,7 +169,7 @@ export default function Builder() {
           <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
         </div>
         <div className="flex-1 p-2">
-          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} stampSettings={stampSettings} />
+          <RingViewport ref={viewportRef} params={params} viewMode={viewMode} metalPreset={metalPreset} activeTool={activeTool} onAddWaxMark={addWaxMark} waxMarks={waxMarks} stampSettings={stampSettings} inlays={inlays} />
         </div>
         <div className="w-72 flex flex-col border-l border-border flex-shrink-0">
           <div className="flex-1 p-3 overflow-y-auto">
@@ -179,7 +181,10 @@ export default function Builder() {
           <div className="border-t border-border p-3">
             <ForgePipelinePanel pipelineState={pipelineState} onNext={nextStage} onPrev={prevStage} />
           </div>
-          <div className="border-t border-border p-3 h-[30%] overflow-hidden">
+          <div className="border-t border-border p-3">
+            <InlaysPanel inlays={inlays} onAdd={addInlayChannel} onRemove={removeInlayChannel} onClear={clearInlays} />
+          </div>
+          <div className="border-t border-border p-3 h-[25%] overflow-hidden">
             <TemplatesPanel onApply={applyTemplate} currentParams={params} />
           </div>
         </div>
@@ -204,6 +209,7 @@ export default function Builder() {
         viewMode={viewMode}
         castabilityReport={castabilityReport}
         craftActions={craftActions}
+        hasInlays={inlays.length > 0}
         onSave={() => { setForgeModalOpen(false); handleSave(); }}
         onSendToGalaxiForge={() => { setForgeModalOpen(false); handleExport(); }}
       />
