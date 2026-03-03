@@ -121,8 +121,8 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
   const displacementScale = useMemo(() => {
     if (!lunarTexture?.enabled) return 0;
     const thickness = params.thickness / 10;
-    // Scale displacement relative to ring thickness, intensity controls it
-    return thickness * 0.12 * (lunarTexture.intensity / 100);
+    // Aggressive displacement — craters should be visibly carved
+    return thickness * 0.25 * (lunarTexture.intensity / 100);
   }, [lunarTexture?.enabled, lunarTexture?.intensity, params.thickness]);
 
   const isWax = viewMode === "wax";

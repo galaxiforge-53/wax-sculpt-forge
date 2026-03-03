@@ -18,8 +18,8 @@ export interface LunarSurfaceMapSet {
   displacementMap: THREE.CanvasTexture;
 }
 
-const MAP_W = 1024;
-const MAP_H = 256;
+const MAP_W = 2048;
+const MAP_H = 512;
 
 const cache = new Map<string, LunarSurfaceMapSet>();
 
@@ -145,20 +145,26 @@ function stampCrater(
   warpNoise: (x: number, y: number) => number,
   warpAmp: number,
 ) {
+  // pxR and pyR must produce CIRCULAR craters in physical space.
+  // U maps to circumference (~60mm), V maps to width (~6mm).
+  // The heightmap is w×h pixels. A circle in UV space becomes
+  // an ellipse on the ring. To fix: pyR uses actual V pixels.
   const pxR = c.radius * w;
-  const pyR = c.radius * h * (w / h);
+  const pyR = c.radius * h;  // NOT scaled by (w/h) — keeps crater round on ring
 
-  const x0 = Math.floor((c.cu - c.radius * 1.5) * w);
-  const x1 = Math.ceil((c.cu + c.radius * 1.5) * w);
-  const y0 = Math.max(0, Math.floor((c.cv - c.radius * 1.5 * (w / h)) * h));
-  const y1 = Math.min(h - 1, Math.ceil((c.cv + c.radius * 1.5 * (w / h)) * h));
+  const spreadU = c.radius * 1.5;
+  const spreadV = c.radius * 1.5;
+  const x0 = Math.floor((c.cu - spreadU) * w);
+  const x1 = Math.ceil((c.cu + spreadU) * w);
+  const y0 = Math.max(0, Math.floor((c.cv - spreadV) * h));
+  const y1 = Math.min(h - 1, Math.ceil((c.cv + spreadV) * h));
 
-  const bowlEnd = 0.55;
-  const rimCenter = (0.65 + rimSharpness * 0.1) + c.rimCenterJitter;
-  const rimWidth = Math.max(0.02, (0.1 - rimSharpness * 0.04) + c.rimWidthJitter);
+  // Crater profile zones
+  const bowlEnd = 0.5;
+  const rimPeak = (0.62 + rimSharpness * 0.08) + c.rimCenterJitter;
+  const rimHalf = Math.max(0.03, (0.08 - rimSharpness * 0.03) + c.rimWidthJitter);
 
-  // Noise scale for domain warp per crater
-  const noiseScale = 8 + c.warpSeed * 4;
+  const noiseScale = 6 + c.warpSeed * 3;
 
   for (let py = y0; py <= y1; py++) {
     for (let px = x0; px <= x1; px++) {
@@ -168,31 +174,35 @@ function stampCrater(
       const du = (px - c.cu * w) / pxR;
       const dv = (py - c.cv * h) / pyR;
 
-      // Domain warp: perturb distance field
-      const warpU = warpNoise(px * noiseScale / w, py * noiseScale / h);
-      const warpV = warpNoise(py * noiseScale / h + 100, px * noiseScale / w + 100);
-      const wdu = du + warpAmp * warpU;
-      const wdv = dv + warpAmp * warpV;
+      // Subtle domain warp for organic irregularity (NOT breaking roundness)
+      const wU = warpNoise(px * noiseScale / w, py * noiseScale / h);
+      const wV = warpNoise(py * noiseScale / h + 100, px * noiseScale / w + 100);
+      const wdu = du + warpAmp * 0.3 * wU;
+      const wdv = dv + warpAmp * 0.3 * wV;
 
       const dist = Math.sqrt(wdu * wdu + wdv * wdv);
-      if (dist > 1.4) continue;
+      if (dist > 1.3) continue;
 
       let delta = 0;
       if (dist < bowlEnd) {
+        // Smooth concave bowl — parabolic, deepest at center
         const t = dist / bowlEnd;
-        delta = -c.depth * (1 - t * t) * 0.5;
-      } else if (dist < rimCenter - rimWidth) {
-        const t = (dist - bowlEnd) / (rimCenter - rimWidth - bowlEnd);
-        delta = -c.depth * 0.5 * (1 - t) + c.rimHeight * t * 0.3;
-      } else if (dist < rimCenter + rimWidth) {
-        const t = (dist - (rimCenter - rimWidth)) / (2 * rimWidth);
-        delta = c.rimHeight * 0.3 * Math.sin(t * Math.PI);
-      } else if (dist < 1.4) {
-        const t = (dist - (rimCenter + rimWidth)) / (1.4 - (rimCenter + rimWidth));
-        delta = c.rimHeight * 0.05 * Math.max(0, 1 - t);
+        delta = -c.depth * (1 - t * t);
+      } else if (dist < rimPeak - rimHalf) {
+        // Transition from bowl floor to rim — smooth rise
+        const t = (dist - bowlEnd) / (rimPeak - rimHalf - bowlEnd);
+        const smooth = t * t * (3 - 2 * t); // smoothstep
+        delta = -c.depth * (1 - smooth) * 0.15 + c.rimHeight * smooth * 0.5;
+      } else if (dist < rimPeak + rimHalf) {
+        // Rim peak — raised ring around crater
+        const t = (dist - (rimPeak - rimHalf)) / (2 * rimHalf);
+        delta = c.rimHeight * 0.5 * Math.sin(t * Math.PI);
+      } else if (dist < 1.3) {
+        // Outer falloff
+        const t = (dist - (rimPeak + rimHalf)) / (1.3 - (rimPeak + rimHalf));
+        delta = c.rimHeight * 0.08 * Math.max(0, 1 - t * t);
       }
 
-      // Apply edge mask so edges stay polished
       const mask = edgeMask[py * w + wpx];
       delta *= mask;
 
@@ -232,42 +242,73 @@ function buildHeightmap(lunar: LunarTextureState): Float32Array {
   const warpNoise = makeNoise2D(lunar.seed + 1234);
   const warpAmp = 0.15 + rimSharp * 0.12; // more warp = more irregular craters
 
-  // ─── 3) Crater stamps ──────────────────────────────────
-  // Dramatically increased counts for dense lunar coverage like reference images
-  const baseCount = lunar.craterDensity === "low" ? 60 : lunar.craterDensity === "med" ? 150 : 300;
-  const baseSizeMin = lunar.craterSize === "small" ? 0.006 : lunar.craterSize === "med" ? 0.012 : 0.02;
-  const baseSizeMax = lunar.craterSize === "small" ? 0.03 : lunar.craterSize === "med" ? 0.065 : 0.11;
+  // ─── 3) Multi-tier crater stamps (hero + medium + tiny) ─
+  // Real lunar surfaces have a power-law size distribution:
+  // a few huge craters, many medium, and tons of tiny ones.
+
+  const densityMul = lunar.craterDensity === "low" ? 0.5 : lunar.craterDensity === "med" ? 1.0 : 1.8;
+  const sizeMul = lunar.craterSize === "small" ? 0.6 : lunar.craterSize === "med" ? 1.0 : 1.5;
+
+  // Tier 1: HERO craters (2-5 large dominant craters)
+  const heroCount = Math.round((2 + densityMul * 3) * sizeMul);
+  const heroRadiusMin = 0.06 * sizeMul;
+  const heroRadiusMax = 0.14 * sizeMul;
+
+  // Tier 2: MEDIUM craters (10-40)
+  const medCount = Math.round(12 * densityMul * sizeMul);
+  const medRadiusMin = 0.025 * sizeMul;
+  const medRadiusMax = 0.06 * sizeMul;
+
+  // Tier 3: SMALL craters (30-150)
+  const smallCount = Math.round(40 * densityMul);
+  const smallRadiusMin = 0.008;
+  const smallRadiusMax = 0.025 * sizeMul;
 
   const stamps: CraterStamp[] = [];
-  let lastU = rand();
-  let lastV = 0.5;
 
-  for (let i = 0; i < baseCount; i++) {
-    const t = rand();
-    const radius = baseSizeMin + (baseSizeMax - baseSizeMin) * (t * t);
+  function addCraters(count: number, rMin: number, rMax: number, depthMul: number) {
+    for (let i = 0; i < count; i++) {
+      const t = rand();
+      const radius = rMin + (rMax - rMin) * t;
+      const cu = rand();
+      const cv = 0.12 + rand() * 0.76;
 
-    let cu: number, cv: number;
-    if (i > 0 && rand() < overlapFactor * 0.5) {
-      cu = lastU + (rand() - 0.5) * radius * 4;
-      cv = lastV + (rand() - 0.5) * radius * 4 * (MAP_W / MAP_H);
-    } else {
-      cu = rand();
-      cv = 0.1 + rand() * 0.8;
+      const depth = (0.5 + rand() * 0.5) * depthScale * depthMul;
+      const rimH = (0.35 + rimSharp * 0.65) * depthScale * depthMul;
+
+      const rimCenterJitter = (rand() - 0.5) * 0.04;
+      const rimWidthJitter = (rand() - 0.5) * 0.02;
+      const warpSeed = rand();
+
+      stamps.push({ cu, cv, radius, depth, rimHeight: rimH, rimCenterJitter, rimWidthJitter, warpSeed });
     }
-    cu = ((cu % 1) + 1) % 1;
-    cv = Math.max(0.05, Math.min(0.95, cv));
+  }
 
-    const depth = (0.35 + rand() * 0.5) * depthScale;
-    const rimH = (0.3 + rimSharp * 0.6) * depthScale;
+  // Stamp largest first so smaller ones overlap on top (natural look)
+  addCraters(heroCount, heroRadiusMin, heroRadiusMax, 1.0);
+  addCraters(medCount, medRadiusMin, medRadiusMax, 0.8);
+  addCraters(smallCount, smallRadiusMin, smallRadiusMax, 0.6);
 
-    // Per-crater rim jitter for irregularity
-    const rimCenterJitter = (rand() - 0.5) * 0.06;
-    const rimWidthJitter = (rand() - 0.5) * 0.03;
-    const warpSeed = rand();
+  // Overlap pass: add extra craters near existing ones
+  if (overlapFactor > 0) {
+    const overlapCount = Math.round(stamps.length * overlapFactor * 0.4);
+    for (let i = 0; i < overlapCount; i++) {
+      const parent = stamps[Math.floor(rand() * stamps.length)];
+      const radius = parent.radius * (0.3 + rand() * 0.5);
+      const angle = rand() * Math.PI * 2;
+      const dist = parent.radius * (0.6 + rand() * 0.8);
+      const cu = ((parent.cu + Math.cos(angle) * dist) % 1 + 1) % 1;
+      const cv = Math.max(0.08, Math.min(0.92, parent.cv + Math.sin(angle) * dist));
 
-    stamps.push({ cu, cv, radius, depth, rimHeight: rimH, rimCenterJitter, rimWidthJitter, warpSeed });
-    lastU = cu;
-    lastV = cv;
+      const depth = (0.4 + rand() * 0.4) * depthScale * 0.7;
+      const rimH = (0.3 + rimSharp * 0.5) * depthScale * 0.7;
+
+      stamps.push({ cu, cv, radius, depth, rimHeight: rimH,
+        rimCenterJitter: (rand() - 0.5) * 0.03,
+        rimWidthJitter: (rand() - 0.5) * 0.02,
+        warpSeed: rand(),
+      });
+    }
   }
 
   for (const s of stamps) {
