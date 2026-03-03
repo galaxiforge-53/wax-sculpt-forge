@@ -5,6 +5,7 @@ import RingViewport from "@/components/builder/RingViewport";
 import ToolRail from "@/components/builder/ToolRail";
 import PropertiesPanel from "@/components/builder/PropertiesPanel";
 import CastabilityPanel from "@/components/builder/CastabilityPanel";
+import ForgePipelinePanel from "@/components/builder/ForgePipelinePanel";
 import TemplatesPanel from "@/components/builder/TemplatesPanel";
 import TopBar from "@/components/builder/TopBar";
 import { isEmbedMode } from "@/config/galaxiforge";
@@ -21,6 +22,7 @@ export default function Builder() {
     undo, redo, canUndo, canRedo,
     generateDesignPackage,
     castabilityReport,
+    pipelineState, nextStage, prevStage,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -88,7 +90,14 @@ export default function Builder() {
           <div className="border-t border-border p-3">
             <CastabilityPanel report={castabilityReport} />
           </div>
-          <div className="border-t border-border p-3 h-[35%] overflow-hidden">
+          <div className="border-t border-border p-3">
+            <ForgePipelinePanel
+              pipelineState={pipelineState}
+              onNext={nextStage}
+              onPrev={prevStage}
+            />
+          </div>
+          <div className="border-t border-border p-3 h-[30%] overflow-hidden">
             <TemplatesPanel
               onApply={applyTemplate}
               currentParams={params}
