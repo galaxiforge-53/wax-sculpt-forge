@@ -17,9 +17,7 @@ export default function Export() {
 
   const handleSend = async () => {
     if (!pkg) return;
-    // Stub: POST to GalaxiForge
     console.log("Sending design package to:", getHandoffUrl(), pkg);
-    // In production: await fetch(getHandoffUrl(), { method: 'POST', body: JSON.stringify(pkg) });
     setSent(true);
   };
 
@@ -40,6 +38,29 @@ export default function Export() {
     <div className="min-h-screen bg-background flex items-center justify-center p-8">
       <div className="max-w-lg w-full space-y-6">
         <h1 className="font-display text-2xl text-primary ember-text">Design Package</h1>
+
+        {/* Preview thumbnails */}
+        {pkg.previews && pkg.previews.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {pkg.previews.map((preview) => (
+              <div
+                key={preview.id}
+                className="bg-card border border-border rounded-lg overflow-hidden"
+              >
+                <img
+                  src={preview.dataUrl}
+                  alt={preview.label}
+                  className="w-full aspect-square object-cover"
+                />
+                <div className="px-2 py-1.5 text-center">
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                    {preview.label}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="bg-card border border-border rounded-lg p-6 space-y-3">
           <div className="flex justify-between text-sm">
@@ -80,7 +101,6 @@ export default function Export() {
           </div>
         </div>
 
-        {/* JSON Preview */}
         <details className="text-xs">
           <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
             View Raw JSON
