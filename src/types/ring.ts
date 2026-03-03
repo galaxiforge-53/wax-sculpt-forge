@@ -17,6 +17,13 @@ export interface RingParameters {
   bevelSize: number;
 }
 
+export interface DesignPreview {
+  id: "front" | "angle" | "side";
+  label: string;
+  viewMode: ViewMode;
+  dataUrl: string;
+}
+
 export interface DesignPackage {
   id: string;
   version: string;
@@ -26,7 +33,7 @@ export interface DesignPackage {
   metalPreset: MetalPreset;
   finishPreset: FinishPreset;
   toolHistory: ToolHistoryEntry[];
-  previews: string[]; // base64 or URLs
+  previews: DesignPreview[];
   craftState: import("./craft").CraftState;
   castabilityReport: import("./castability").CastabilityReport;
   pipelineState: import("./pipeline").ForgePipelineState;
