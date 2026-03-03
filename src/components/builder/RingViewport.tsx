@@ -162,6 +162,8 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
           metalness={0.05}
           normalMap={lunarMaps?.normalMap ?? null}
           roughnessMap={lunarMaps?.roughnessMap ?? null}
+          aoMap={lunarMaps?.aoMap ?? null}
+          map={lunarMaps?.albedoMap ?? null}
           normalScale={normalScale}
         />
       ) : (
@@ -171,6 +173,7 @@ function RingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, sta
           metalness={0.9}
           normalMap={lunarMaps?.normalMap ?? null}
           roughnessMap={lunarMaps?.roughnessMap ?? null}
+          aoMap={lunarMaps?.aoMap ?? null}
           normalScale={normalScale}
         />
       )}
