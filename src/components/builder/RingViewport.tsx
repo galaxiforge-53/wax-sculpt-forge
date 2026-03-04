@@ -114,10 +114,18 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
     titanium: "#878681", tungsten: "#6B6B6B",
   };
 
+  // Compute physical aspect ratio: circumference / width so craters are circular
+  const physicalAspect = useMemo(() => {
+    const outerDiam = params.innerDiameter + 2 * params.thickness;
+    const circumference = Math.PI * outerDiam;
+    const width = params.width;
+    return width > 0 ? circumference / width : 1;
+  }, [params.innerDiameter, params.thickness, params.width]);
+
   // Generate procedural maps for micro-detail enhancement on top of real geometry
   const lunarMaps = useMemo(() => {
     if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture);
+    return generateLunarSurfaceMaps(lunarTexture, physicalAspect);
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
@@ -126,6 +134,7 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
     lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
     lunarTexture?.erosion, lunarTexture?.terrainRoughness,
     lunarTexture?.craterVariation,
+    physicalAspect,
   ]);
 
   const normalScale = useMemo(() => {
@@ -257,10 +266,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
     titanium: "#878681", tungsten: "#6B6B6B",
   };
 
+  // Compute physical aspect ratio for circular craters
+  const physicalAspect = useMemo(() => {
+    const outerDiam = params.innerDiameter + 2 * params.thickness;
+    const circumference = Math.PI * outerDiam;
+    const width = params.width;
+    return width > 0 ? circumference / width : 1;
+  }, [params.innerDiameter, params.thickness, params.width]);
+
   // Generate lunar procedural maps for ANY ring shape
   const lunarMaps = useMemo(() => {
     if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture);
+    return generateLunarSurfaceMaps(lunarTexture, physicalAspect);
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
@@ -269,6 +286,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
     lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
     lunarTexture?.erosion, lunarTexture?.terrainRoughness,
     lunarTexture?.craterVariation,
+    physicalAspect,
   ]);
 
   const normalScale = useMemo(() => {

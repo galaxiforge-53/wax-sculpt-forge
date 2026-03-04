@@ -168,7 +168,7 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
   const craterCount = useMemo(() => {
     if (!state.enabled) return 0;
     try {
-      const maps = generateLunarSurfaceMaps(state);
+      const maps = generateLunarSurfaceMaps(state, 8); // approximate aspect for count display
       return maps.craterCount;
     } catch {
       return 0;
