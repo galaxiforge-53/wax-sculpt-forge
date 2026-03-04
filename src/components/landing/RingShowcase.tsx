@@ -307,43 +307,49 @@ function getOuterRadiusAtY(
   }
 }
 
-// ── Meteorite Widmanstätten texture ──────────────────────────────
+// ── Meteorite Widmanstätten texture (enhanced) ──────────────────
 
 function useMeteoriteTexture(seed: number) {
   return useMemo(() => {
-    const size = 128;
+    const size = 256;
     const data = new Uint8Array(size * size * 4);
     let s = seed | 0 || 1;
     const rng = () => { s = (s * 16807) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
 
+    // Base grain
     for (let i = 0; i < size * size; i++) {
-      const v = 140 + rng() * 30;
+      const v = 120 + rng() * 40;
       data[i * 4] = v;
       data[i * 4 + 1] = v;
       data[i * 4 + 2] = v;
       data[i * 4 + 3] = 255;
     }
 
-    const lineCount = 8 + Math.floor(rng() * 8);
+    // Widmanstätten crystalline bands — more of them, sharper
+    const lineCount = 14 + Math.floor(rng() * 12);
     for (let l = 0; l < lineCount; l++) {
       const angle = rng() * Math.PI;
-      const cx = rng() * size;
-      const cy = rng() * size;
-      const length = 20 + rng() * 60;
-      const width = 1 + rng() * 2;
-      const brightness = 180 + rng() * 50;
+      // Multiple parallel sub-bands per line group
+      const subBands = 1 + Math.floor(rng() * 3);
+      for (let sb = 0; sb < subBands; sb++) {
+        const cx = rng() * size;
+        const cy = rng() * size;
+        const length = 30 + rng() * 80;
+        const width = 0.5 + rng() * 2.5;
+        const brightness = 170 + rng() * 60;
 
-      for (let t = -length / 2; t < length / 2; t += 0.5) {
-        for (let w2 = -width; w2 <= width; w2 += 0.5) {
-          const px = Math.round(cx + Math.cos(angle) * t + Math.cos(angle + Math.PI / 2) * w2);
-          const py = Math.round(cy + Math.sin(angle) * t + Math.sin(angle + Math.PI / 2) * w2);
-          if (px >= 0 && px < size && py >= 0 && py < size) {
-            const idx = (py * size + px) * 4;
+        for (let t = -length / 2; t < length / 2; t += 0.4) {
+          for (let w2 = -width; w2 <= width; w2 += 0.4) {
+            const px = Math.round(cx + Math.cos(angle) * t + Math.cos(angle + Math.PI / 2) * w2);
+            const py = Math.round(cy + Math.sin(angle) * t + Math.sin(angle + Math.PI / 2) * w2);
+            const wpx = ((px % size) + size) % size;
+            const wpy = ((py % size) + size) % size;
+            const idx = (wpy * size + wpx) * 4;
             const falloff = 1 - Math.abs(w2) / width;
-            const v = data[idx] * (1 - falloff * 0.4) + brightness * falloff * 0.4;
-            data[idx] = v;
-            data[idx + 1] = v;
-            data[idx + 2] = v;
+            const mix = falloff * 0.5;
+            data[idx] = data[idx] * (1 - mix) + brightness * mix;
+            data[idx + 1] = data[idx + 1] * (1 - mix) + brightness * mix;
+            data[idx + 2] = data[idx + 2] * (1 - mix) + brightness * mix;
           }
         }
       }
@@ -352,9 +358,136 @@ function useMeteoriteTexture(seed: number) {
     const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2, 1);
+    tex.repeat.set(3, 1);
     tex.needsUpdate = true;
     return tex;
+  }, [seed]);
+}
+
+// ── Casting surface texture (normal + roughness) ────────────────
+// Simulates investment casting grain, micro tool marks, and hand-finish imperfections
+
+function useCastingTextures(seed: number) {
+  return useMemo(() => {
+    const size = 512;
+    let s = seed | 0 || 1;
+    const rng = () => { s = (s * 16807) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
+
+    // ── Heightmap: casting grain + radial tool marks + pitting ──
+    const hmap = new Float32Array(size * size).fill(0.5);
+
+    // 1) Fine casting grain noise
+    for (let i = 0; i < hmap.length; i++) {
+      hmap[i] += (rng() - 0.5) * 0.08;
+    }
+
+    // 2) Circumferential polishing scratches (horizontal streaks in UV)
+    const scratchCount = 40 + Math.floor(rng() * 60);
+    for (let sc = 0; sc < scratchCount; sc++) {
+      const y = Math.floor(rng() * size);
+      const width = 1 + Math.floor(rng() * 2);
+      const depth = 0.02 + rng() * 0.04;
+      const startX = Math.floor(rng() * size * 0.3);
+      const length = Math.floor(size * 0.4 + rng() * size * 0.6);
+      for (let x = startX; x < startX + length && x < size; x++) {
+        for (let dy = -width; dy <= width; dy++) {
+          const wy = ((y + dy) % size + size) % size;
+          const falloff = 1 - Math.abs(dy) / (width + 1);
+          hmap[wy * size + x] -= depth * falloff;
+        }
+      }
+    }
+
+    // 3) Tiny casting pits (investment casting porosity)
+    const pitCount = 80 + Math.floor(rng() * 120);
+    for (let p = 0; p < pitCount; p++) {
+      const px = Math.floor(rng() * size);
+      const py = Math.floor(rng() * size);
+      const r = 1 + Math.floor(rng() * 3);
+      const depth = 0.03 + rng() * 0.06;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d > r) continue;
+          const wx = ((px + dx) % size + size) % size;
+          const wy = ((py + dy) % size + size) % size;
+          hmap[wy * size + wx] -= depth * (1 - d / r);
+        }
+      }
+    }
+
+    // 4) Broader hand-worked undulation
+    const blobCount = 8 + Math.floor(rng() * 8);
+    for (let b = 0; b < blobCount; b++) {
+      const bx = rng() * size;
+      const by = rng() * size;
+      const br = 20 + rng() * 40;
+      const bh = (rng() - 0.5) * 0.06;
+      for (let dy = -Math.ceil(br); dy <= Math.ceil(br); dy++) {
+        for (let dx = -Math.ceil(br); dx <= Math.ceil(br); dx++) {
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d > br) continue;
+          const wx = ((Math.floor(bx) + dx) % size + size) % size;
+          const wy = ((Math.floor(by) + dy) % size + size) % size;
+          hmap[wy * size + wx] += bh * (1 - (d / br) * (d / br));
+        }
+      }
+    }
+
+    // ── Normal map from heightmap ──
+    const normalData = new Uint8Array(size * size * 4);
+    const strength = 3.0;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const xl = ((x - 1) + size) % size;
+        const xr = (x + 1) % size;
+        const yu = Math.max(0, y - 1);
+        const yd = Math.min(size - 1, y + 1);
+        const left = hmap[y * size + xl];
+        const right = hmap[y * size + xr];
+        const up = hmap[yu * size + x];
+        const down = hmap[yd * size + x];
+        let nx = (left - right) * strength;
+        let ny = (up - down) * strength;
+        let nz = 1.0;
+        const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        nx /= len; ny /= len; nz /= len;
+        const idx = (y * size + x) * 4;
+        normalData[idx] = Math.round((nx * 0.5 + 0.5) * 255);
+        normalData[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+        normalData[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+        normalData[idx + 3] = 255;
+      }
+    }
+
+    // ── Roughness map — scratches are shinier, pits are rougher ──
+    const roughData = new Uint8Array(size * size * 4);
+    for (let i = 0; i < hmap.length; i++) {
+      const h = hmap[i];
+      // Lower heightmap = pit/scratch = slightly different roughness
+      const rough = h < 0.48 ? 100 : h > 0.52 ? 140 : 120;
+      const jitter = Math.floor((rng() - 0.5) * 20);
+      const v = Math.max(0, Math.min(255, rough + jitter));
+      const idx = i * 4;
+      roughData[idx] = v;
+      roughData[idx + 1] = v;
+      roughData[idx + 2] = v;
+      roughData[idx + 3] = 255;
+    }
+
+    const normalMap = new THREE.DataTexture(normalData, size, size, THREE.RGBAFormat);
+    normalMap.wrapS = THREE.RepeatWrapping;
+    normalMap.wrapT = THREE.RepeatWrapping;
+    normalMap.repeat.set(2, 1);
+    normalMap.needsUpdate = true;
+
+    const roughnessMap = new THREE.DataTexture(roughData, size, size, THREE.RGBAFormat);
+    roughnessMap.wrapS = THREE.RepeatWrapping;
+    roughnessMap.wrapT = THREE.RepeatWrapping;
+    roughnessMap.repeat.set(2, 1);
+    roughnessMap.needsUpdate = true;
+
+    return { normalMap, roughnessMap };
   }, [seed]);
 }
 
@@ -439,17 +572,35 @@ function InlayChannel({
   return (
     <group>
       <mesh ref={meshRef} geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <meshStandardMaterial
-          color={inlay.color}
-          emissive={inlay.emissive}
-          emissiveIntensity={inlay.emissiveIntensity}
-          roughness={inlay.roughness}
-          metalness={inlay.metalness}
-          transparent
-          opacity={inlay.opacity}
-          envMapIntensity={inlay.material === "opal" ? 3.0 : inlay.material === "crystal" ? 2.5 : 1.0}
-          map={inlay.material === "meteorite" ? meteorTex : null}
-        />
+        {inlay.material === "meteorite" ? (
+          <meshStandardMaterial
+            color={inlay.color}
+            emissive={inlay.emissive}
+            emissiveIntensity={inlay.emissiveIntensity}
+            roughness={inlay.roughness}
+            metalness={inlay.metalness}
+            transparent
+            opacity={inlay.opacity}
+            envMapIntensity={1.2}
+            map={meteorTex}
+          />
+        ) : (
+          <meshPhysicalMaterial
+            color={inlay.color}
+            emissive={inlay.emissive}
+            emissiveIntensity={inlay.emissiveIntensity}
+            roughness={inlay.roughness}
+            metalness={inlay.metalness}
+            transparent
+            opacity={inlay.opacity}
+            envMapIntensity={inlay.material === "opal" ? 3.5 : 3.0}
+            transmission={inlay.material === "opal" ? 0.3 : 0.15}
+            thickness={0.5}
+            ior={inlay.material === "opal" ? 1.45 : 1.55}
+            clearcoat={0.4}
+            clearcoatRoughness={0.1}
+          />
+        )}
       </mesh>
 
       {glowGeometry && inlay.material !== "meteorite" && (
@@ -534,16 +685,21 @@ function GemStoneGroup({
       {stone.shape === "cabochon" ? (
         // Cabochon: smooth dome (squashed sphere)
         <mesh ref={gemRef} position={[0, bezelH * 0.45, 0]} scale={[1, 0.55, 1]} castShadow>
-          <sphereGeometry args={[stoneR, 32, 24]} />
-          <meshStandardMaterial
+          <sphereGeometry args={[stoneR, 48, 32]} />
+          <meshPhysicalMaterial
             color={stone.color}
             emissive={stone.emissive}
             emissiveIntensity={stone.emissiveIntensity}
-            roughness={0.04}
-            metalness={0.02}
+            roughness={0.02}
+            metalness={0.01}
             transparent
             opacity={stone.opacity}
-            envMapIntensity={3.5}
+            envMapIntensity={4.0}
+            transmission={0.35}
+            thickness={stoneR * 8}
+            ior={1.54}
+            clearcoat={0.8}
+            clearcoatRoughness={0.05}
           />
         </mesh>
       ) : (
@@ -555,16 +711,21 @@ function GemStoneGroup({
           rotation={[0, Math.PI / 4, 0]}
           castShadow
         >
-          <octahedronGeometry args={[stoneR, 1]} />
-          <meshStandardMaterial
+          <octahedronGeometry args={[stoneR, 2]} />
+          <meshPhysicalMaterial
             color={stone.color}
             emissive={stone.emissive}
             emissiveIntensity={stone.emissiveIntensity}
-            roughness={0.02}
-            metalness={0.03}
+            roughness={0.01}
+            metalness={0.02}
             transparent
             opacity={stone.opacity}
-            envMapIntensity={4.0}
+            envMapIntensity={5.0}
+            transmission={0.4}
+            thickness={stoneR * 10}
+            ior={2.42}
+            clearcoat={1.0}
+            clearcoatRoughness={0.02}
           />
         </mesh>
       )}
@@ -584,10 +745,11 @@ function GemStoneGroup({
   );
 }
 
-// ── 3D Ring Mesh ─────────────────────────────────────────────────
+// ── 3D Ring Mesh (enhanced with casting detail) ─────────────────
 
 function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }) {
   const groupRef = useRef<THREE.Group>(null);
+  const castingTex = useCastingTextures(42 + design.id.length * 7);
 
   useFrame((_, delta) => {
     if (groupRef.current) {
@@ -602,7 +764,8 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
   const geometry = useMemo(() => {
     const bevel = design.bevel / 10;
     const points: THREE.Vector2[] = [];
-    const steps = 64;
+    // High poly for surface detail
+    const steps = 128;
 
     if (design.profile === "dome" || design.profile === "comfort") {
       for (let i = 0; i <= steps; i++) {
@@ -645,8 +808,10 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
       points.push(new THREE.Vector2(innerR, w / 2));
     }
 
-    const lathe = new THREE.LatheGeometry(points, 128);
+    const segments = 256;
+    const lathe = new THREE.LatheGeometry(points, segments);
 
+    // ── Groove carving ──
     if (design.grooves > 0) {
       const posAttr = lathe.attributes.position;
       for (let i = 0; i < posAttr.count; i++) {
@@ -669,22 +834,78 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
       posAttr.needsUpdate = true;
     }
 
+    // ── Organic surface perturbation — hand-carved wax feel ──
+    {
+      const posAttr = lathe.attributes.position;
+      let seed = design.id.length * 137;
+      const srng = () => { seed = (seed * 16807) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
+      // Pre-seed
+      for (let i = 0; i < 50; i++) srng();
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        const z = posAttr.getZ(i);
+        const r = Math.sqrt(x * x + z * z);
+        if (r < innerR + 0.005) continue; // don't perturb inner surface
+
+        const angle = Math.atan2(z, x);
+        // Multi-frequency organic displacement
+        const disp1 = Math.sin(angle * 23 + y * 40) * 0.0008;
+        const disp2 = Math.sin(angle * 47 + y * 80 + 1.3) * 0.0004;
+        const disp3 = Math.sin(angle * 11 + y * 15) * 0.0012;
+        // Random per-vertex micro jitter
+        const jitter = (srng() - 0.5) * 0.0006;
+        const totalDisp = disp1 + disp2 + disp3 + jitter;
+
+        const scale = (r + totalDisp) / r;
+        posAttr.setX(i, x * scale);
+        posAttr.setZ(i, z * scale);
+      }
+      posAttr.needsUpdate = true;
+    }
+
     lathe.computeVertexNormals();
     return lathe;
   }, [design, innerR, outerR, w]);
 
   const isWax = metal.id === "wax";
+  const normalScale = useMemo(() => new THREE.Vector2(
+    isWax ? 1.2 : 0.6,
+    isWax ? -1.2 : -0.6
+  ), [isWax]);
 
   return (
     <group ref={groupRef}>
-      {/* Main ring body */}
+      {/* Main ring body — meshPhysicalMaterial for PBR realism */}
       <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <meshStandardMaterial
-          color={metal.color}
-          roughness={isWax ? 0.85 : metal.roughness}
-          metalness={isWax ? 0.05 : metal.metalness}
-          envMapIntensity={isWax ? 0.2 : metal.envIntensity}
-        />
+        {isWax ? (
+          <meshStandardMaterial
+            color="#78A85B"
+            roughness={0.82}
+            metalness={0.05}
+            envMapIntensity={0.3}
+            normalMap={castingTex.normalMap}
+            normalScale={normalScale}
+            roughnessMap={castingTex.roughnessMap}
+          />
+        ) : (
+          <meshPhysicalMaterial
+            color={metal.color}
+            roughness={metal.roughness}
+            metalness={metal.metalness}
+            envMapIntensity={metal.envIntensity}
+            normalMap={castingTex.normalMap}
+            normalScale={normalScale}
+            roughnessMap={castingTex.roughnessMap}
+            clearcoat={0.15}
+            clearcoatRoughness={0.2}
+            reflectivity={0.95}
+            sheen={0.05}
+            sheenRoughness={0.3}
+            sheenColor={new THREE.Color(metal.color).multiplyScalar(0.3)}
+          />
+        )}
       </mesh>
 
       {/* Inlay channels */}
@@ -720,17 +941,23 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef }) {
   return (
     <>
-      <ambientLight intensity={0.2} />
-      <directionalLight position={[4, 5, 5]} intensity={1.6} castShadow color="#ffffff" />
-      <directionalLight position={[-3, 2, -4]} intensity={0.5} color="#ff8c00" />
-      <pointLight position={[0, 0, 3]} intensity={0.6} color="#ffffff" />
-      <pointLight position={[2, -1, -3]} intensity={0.4} color="#e879f9" />
-      <pointLight position={[-2, 1, 2]} intensity={0.35} color="#38bdf8" />
-      <pointLight position={[0, 2, 0]} intensity={0.3} color="#fbbf24" />
+      <ambientLight intensity={0.15} />
+      {/* Key light — raking angle to reveal surface texture and carving detail */}
+      <directionalLight position={[3, 6, 4]} intensity={1.8} castShadow color="#fff8f0" />
+      {/* Fill — warm, opposite side */}
+      <directionalLight position={[-4, 2, -3]} intensity={0.45} color="#ff9040" />
+      {/* Rim lights — catch edges and groove walls */}
+      <pointLight position={[0, 0, 3.5]} intensity={0.7} color="#ffffff" />
+      <pointLight position={[2, -1, -3]} intensity={0.45} color="#e879f9" />
+      <pointLight position={[-2, 1, 2]} intensity={0.4} color="#38bdf8" />
+      {/* Top accent — reveals surface pitting and casting grain */}
+      <pointLight position={[0, 3, 0]} intensity={0.5} color="#fbbf24" />
+      {/* Under-light — fills shadows in grooves */}
+      <pointLight position={[0, -2, 2]} intensity={0.2} color="#94a3b8" />
 
       <ShowcaseRing design={design} metal={metal} />
 
-      <ContactShadows position={[0, -0.7, 0]} opacity={0.5} scale={4} blur={2} far={3} />
+      <ContactShadows position={[0, -0.7, 0]} opacity={0.55} scale={5} blur={2.5} far={3} />
       <Environment preset="studio" />
       <OrbitControls
         enablePan={false}
