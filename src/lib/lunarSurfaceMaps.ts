@@ -143,12 +143,18 @@ function stampCrater(
   warpAmp: number,
   hasCentralPeak: boolean,
   hasTerraces: boolean,
+  physicalAspect: number = 1,
 ) {
+  // Physical aspect correction: stretch V so craters are circular on the ring surface
+  // physicalAspect = circumference / width. We need craters to cover more V-range.
+  const vStretch = physicalAspect;
+
   const pxR = c.radius * w;
-  const pyR = c.radius * h;
+  // pyR is enlarged by vStretch so the crater extends further in V, appearing circular on ring
+  const pyR = c.radius * h * vStretch;
 
   const spreadU = c.radius * 1.5;
-  const spreadV = c.radius * 1.5;
+  const spreadV = c.radius * 1.5 * vStretch;
   const x0 = Math.floor((c.cu - spreadU) * w);
   const x1 = Math.ceil((c.cu + spreadU) * w);
   const y0 = Math.max(0, Math.floor((c.cv - spreadV) * h));
@@ -234,6 +240,7 @@ function stampEjectaRays(
   rand: () => number,
   edgeMask: Float32Array,
   secondaryStamps: CraterStamp[],
+  physicalAspect: number = 1,
 ) {
   const rayCount = 4 + Math.floor(rand() * 5);
   const rayLength = c.radius * (2.5 + rand() * 2.0);
@@ -249,7 +256,8 @@ function stampEjectaRays(
       const t = s / steps;
       const dist = c.radius * 0.8 + t * rayLength;
       const ru = c.cu + Math.cos(angle) * dist;
-      const rv = c.cv + Math.sin(angle) * dist * (w / h);
+      // Use physicalAspect so rays extend equally in physical space
+      const rv = c.cv + Math.sin(angle) * dist * physicalAspect;
 
       if (rv < 0.05 || rv > 0.95) continue;
 
@@ -324,7 +332,7 @@ interface HeightmapResult {
   craterCount: number;
 }
 
-function buildHeightmap(lunar: LunarTextureState): HeightmapResult {
+function buildHeightmap(lunar: LunarTextureState, physicalAspect: number = 1): HeightmapResult {
   const hmap = new Float32Array(MAP_W * MAP_H).fill(0.5);
   const rand = seededRng(lunar.seed);
   const rimSharp = lunar.rimSharpness / 100;
@@ -437,17 +445,17 @@ function buildHeightmap(lunar: LunarTextureState): HeightmapResult {
   for (const s of stamps) {
     const hasPeak = s.tier <= 1; // mega + hero get central peaks
     const hasTerraces = s.tier === 0; // only mega gets terraces
-    stampCrater(hmap, MAP_W, MAP_H, s, rimSharp, edgeMask, warpNoise, warpAmp, hasPeak, hasTerraces);
+    stampCrater(hmap, MAP_W, MAP_H, s, rimSharp, edgeMask, warpNoise, warpAmp, hasPeak, hasTerraces, physicalAspect);
 
     // Ejecta rays for mega + hero
     if (s.tier <= 1) {
-      stampEjectaRays(hmap, MAP_W, MAP_H, s, rand, edgeMask, secondaryStamps);
+      stampEjectaRays(hmap, MAP_W, MAP_H, s, rand, edgeMask, secondaryStamps, physicalAspect);
     }
   }
 
   // Stamp secondary impact chains from ejecta
   for (const sec of secondaryStamps) {
-    stampCrater(hmap, MAP_W, MAP_H, sec, rimSharp, edgeMask, warpNoise, warpAmp, false, false);
+    stampCrater(hmap, MAP_W, MAP_H, sec, rimSharp, edgeMask, warpNoise, warpAmp, false, false, physicalAspect);
   }
 
   const totalCraterCount = stamps.length + secondaryStamps.length + microPitCount;
@@ -470,11 +478,11 @@ function buildHeightmap(lunar: LunarTextureState): HeightmapResult {
       const pd = pitDepth * (0.5 + pitRng() * 0.5);
 
       const pxR = pr * MAP_W;
-      const pyR = pr * MAP_H * (MAP_W / MAP_H);
+      const pyR = pr * MAP_H * physicalAspect;
       const x0 = Math.max(0, Math.floor((pu - pr * 1.2) * MAP_W));
       const x1 = Math.min(MAP_W - 1, Math.ceil((pu + pr * 1.2) * MAP_W));
-      const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * (MAP_W / MAP_H)) * MAP_H));
-      const y1 = Math.min(MAP_H - 1, Math.ceil((pv + pr * 1.2 * (MAP_W / MAP_H)) * MAP_H));
+      const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * MAP_H));
+      const y1 = Math.min(MAP_H - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * MAP_H));
 
       for (let py = y0; py <= y1; py++) {
         for (let px = x0; px <= x1; px++) {
@@ -511,12 +519,15 @@ function buildHeightmap(lunar: LunarTextureState): HeightmapResult {
 
 // ── Normal map from heightmap (Sobel) ─────────────────────────────
 
-function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, strength: number): HTMLCanvasElement {
+function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, strength: number, physicalAspect: number = 1): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
+
+  // Correct Y gradient for physical aspect ratio so normals match circular craters
+  const yScale = physicalAspect * (h / w);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -531,7 +542,7 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
       const down = hmap[yd * w + x];
 
       let nx = (left - right) * strength;
-      let ny = (up - down) * strength;
+      let ny = (up - down) * strength * yScale;
       let nz = 1.0;
       const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
       nx /= len; ny /= len; nz /= len;
@@ -698,13 +709,16 @@ function setupDataTexture(tex: THREE.CanvasTexture) {
 
 // ── Public API ────────────────────────────────────────────────────
 
-export function generateLunarSurfaceMaps(lunar: LunarTextureState): LunarSurfaceMapSet {
-  const key = cacheKey(lunar);
+export function generateLunarSurfaceMaps(lunar: LunarTextureState, physicalAspect?: number): LunarSurfaceMapSet {
+  // physicalAspect = circumference / width; defaults to 1 (square) for backward compat
+  const aspect = physicalAspect ?? 1;
+  const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}`;
   if (cache.has(key)) return cache.get(key)!;
 
-  const { hmap, craterCount } = buildHeightmap(lunar);
+  const { hmap, craterCount } = buildHeightmap(lunar, aspect);
 
-  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.0);
+  // Scale normal map Y gradient by aspect ratio so lighting responds to circular craters correctly
+  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.0, aspect);
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
   const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
