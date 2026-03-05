@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useRingDesign } from "@/hooks/useRingDesign";
 import { useEffect, useRef, useState } from "react";
-import RingViewport, { RingViewportHandle } from "@/components/builder/RingViewport";
+import RingViewport, { RingViewportHandle, SnapshotAngle } from "@/components/builder/RingViewport";
 import ToolRail from "@/components/builder/ToolRail";
 import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import TopBar from "@/components/builder/TopBar";
@@ -71,15 +71,15 @@ export default function Builder() {
 
   const capturePreviewsAsync = async (captureMode: ViewMode): Promise<DesignPreview[]> => {
     if (!viewportRef.current) return [];
-    const angles = ["front", "angle", "side"] as const;
-    const labels: Record<typeof angles[number], string> = {
-      front: "Front View", angle: "45° Angle", side: "Side View",
+    const angles: SnapshotAngle[] = ["angle", "side", "inside"];
+    const labels: Record<SnapshotAngle, string> = {
+      front: "Front View", angle: "Hero 45°", side: "Side Profile", inside: "Inside View",
     };
     try {
       const results = await Promise.all(
         angles.map(async (id) => {
           const dataUrl = await viewportRef.current!.captureSnapshot(id, captureMode);
-          return { id, label: labels[id], viewMode: captureMode, dataUrl } as DesignPreview;
+          return { id: id as DesignPreview["id"], label: labels[id], viewMode: captureMode, dataUrl } as DesignPreview;
         })
       );
       return results.filter((p) => p.dataUrl.length > 100);
