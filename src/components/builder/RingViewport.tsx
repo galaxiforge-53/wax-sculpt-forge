@@ -10,17 +10,20 @@ import { LunarTextureState } from "@/types/lunar";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
 
+export type SnapshotAngle = "front" | "angle" | "side" | "inside";
+
 export interface RingViewportHandle {
   captureSnapshot(
-    anglePreset: "front" | "angle" | "side",
+    anglePreset: SnapshotAngle,
     viewMode: ViewMode
   ): Promise<string>;
 }
 
-const CAMERA_PRESETS: Record<"front" | "angle" | "side", [number, number, number]> = {
-  front: [0, 0, 4],
-  angle: [2.8, 2, 2.8],
-  side: [4, 0, 0],
+const CAMERA_PRESETS: Record<SnapshotAngle, [number, number, number]> = {
+  front: [0, 0, 3.5],
+  angle: [2.5, 1.8, 2.5],
+  side: [3.5, 0.2, 0],
+  inside: [0, -0.1, 0.6],  // looking into the ring bore
 };
 
 // ── Ring Mesh ─────────────────────────────────────────────────────
@@ -449,15 +452,43 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
 
   captureRef.current = useCallback(async (pos: [number, number, number]) => {
     const origPos = camera.position.clone();
-    const origTarget = new THREE.Vector3();
-    camera.position.set(...pos);
-    camera.lookAt(0, 0, 0);
+    const origSize = gl.getSize(new THREE.Vector2());
+    const origPixelRatio = gl.getPixelRatio();
+
+    // Boost render resolution to 1024x1024
+    const snapshotSize = 1024;
+    gl.setPixelRatio(1);
+    gl.setSize(snapshotSize, snapshotSize, false);
+
+    // Auto-frame: compute scene bounding box and position camera so ring fills ~70%
+    const bbox = new THREE.Box3();
+    scene.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) bbox.expandByObject(obj);
+    });
+    const sphere = new THREE.Sphere();
+    bbox.getBoundingSphere(sphere);
+    const ringCenter = sphere.center.clone();
+    const ringRadius = sphere.radius || 1;
+
+    // Calculate distance so ring fills 70% of frame
+    const fov = (camera as THREE.PerspectiveCamera).fov;
+    const fillRatio = 0.70;
+    const halfFovRad = THREE.MathUtils.degToRad(fov / 2);
+    const idealDist = (ringRadius / fillRatio) / Math.tan(halfFovRad);
+
+    // Position camera at the preset direction but at the ideal distance
+    const dir = new THREE.Vector3(...pos).normalize();
+    const camPos = ringCenter.clone().add(dir.multiplyScalar(idealDist));
+
+    camera.position.copy(camPos);
+    (camera as THREE.PerspectiveCamera).aspect = 1;
+    camera.lookAt(ringCenter);
     camera.updateProjectionMatrix();
     gl.render(scene, camera);
 
     let dataUrl = "";
     try {
-      dataUrl = gl.domElement.toDataURL("image/webp", 0.85);
+      dataUrl = gl.domElement.toDataURL("image/webp", 0.92);
       if (!dataUrl || dataUrl.length < 100) {
         dataUrl = gl.domElement.toDataURL("image/png");
       }
@@ -465,9 +496,13 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
       dataUrl = "";
     }
 
+    // Restore original state
     camera.position.copy(origPos);
-    camera.lookAt(origTarget);
+    (camera as THREE.PerspectiveCamera).aspect = origSize.x / origSize.y;
+    camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
+    gl.setPixelRatio(origPixelRatio);
+    gl.setSize(origSize.x, origSize.y, false);
 
     return dataUrl;
   }, [gl, camera, scene]);
@@ -479,6 +514,62 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
   }, [onReady]);
 
   return null;
+}
+
+// ── Forge Workbench Environment ────────────────────────────────────
+function WorkbenchGrid({ params }: { params: RingParameters }) {
+  const outerDiam = (params.innerDiameter + 2 * params.thickness) / 10;
+  const gridSize = Math.max(4, Math.ceil(outerDiam * 4));
+  const divisions = gridSize * 10; // 1mm divisions
+
+  // Scale indicator length in scene units (10mm = 1cm)
+  const scaleLen = 1; // 10mm in scene units (1 unit = 10mm)
+
+  return (
+    <group position={[0, -0.85, 0]}>
+      {/* Measurement bed plane */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[gridSize, gridSize]} />
+        <meshStandardMaterial
+          color="#1a1a1e"
+          roughness={0.95}
+          metalness={0.05}
+          transparent
+          opacity={0.6}
+        />
+      </mesh>
+
+      {/* Subtle grid lines */}
+      <gridHelper
+        args={[gridSize, divisions, "#333340", "#222228"]}
+        position={[0, 0.001, 0]}
+      />
+
+      {/* Major grid lines (every 10mm) */}
+      <gridHelper
+        args={[gridSize, gridSize, "#444450", "#2a2a32"]}
+        position={[0, 0.002, 0]}
+      />
+
+      {/* Scale indicator bar */}
+      <group position={[gridSize * 0.35, 0.003, gridSize * 0.35]}>
+        {/* Bar */}
+        <mesh>
+          <boxGeometry args={[scaleLen, 0.004, 0.02]} />
+          <meshBasicMaterial color="#666680" />
+        </mesh>
+        {/* End ticks */}
+        <mesh position={[-scaleLen / 2, 0, 0]}>
+          <boxGeometry args={[0.005, 0.004, 0.05]} />
+          <meshBasicMaterial color="#666680" />
+        </mesh>
+        <mesh position={[scaleLen / 2, 0, 0]}>
+          <boxGeometry args={[0.005, 0.004, 0.05]} />
+          <meshBasicMaterial color="#666680" />
+        </mesh>
+      </group>
+    </group>
+  );
 }
 
 interface RingViewportProps {
@@ -520,25 +611,34 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           shadows
           gl={{ preserveDrawingBuffer: true, antialias: true }}
         >
-          <ambientLight intensity={0.2} />
+          <ambientLight intensity={0.25} />
           {/* Key light — rakes across craters to show relief */}
           <directionalLight
             position={[4, 6, 3]}
-            intensity={1.6}
+            intensity={1.8}
             castShadow
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
+            shadow-bias={-0.001}
             color={viewMode === "wax" ? "#fff5e0" : "#ffffff"}
           />
           {/* Fill light — softer, opposite side */}
           <directionalLight
             position={[-4, 2, -3]}
-            intensity={0.4}
+            intensity={0.5}
             color={viewMode === "wax" ? "#ffe8c0" : "#e8e8ff"}
           />
           {/* Rim light — highlights edges and crater rims */}
           <pointLight
             position={[0, -3, 4]}
-            intensity={0.6}
+            intensity={0.7}
             color="#ffffff"
+          />
+          {/* Top accent for specular highlights */}
+          <pointLight
+            position={[0, 5, 0]}
+            intensity={0.3}
+            color="#f0f0ff"
           />
 
           <RingMesh
@@ -559,18 +659,21 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             <InlayBandMarkers inlays={inlays} params={params} />
           )}
 
+          {/* Workbench measurement bed */}
+          <WorkbenchGrid params={params} />
+
           <ContactShadows
-            position={[0, -0.8, 0]}
-            opacity={0.5}
-            scale={5}
-            blur={2}
-            far={3}
+            position={[0, -0.84, 0]}
+            opacity={0.6}
+            scale={6}
+            blur={2.5}
+            far={4}
           />
 
           <Environment preset={viewMode === "wax" ? "warehouse" : "studio"} />
           <OrbitControls
             enablePan={false}
-            minDistance={2}
+            minDistance={1.5}
             maxDistance={8}
             autoRotate
             autoRotateSpeed={0.5}

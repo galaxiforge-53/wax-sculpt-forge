@@ -18,7 +18,7 @@ export interface RingParameters {
 }
 
 export interface DesignPreview {
-  id: "front" | "angle" | "side";
+  id: "front" | "angle" | "side" | "inside";
   label: string;
   viewMode: ViewMode;
   dataUrl: string;
