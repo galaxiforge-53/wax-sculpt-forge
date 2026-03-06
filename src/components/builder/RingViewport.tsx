@@ -1,5 +1,5 @@
-import { Canvas, useThree, ThreeEvent, useLoader } from "@react-three/fiber";
-import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
+import { Canvas, useThree, ThreeEvent, useLoader, useFrame } from "@react-three/fiber";
+import { OrbitControls, Environment, ContactShadows, Text } from "@react-three/drei";
 import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback, useState, useEffect, Suspense } from "react";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
@@ -9,6 +9,7 @@ import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
 
@@ -519,57 +520,98 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
 // ── Forge Workbench Environment ────────────────────────────────────
 function WorkbenchGrid({ params }: { params: RingParameters }) {
   const outerDiam = (params.innerDiameter + 2 * params.thickness) / 10;
-  const gridSize = Math.max(4, Math.ceil(outerDiam * 4));
-  const divisions = gridSize * 10; // 1mm divisions
+  const gridSize = Math.max(3, Math.ceil(outerDiam * 3));
+  const majorDivisions = gridSize; // every 10mm
+  const minorDivisions = gridSize * 5; // every 2mm
 
-  // Scale indicator length in scene units (10mm = 1cm)
-  const scaleLen = 1; // 10mm in scene units (1 unit = 10mm)
+  const scaleLen = 1; // 10mm
 
   return (
     <group position={[0, -0.85, 0]}>
-      {/* Measurement bed plane */}
+      {/* Measurement bed plane — very subtle */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[gridSize, gridSize]} />
         <meshStandardMaterial
-          color="#1a1a1e"
-          roughness={0.95}
-          metalness={0.05}
+          color="#141418"
+          roughness={0.98}
+          metalness={0.02}
           transparent
-          opacity={0.6}
+          opacity={0.45}
         />
       </mesh>
 
-      {/* Subtle grid lines */}
+      {/* Minor grid — very faint 2mm lines */}
       <gridHelper
-        args={[gridSize, divisions, "#333340", "#222228"]}
+        args={[gridSize, minorDivisions, "#252530", "#1e1e26"]}
         position={[0, 0.001, 0]}
       />
 
-      {/* Major grid lines (every 10mm) */}
+      {/* Major grid — 10mm lines slightly brighter */}
       <gridHelper
-        args={[gridSize, gridSize, "#444450", "#2a2a32"]}
+        args={[gridSize, majorDivisions, "#3a3a48", "#282832"]}
         position={[0, 0.002, 0]}
       />
 
-      {/* Scale indicator bar */}
-      <group position={[gridSize * 0.35, 0.003, gridSize * 0.35]}>
-        {/* Bar */}
+      {/* Scale indicator bar with label */}
+      <group position={[gridSize * 0.32, 0.003, gridSize * 0.32]}>
         <mesh>
-          <boxGeometry args={[scaleLen, 0.004, 0.02]} />
-          <meshBasicMaterial color="#666680" />
+          <boxGeometry args={[scaleLen, 0.003, 0.015]} />
+          <meshBasicMaterial color="#555570" />
         </mesh>
-        {/* End ticks */}
         <mesh position={[-scaleLen / 2, 0, 0]}>
-          <boxGeometry args={[0.005, 0.004, 0.05]} />
-          <meshBasicMaterial color="#666680" />
+          <boxGeometry args={[0.004, 0.003, 0.04]} />
+          <meshBasicMaterial color="#555570" />
         </mesh>
         <mesh position={[scaleLen / 2, 0, 0]}>
-          <boxGeometry args={[0.005, 0.004, 0.05]} />
-          <meshBasicMaterial color="#666680" />
+          <boxGeometry args={[0.004, 0.003, 0.04]} />
+          <meshBasicMaterial color="#555570" />
         </mesh>
+        {/* 10mm label */}
+        <Text
+          position={[0, 0.01, 0.05]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.06}
+          color="#555570"
+          anchorX="center"
+          anchorY="middle"
+        >
+          10 mm
+        </Text>
       </group>
     </group>
   );
+}
+
+// ── Camera Preset Animator ──────────────────────────────────────────
+function CameraPresetAnimator({ targetPreset, onComplete }: { targetPreset: SnapshotAngle | null; onComplete: () => void }) {
+  const { camera } = useThree();
+  const animating = useRef(false);
+  const startPos = useRef(new THREE.Vector3());
+  const endPos = useRef(new THREE.Vector3());
+  const progress = useRef(0);
+
+  useEffect(() => {
+    if (!targetPreset) return;
+    const pos = CAMERA_PRESETS[targetPreset];
+    startPos.current.copy(camera.position);
+    endPos.current.set(...pos);
+    progress.current = 0;
+    animating.current = true;
+  }, [targetPreset, camera]);
+
+  useFrame((_, delta) => {
+    if (!animating.current) return;
+    progress.current = Math.min(1, progress.current + delta * 3);
+    const t = 1 - Math.pow(1 - progress.current, 3); // ease-out cubic
+    camera.position.lerpVectors(startPos.current, endPos.current, t);
+    camera.lookAt(0, 0, 0);
+    if (progress.current >= 1) {
+      animating.current = false;
+      onComplete();
+    }
+  });
+
+  return null;
 }
 
 interface RingViewportProps {
@@ -582,11 +624,14 @@ interface RingViewportProps {
   stampSettings?: StampSettings;
   inlays?: InlayChannel[];
   lunarTexture?: LunarTextureState;
+  cameraPreset?: SnapshotAngle | null;
+  onPresetApplied?: () => void;
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, cameraPreset, onPresetApplied }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
+    const isMobile = useIsMobile();
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
       snapshotApiRef.current = api;
@@ -604,14 +649,18 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       },
     }), []);
 
+    // Closer camera on mobile so ring fills screen
+    const initialCamPos: [number, number, number] = isMobile ? [0, 1.4, 2.8] : [0, 2, 4];
+
     return (
-      <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden">
+      <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none">
         <Canvas
-          camera={{ position: [0, 2, 4], fov: 35 }}
+          camera={{ position: initialCamPos, fov: isMobile ? 30 : 35 }}
           shadows
           gl={{ preserveDrawingBuffer: true, antialias: true }}
+          dpr={isMobile ? [1, 1.5] : [1, 2]}
         >
-          <ambientLight intensity={0.25} />
+          <ambientLight intensity={0.3} />
           {/* Key light — rakes across craters to show relief */}
           <directionalLight
             position={[4, 6, 3]}
@@ -625,7 +674,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           {/* Fill light — softer, opposite side */}
           <directionalLight
             position={[-4, 2, -3]}
-            intensity={0.5}
+            intensity={0.6}
             color={viewMode === "wax" ? "#ffe8c0" : "#e8e8ff"}
           />
           {/* Rim light — highlights edges and crater rims */}
@@ -637,8 +686,14 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           {/* Top accent for specular highlights */}
           <pointLight
             position={[0, 5, 0]}
-            intensity={0.3}
+            intensity={0.4}
             color="#f0f0ff"
+          />
+          {/* Side kicker for depth perception */}
+          <pointLight
+            position={[-5, 1, -2]}
+            intensity={0.3}
+            color="#d0d0ff"
           />
 
           <RingMesh
@@ -664,20 +719,32 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           <ContactShadows
             position={[0, -0.84, 0]}
-            opacity={0.6}
+            opacity={0.5}
             scale={6}
-            blur={2.5}
+            blur={2}
             far={4}
           />
 
           <Environment preset={viewMode === "wax" ? "warehouse" : "studio"} />
           <OrbitControls
             enablePan={false}
-            minDistance={1.5}
-            maxDistance={8}
-            autoRotate
-            autoRotateSpeed={0.5}
+            minDistance={isMobile ? 1.2 : 1.5}
+            maxDistance={isMobile ? 6 : 8}
+            autoRotate={!isMobile}
+            autoRotateSpeed={0.4}
+            enableDamping
+            dampingFactor={0.08}
+            rotateSpeed={isMobile ? 0.6 : 1}
+            touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE }}
           />
+
+          {/* Camera preset animator */}
+          {cameraPreset && (
+            <CameraPresetAnimator
+              targetPreset={cameraPreset}
+              onComplete={onPresetApplied ?? (() => {})}
+            />
+          )}
 
           <SnapshotHelper onReady={handleSnapshotReady} />
         </Canvas>

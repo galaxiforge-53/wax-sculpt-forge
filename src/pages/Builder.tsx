@@ -13,7 +13,7 @@ import { getProject, saveProject } from "@/lib/projectsStore";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2 } from "lucide-react";
+import { Settings2, Eye, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Builder() {
@@ -27,6 +27,14 @@ export default function Builder() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState(false);
+  const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
+
+  const CAMERA_BUTTONS: { id: SnapshotAngle; label: string }[] = [
+    { id: "front", label: "Front" },
+    { id: "angle", label: "45°" },
+    { id: "side", label: "Side" },
+    { id: "inside", label: "Inside" },
+  ];
 
   const {
     params, updateParams, applyTemplate,
@@ -196,7 +204,7 @@ export default function Builder() {
         )}
 
         {/* Viewport */}
-        <div className="flex-1 p-1 sm:p-2 relative">
+        <div className="flex-1 p-0 sm:p-1 relative">
           <RingViewport
             ref={viewportRef}
             params={params}
@@ -208,13 +216,32 @@ export default function Builder() {
             stampSettings={stampSettings}
             inlays={inlays}
             lunarTexture={lunarTexture}
+            cameraPreset={cameraPreset}
+            onPresetApplied={() => setCameraPreset(null)}
           />
+
+          {/* Camera preset buttons — top-left overlay */}
+          <div className="absolute top-2 left-2 flex gap-1 z-10">
+            {CAMERA_BUTTONS.map((cam) => (
+              <button
+                key={cam.id}
+                onClick={() => setCameraPreset(cam.id)}
+                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                  ${cameraPreset === cam.id
+                    ? "bg-primary/30 text-primary border border-primary/40"
+                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                  }`}
+              >
+                {cam.label}
+              </button>
+            ))}
+          </div>
 
           {/* Mobile floating buttons */}
           {isMobile && (
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
               {/* Tool selector as horizontal strip */}
-              <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-1 flex gap-0.5 overflow-x-auto max-w-[70%]">
+              <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-1 flex gap-0.5 overflow-x-auto max-w-[65%]">
                 <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
               </div>
 
