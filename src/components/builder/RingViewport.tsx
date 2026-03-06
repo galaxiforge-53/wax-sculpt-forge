@@ -863,13 +863,27 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
 // ── Forge Workbench Environment ────────────────────────────────────
 function WorkbenchGrid({ params }: { params: RingParameters }) {
   const outerR = (params.innerDiameter / 2 + params.thickness) / 10;
+  const innerR = params.innerDiameter / 2 / 10;
   const gridY = -(outerR + 0.12); // Position grid just below the ring's outer radius
   const outerDiam = (params.innerDiameter + 2 * params.thickness) / 10;
   const gridSize = Math.max(3, Math.ceil(outerDiam * 3));
   const majorDivisions = gridSize; // every 10mm
   const minorDivisions = gridSize * 5; // every 2mm
 
-  const scaleLen = 1; // 10mm
+  // Diameter reference circle points
+  const diamCirclePoints = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    const segments = 72;
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(angle) * innerR, 0, Math.sin(angle) * innerR));
+    }
+    return pts;
+  }, [innerR]);
+
+  // Scale ruler ticks (5 ticks at 10mm intervals = 50mm ruler)
+  const rulerLength = Math.min(5, gridSize - 1); // in cm (each unit = 10mm)
+  const rulerZ = outerR + 0.6;
 
   return (
     <group position={[0, gridY, 0]}>
@@ -897,32 +911,90 @@ function WorkbenchGrid({ params }: { params: RingParameters }) {
         position={[0, 0.002, 0]}
       />
 
-      {/* Scale indicator bar with label */}
-      <group position={[gridSize * 0.32, 0.003, gridSize * 0.32]}>
-        <mesh>
-          <boxGeometry args={[scaleLen, 0.003, 0.015]} />
-          <meshBasicMaterial color="#555570" />
-        </mesh>
-        <mesh position={[-scaleLen / 2, 0, 0]}>
-          <boxGeometry args={[0.004, 0.003, 0.04]} />
-          <meshBasicMaterial color="#555570" />
-        </mesh>
-        <mesh position={[scaleLen / 2, 0, 0]}>
-          <boxGeometry args={[0.004, 0.003, 0.04]} />
-          <meshBasicMaterial color="#555570" />
-        </mesh>
-        {/* 10mm label */}
+      {/* ── Diameter reference circle on the bed ── */}
+      <group position={[0, 0.004, 0]}>
+        <line>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={diamCirclePoints.length}
+              array={new Float32Array(diamCirclePoints.flatMap(p => [p.x, p.y, p.z]))}
+              itemSize={3}
+            />
+          </bufferGeometry>
+          <lineBasicMaterial color="#667788" transparent opacity={0.4} />
+        </line>
+        {/* Diameter label */}
         <Text
-          position={[0, 0.01, 0.05]}
+          position={[0, 0.002, innerR + 0.12]}
           rotation={[-Math.PI / 2, 0, 0]}
-          fontSize={0.06}
-          color="#555570"
+          fontSize={0.05}
+          color="#667788"
           anchorX="center"
           anchorY="middle"
         >
-          10 mm
+          {`Ø${params.innerDiameter.toFixed(1)}mm`}
         </Text>
       </group>
+
+      {/* ── Scale ruler near the ring ── */}
+      <group position={[-rulerLength / 2, 0.005, rulerZ]}>
+        {/* Main ruler bar */}
+        <mesh position={[rulerLength / 2, 0, 0]}>
+          <boxGeometry args={[rulerLength, 0.002, 0.008]} />
+          <meshBasicMaterial color="#778899" />
+        </mesh>
+
+        {/* Tick marks + labels every 10mm */}
+        {Array.from({ length: rulerLength + 1 }, (_, i) => {
+          const isMajor = i % 1 === 0;
+          const tickH = isMajor ? 0.06 : 0.03;
+          return (
+            <group key={i} position={[i, 0, 0]}>
+              <mesh>
+                <boxGeometry args={[0.003, 0.002, tickH]} />
+                <meshBasicMaterial color="#778899" />
+              </mesh>
+              {isMajor && (
+                <Text
+                  position={[0, 0.002, tickH / 2 + 0.04]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  fontSize={0.035}
+                  color="#778899"
+                  anchorX="center"
+                  anchorY="middle"
+                >
+                  {`${i * 10}`}
+                </Text>
+              )}
+            </group>
+          );
+        })}
+
+        {/* mm label at end */}
+        <Text
+          position={[rulerLength + 0.15, 0.002, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.04}
+          color="#667788"
+          anchorX="left"
+          anchorY="middle"
+        >
+          mm
+        </Text>
+      </group>
+
+      {/* ── Ring size callout — small badge on the bed ── */}
+      <Text
+        position={[0, 0.004, -(innerR + 0.2)]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.045}
+        color="#556677"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {`US ${params.size}`}
+      </Text>
     </group>
   );
 }
