@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
   { label: "Home", path: "/" },
+  { label: "Library", path: "/library" },
   { label: "Builders", path: "/builders" },
   { label: "Templates", path: "/templates" },
   { label: "My Designs", path: "/my-designs" },
