@@ -18,8 +18,9 @@ export interface LunarSurfaceMapSet {
   craterCount: number;
 }
 
-const MAP_W = 2048;
-const MAP_H = 512;
+export const MAP_W = 2048;
+export const MAP_H = 512;
+export const MAP_DIMENSIONS = { width: MAP_W, height: MAP_H } as const;
 
 const cache = new Map<string, LunarSurfaceMapSet>();
 
@@ -346,12 +347,12 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
 
 // ── Build heightmap ───────────────────────────────────────────────
 
-interface HeightmapResult {
+export interface HeightmapResult {
   hmap: Float32Array;
   craterCount: number;
 }
 
-function buildHeightmap(lunar: LunarTextureState, physicalAspect: number = 1): HeightmapResult {
+export function buildHeightmap(lunar: LunarTextureState, physicalAspect: number = 1): HeightmapResult {
   const hmap = new Float32Array(MAP_W * MAP_H).fill(0.5);
   const rand = seededRng(lunar.seed);
   const rimSharp = lunar.rimSharpness / 100;
