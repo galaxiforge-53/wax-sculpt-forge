@@ -1,11 +1,20 @@
 import { TEMPLATE_REGISTRY, TemplateMeta } from "@/config/templates";
 import { RingParameters } from "@/types/ring";
+import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
+import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
+import type { MetalPreset, FinishPreset } from "@/types/ring";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 
 interface TemplatesPanelProps {
   onApply: (params: Partial<RingParameters>) => void;
   currentParams: RingParameters;
+  onLunarChange?: (state: LunarTextureState) => void;
+  onEngravingChange?: (state: EngravingState) => void;
+  onMetalChange?: (metal: MetalPreset) => void;
+  onFinishChange?: (finish: FinishPreset) => void;
 }
 
 const CATEGORIES = [
@@ -16,9 +25,10 @@ const CATEGORIES = [
   { id: "cosmic", label: "Cosmic" },
 ] as const;
 
-import { useState } from "react";
-
-export default function TemplatesPanel({ onApply, currentParams }: TemplatesPanelProps) {
+export default function TemplatesPanel({
+  onApply, currentParams,
+  onLunarChange, onEngravingChange, onMetalChange, onFinishChange,
+}: TemplatesPanelProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
   const filtered = activeCategory === "all"
@@ -30,9 +40,35 @@ export default function TemplatesPanel({ onApply, currentParams }: TemplatesPane
     t.params.width === currentParams.width &&
     t.params.grooveCount === currentParams.grooveCount;
 
+  const handleApply = (template: TemplateMeta) => {
+    onApply(template.params);
+
+    if (template.lunar && onLunarChange) {
+      onLunarChange({
+        ...DEFAULT_LUNAR_TEXTURE,
+        seed: Math.floor(Math.random() * 9999),
+        ...template.lunar,
+      });
+    }
+
+    if (template.engraving && onEngravingChange) {
+      onEngravingChange({ ...DEFAULT_ENGRAVING, ...template.engraving });
+    }
+
+    if (template.metalPreset && onMetalChange) {
+      onMetalChange(template.metalPreset);
+    }
+
+    if (template.finishPreset && onFinishChange) {
+      onFinishChange(template.finishPreset);
+    }
+  };
+
+  const hasExtras = (t: TemplateMeta) =>
+    !!t.lunar?.enabled || !!t.engraving?.enabled || !!t.metalPreset || !!t.finishPreset;
+
   return (
     <div className="flex flex-col gap-3">
-
       {/* Category filter */}
       <div className="flex gap-1 flex-wrap">
         {CATEGORIES.map((cat) => (
@@ -58,7 +94,7 @@ export default function TemplatesPanel({ onApply, currentParams }: TemplatesPane
             key={template.id}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => onApply(template.params)}
+            onClick={() => handleApply(template)}
             className={cn(
               "text-left p-3 rounded-lg border transition-all group",
               isActive(template)
@@ -71,16 +107,31 @@ export default function TemplatesPanel({ onApply, currentParams }: TemplatesPane
               <span className="text-xs font-display tracking-wide text-foreground">
                 {template.name}
               </span>
+              {hasExtras(template) && (
+                <Badge variant="outline" className="text-[8px] px-1.5 py-0 h-4 ml-auto border-primary/30 text-primary/70">
+                  preset
+                </Badge>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground leading-relaxed">
               {template.description}
             </p>
-            <div className="flex gap-2 mt-1.5 text-[9px] text-muted-foreground/70">
-              <span>{template.params.width}mm W</span>
-              <span>·</span>
-              <span>{template.params.profile}</span>
-              <span>·</span>
-              <span>{template.params.grooveCount}G</span>
+            <div className="flex gap-1.5 mt-1.5 flex-wrap">
+              <span className="text-[9px] text-muted-foreground/70">{template.params.width}mm W</span>
+              <span className="text-[9px] text-muted-foreground/40">·</span>
+              <span className="text-[9px] text-muted-foreground/70">{template.params.profile}</span>
+              {template.lunar?.enabled && (
+                <>
+                  <span className="text-[9px] text-muted-foreground/40">·</span>
+                  <span className="text-[9px] text-primary/60">🌙 textured</span>
+                </>
+              )}
+              {template.metalPreset && (
+                <>
+                  <span className="text-[9px] text-muted-foreground/40">·</span>
+                  <span className="text-[9px] text-muted-foreground/70">{template.metalPreset}</span>
+                </>
+              )}
             </div>
           </motion.button>
         ))}

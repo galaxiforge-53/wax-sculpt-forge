@@ -148,7 +148,14 @@ export default function BuilderSidebar({
         </Section>
 
         <Section title="Templates">
-          <TemplatesPanel onApply={onApplyTemplate} currentParams={params} />
+          <TemplatesPanel
+            onApply={onApplyTemplate}
+            currentParams={params}
+            onLunarChange={onLunarChange}
+            onEngravingChange={onEngravingChange}
+            onMetalChange={onMetalChange}
+            onFinishChange={onFinishChange}
+          />
         </Section>
       </div>
     </ScrollArea>
