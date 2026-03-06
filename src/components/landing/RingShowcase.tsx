@@ -759,6 +759,7 @@ function GemStoneGroup({
 // ── Interior Engraving Geometry ──────────────────────────────────
 // Creates 3D engraved text on the inner bore of the ring using
 // displaced rectangular blocks arranged along the circumference.
+// The group is rotated PI/2 around X to match the ring mesh orientation.
 
 function InteriorEngraving({
   text,
@@ -776,14 +777,13 @@ function InteriorEngraving({
   const glyphMeshes = useMemo(() => {
     if (!text) return [];
     const chars = text.split("");
-    const charHeight = ringWidth * 0.28; // 28% of ring width
+    const charHeight = ringWidth * 0.28;
     const charWidth = charHeight * 0.55;
     const spacing = charHeight * 0.15;
     const totalWidth = chars.length * (charWidth + spacing);
-    const engravingR = innerR - 0.004; // slightly inset from inner surface
-    const depth = 0.008; // engraving depth
+    const engravingR = innerR - 0.008; // inset into inner surface
+    const depth = 0.006;
 
-    // Angle per character around the circumference
     const circumference = 2 * Math.PI * engravingR;
     const totalAngle = (totalWidth / circumference) * 2 * Math.PI;
     const startAngle = -totalAngle / 2;
@@ -791,15 +791,14 @@ function InteriorEngraving({
     return chars.map((char, i) => {
       if (char === " ") return null;
       const charAngle = startAngle + (i * (charWidth + spacing) / circumference) * 2 * Math.PI;
-
-      // Each character is built from simple rectangular strokes
       const strokes = getCharStrokes(char, charWidth, charHeight);
       return { char, charAngle, strokes, depth, engravingR, charHeight };
     });
   }, [text, innerR, ringWidth]);
 
   return (
-    <group>
+    // Match the ring mesh rotation so engraving sits on the inner bore
+    <group rotation={[Math.PI / 2, 0, 0]}>
       {glyphMeshes.map((glyph, i) => {
         if (!glyph) return null;
         const { charAngle, strokes, depth, engravingR, charHeight } = glyph;
@@ -807,27 +806,24 @@ function InteriorEngraving({
         return (
           <group key={i}>
             {strokes.map((stroke, si) => {
-              // Position on inner bore
-              const px = engravingR * Math.cos(charAngle + stroke.offsetX / engravingR);
-              const pz = engravingR * Math.sin(charAngle + stroke.offsetX / engravingR);
+              // Position on inner bore — characters face inward (readable from inside)
+              const angle = charAngle + stroke.offsetX / engravingR;
+              const px = engravingR * Math.cos(angle);
+              const pz = engravingR * Math.sin(angle);
               const py = stroke.offsetY - charHeight / 2;
 
               return (
                 <mesh
                   key={si}
                   position={[px, py, pz]}
-                  rotation={[
-                    Math.PI / 2,
-                    0,
-                    -charAngle - stroke.offsetX / engravingR + Math.PI / 2,
-                  ]}
+                  rotation={[0, -angle + Math.PI, 0]}
                 >
-                  <boxGeometry args={[stroke.width, depth, stroke.height]} />
+                  <boxGeometry args={[stroke.width, stroke.height, depth]} />
                   <meshStandardMaterial
                     color={isWax ? "#5a7a42" : metalColor}
-                    roughness={isWax ? 0.9 : 0.3}
-                    metalness={isWax ? 0.02 : 0.8}
-                    envMapIntensity={0.5}
+                    roughness={isWax ? 0.9 : 0.25}
+                    metalness={isWax ? 0.02 : 0.85}
+                    envMapIntensity={0.8}
                   />
                 </mesh>
               );
@@ -919,48 +915,69 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
   const geometry = useMemo(() => {
     const bevel = design.bevel / 10;
     const points: THREE.Vector2[] = [];
-    // High poly for surface detail
-    const steps = 128;
+    const outerSteps = 128;
+    const innerSteps = 32;
+    const comfortInset = 0.012; // subtle comfort-fit curve on inner bore
 
+    // ── 1. Bottom cap: inner → outer edge ──
+    points.push(new THREE.Vector2(innerR, -w / 2));
+
+    // ── 2. Outer surface: bottom → top (profile-dependent) ──
     if (design.profile === "dome" || design.profile === "comfort") {
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
+      for (let i = 0; i <= outerSteps; i++) {
+        const t = i / outerSteps;
+        const y = -w / 2 + t * w;
         const angle = t * Math.PI;
-        const r = innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
-        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+        const bulge = Math.sin(angle);
+        const r = innerR + (outerR - innerR) * bulge;
+        points.push(new THREE.Vector2(r, y));
       }
     } else if (design.profile === "knife") {
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
+      for (let i = 0; i <= outerSteps; i++) {
+        const t = i / outerSteps;
+        const y = -w / 2 + t * w;
         const angle = t * Math.PI;
         const bulge = Math.pow(Math.sin(angle), 0.45);
         const r = innerR + (outerR - innerR) * bulge;
-        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+        points.push(new THREE.Vector2(r, y));
       }
     } else if (design.profile === "runic") {
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
+      for (let i = 0; i <= outerSteps; i++) {
+        const t = i / outerSteps;
+        const y = -w / 2 + t * w;
         const angle = t * Math.PI;
         const stepped = Math.sin(angle) * 0.7 + Math.sin(angle * 3) * 0.15 + Math.sin(angle * 5) * 0.05;
         const r = innerR + (outerR - innerR) * Math.max(0, stepped);
-        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+        points.push(new THREE.Vector2(r, y));
       }
     } else if (design.profile === "cosmic") {
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
+      for (let i = 0; i <= outerSteps; i++) {
+        const t = i / outerSteps;
+        const y = -w / 2 + t * w;
         const angle = t * Math.PI;
         const base = Math.sin(angle);
         const concave = base - 0.08 * Math.sin(angle * 2);
         const r = innerR + (outerR - innerR) * Math.max(0, concave);
-        points.push(new THREE.Vector2(r, (t - 0.5) * w));
+        points.push(new THREE.Vector2(r, y));
       }
     } else {
-      points.push(new THREE.Vector2(innerR, -w / 2));
+      // flat profile with bevels
       points.push(new THREE.Vector2(outerR - bevel, -w / 2));
       points.push(new THREE.Vector2(outerR, -w / 2 + bevel));
       points.push(new THREE.Vector2(outerR, w / 2 - bevel));
       points.push(new THREE.Vector2(outerR - bevel, w / 2));
-      points.push(new THREE.Vector2(innerR, w / 2));
+    }
+
+    // ── 3. Top cap: outer → inner edge ──
+    points.push(new THREE.Vector2(innerR, w / 2));
+
+    // ── 4. Inner bore: top → bottom (comfort-fit curve) ──
+    for (let i = innerSteps; i >= 0; i--) {
+      const t = i / innerSteps;
+      const y = -w / 2 + t * w;
+      const edgeDist = Math.abs(t - 0.5) * 2;
+      const comfort = (1 - edgeDist * edgeDist) * comfortInset;
+      points.push(new THREE.Vector2(innerR - comfort, y));
     }
 
     const segments = 256;
@@ -974,6 +991,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
         const y = posAttr.getY(i);
         const z = posAttr.getZ(i);
         const r = Math.sqrt(x * x + z * z);
+        if (r < innerR - 0.02) continue; // don't carve inner bore
         for (let g = 0; g < design.grooves; g++) {
           const grooveY = ((g + 1) / (design.grooves + 1) - 0.5) * w;
           const dist = Math.abs(y - grooveY);
@@ -994,7 +1012,6 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
       const posAttr = lathe.attributes.position;
       let seed = design.id.length * 137;
       const srng = () => { seed = (seed * 16807) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
-      // Pre-seed
       for (let i = 0; i < 50; i++) srng();
 
       for (let i = 0; i < posAttr.count; i++) {
@@ -1002,14 +1019,12 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
         const y = posAttr.getY(i);
         const z = posAttr.getZ(i);
         const r = Math.sqrt(x * x + z * z);
-        if (r < innerR + 0.005) continue; // don't perturb inner surface
+        if (r < innerR - 0.005) continue; // don't perturb inner bore
 
         const angle = Math.atan2(z, x);
-        // Multi-frequency organic displacement
         const disp1 = Math.sin(angle * 23 + y * 40) * 0.0008;
         const disp2 = Math.sin(angle * 47 + y * 80 + 1.3) * 0.0004;
         const disp3 = Math.sin(angle * 11 + y * 15) * 0.0012;
-        // Random per-vertex micro jitter
         const jitter = (srng() - 0.5) * 0.0006;
         const totalDisp = disp1 + disp2 + disp3 + jitter;
 
@@ -1043,6 +1058,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
             normalMap={castingTex.normalMap}
             normalScale={normalScale}
             roughnessMap={castingTex.roughnessMap}
+            side={THREE.DoubleSide}
           />
         ) : (
           <meshPhysicalMaterial
@@ -1060,6 +1076,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
             sheenRoughness={0.25}
             sheenColor={new THREE.Color(metal.color).multiplyScalar(0.4)}
             ior={2.5}
+            side={THREE.DoubleSide}
           />
         )}
       </mesh>
