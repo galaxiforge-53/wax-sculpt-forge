@@ -144,6 +144,7 @@ export default function BuilderSidebar({
             onClearWaxMarks={onClearWaxMarks}
             stampSettings={stampSettings}
             onStampSettingsChange={onStampSettingsChange}
+            metalPreset={metalPreset}
           />
         </Section>
 
