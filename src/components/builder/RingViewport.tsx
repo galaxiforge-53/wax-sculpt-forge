@@ -659,6 +659,8 @@ function CameraPresetAnimator({ targetPreset, onComplete }: { targetPreset: Snap
   return null;
 }
 
+export type CutawayMode = "normal" | "inside" | "cross-section";
+
 interface RingViewportProps {
   params: RingParameters;
   viewMode: ViewMode;
@@ -673,10 +675,44 @@ interface RingViewportProps {
   onPresetApplied?: () => void;
   showMeasurements?: boolean;
   engraving?: EngravingState;
+  cutawayMode?: CutawayMode;
+}
+
+// ── Clipping plane manager ─────────────────────────────────────────
+function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
+  const { gl } = useThree();
+
+  const clipPlane = useMemo(() => {
+    if (mode === "cross-section") {
+      // Clip along Z axis — shows cross-section from front
+      return new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+    }
+    if (mode === "inside") {
+      // Clip top half — reveals interior bore
+      return new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.001);
+    }
+    return null;
+  }, [mode]);
+
+  useEffect(() => {
+    if (clipPlane) {
+      gl.clippingPlanes = [clipPlane];
+      gl.localClippingEnabled = true;
+    } else {
+      gl.clippingPlanes = [];
+      gl.localClippingEnabled = false;
+    }
+    return () => {
+      gl.clippingPlanes = [];
+      gl.localClippingEnabled = false;
+    };
+  }, [clipPlane, gl]);
+
+  return null;
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal" }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -707,6 +743,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           gl={{ preserveDrawingBuffer: true, antialias: true }}
           dpr={isMobile ? [1, 1.5] : [1, 2]}
         >
+          <ClipPlaneManager mode={cutawayMode} />
           <ambientLight intensity={0.3} />
           {/* Key light — rakes across craters to show relief */}
           <directionalLight

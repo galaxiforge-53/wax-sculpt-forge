@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useRingDesign } from "@/hooks/useRingDesign";
 import { useEffect, useRef, useState } from "react";
-import RingViewport, { RingViewportHandle, SnapshotAngle } from "@/components/builder/RingViewport";
+import RingViewport, { RingViewportHandle, SnapshotAngle, CutawayMode } from "@/components/builder/RingViewport";
 import ToolRail from "@/components/builder/ToolRail";
 import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import TopBar from "@/components/builder/TopBar";
@@ -29,6 +29,7 @@ export default function Builder() {
   const [mobilePanel, setMobilePanel] = useState(false);
   const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
   const [showMeasurements, setShowMeasurements] = useState(false);
+  const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
 
   const CAMERA_BUTTONS: { id: SnapshotAngle; label: string }[] = [
     { id: "front", label: "Front" },
@@ -224,6 +225,7 @@ export default function Builder() {
             cameraPreset={cameraPreset}
             onPresetApplied={() => setCameraPreset(null)}
             showMeasurements={showMeasurements || activeTool === "measure"}
+            cutawayMode={cutawayMode}
           />
 
           {/* Camera preset buttons — top-left overlay */}
@@ -243,18 +245,41 @@ export default function Builder() {
             ))}
           </div>
 
-          {/* Measurement toggle — top-right */}
-          <button
-            onClick={() => setShowMeasurements((v) => !v)}
-            className={`absolute top-2 right-2 z-10 px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-              ${showMeasurements || activeTool === "measure"
-                ? "bg-primary/30 text-primary border border-primary/40"
-                : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-              }`}
-            title="Toggle dimension guides"
-          >
-            📐 Dims
-          </button>
+          {/* Measurement toggle + Cutaway toggle — top-right */}
+          <div className="absolute top-2 right-2 z-10 flex gap-1">
+            {/* Cutaway mode buttons */}
+            {(["normal", "inside", "cross-section"] as CutawayMode[]).map((mode) => {
+              const labels: Record<CutawayMode, string> = {
+                "normal": "Full",
+                "inside": "Inside",
+                "cross-section": "X-Section",
+              };
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setCutawayMode(mode)}
+                  className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                    ${cutawayMode === mode
+                      ? "bg-primary/30 text-primary border border-primary/40"
+                      : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    }`}
+                >
+                  {labels[mode]}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setShowMeasurements((v) => !v)}
+              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                ${showMeasurements || activeTool === "measure"
+                  ? "bg-primary/30 text-primary border border-primary/40"
+                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                }`}
+              title="Toggle dimension guides"
+            >
+              📐 Dims
+            </button>
+          </div>
 
           {/* Mobile floating buttons */}
           {isMobile && (
