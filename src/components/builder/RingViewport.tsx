@@ -3,7 +3,7 @@ import { OrbitControls, Environment, ContactShadows, Text } from "@react-three/d
 import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback, useState, useEffect, Suspense } from "react";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
-import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
+import { RingParameters, ViewMode, MetalPreset, FinishPreset, ToolType } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
@@ -35,14 +35,106 @@ interface RingMeshProps {
   params: RingParameters;
   viewMode: ViewMode;
   metalPreset: MetalPreset;
+  finishPreset: FinishPreset;
   activeTool: ToolType | null;
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   stampSettings?: StampSettings;
   lunarTexture?: LunarTextureState;
 }
 
+// ── Physically-based metal material configs ───────────────────────
+interface MetalMaterialConfig {
+  color: string;
+  roughness: number;
+  metalness: number;
+  envMapIntensity: number;
+  clearcoat: number;
+  clearcoatRoughness: number;
+  reflectivity: number;
+  sheen: number;
+  sheenColor: string;
+  sheenRoughness: number;
+  ior: number;
+}
+
+const METAL_CONFIGS: Record<MetalPreset, MetalMaterialConfig> = {
+  silver: {
+    color: "#D4D4D8",
+    roughness: 0.12,
+    metalness: 1.0,
+    envMapIntensity: 2.5,
+    clearcoat: 0.15,
+    clearcoatRoughness: 0.05,
+    reflectivity: 1.0,
+    sheen: 0.1,
+    sheenColor: "#E8E8F0",
+    sheenRoughness: 0.2,
+    ior: 2.5,
+  },
+  gold: {
+    color: "#D4A520",
+    roughness: 0.1,
+    metalness: 1.0,
+    envMapIntensity: 3.0,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.04,
+    reflectivity: 1.0,
+    sheen: 0.15,
+    sheenColor: "#FFE4A0",
+    sheenRoughness: 0.15,
+    ior: 2.5,
+  },
+  "rose-gold": {
+    color: "#C47A6A",
+    roughness: 0.12,
+    metalness: 1.0,
+    envMapIntensity: 2.8,
+    clearcoat: 0.18,
+    clearcoatRoughness: 0.04,
+    reflectivity: 1.0,
+    sheen: 0.2,
+    sheenColor: "#F0C0B0",
+    sheenRoughness: 0.18,
+    ior: 2.4,
+  },
+  titanium: {
+    color: "#8A8A85",
+    roughness: 0.22,
+    metalness: 0.95,
+    envMapIntensity: 1.8,
+    clearcoat: 0.05,
+    clearcoatRoughness: 0.15,
+    reflectivity: 0.85,
+    sheen: 0.05,
+    sheenColor: "#B0B0B8",
+    sheenRoughness: 0.4,
+    ior: 2.6,
+  },
+  tungsten: {
+    color: "#5A5A5E",
+    roughness: 0.15,
+    metalness: 1.0,
+    envMapIntensity: 2.2,
+    clearcoat: 0.1,
+    clearcoatRoughness: 0.08,
+    reflectivity: 0.95,
+    sheen: 0.0,
+    sheenColor: "#888888",
+    sheenRoughness: 0.3,
+    ior: 2.7,
+  },
+};
+
+const FINISH_ROUGHNESS_MOD: Record<FinishPreset, number> = {
+  polished: 0,
+  satin: 0.15,
+  brushed: 0.25,
+  matte: 0.45,
+  hammered: 0.1,
+};
+
 // ── STL-based lunar ring mesh ──────────────────────────────────────
-function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool, onAddWaxMark, stampSettings }: RingMeshProps) {
+function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTexture, activeTool, onAddWaxMark, stampSettings }: RingMeshProps) {
   const stlGeometry = useLoader(STLLoader, "/models/Ring_8_mm.stl");
 
   // Compute target dimensions from params
@@ -115,10 +207,8 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
   }, [stlGeometry, targetOuterR, targetWidth]);
 
   const isWax = viewMode === "wax";
-  const metalColors: Record<MetalPreset, string> = {
-    silver: "#C0C0C0", gold: "#FFD700", "rose-gold": "#E8A090",
-    titanium: "#878681", tungsten: "#6B6B6B",
-  };
+  const mc = METAL_CONFIGS[metalPreset] ?? METAL_CONFIGS.silver;
+  const finishRoughMod = FINISH_ROUGHNESS_MOD[finishPreset] ?? 0;
 
   // Compute physical aspect ratio: circumference / width so craters are circular
   const physicalAspect = useMemo(() => {
@@ -186,18 +276,22 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
         />
       ) : (
         <meshPhysicalMaterial
-          color={metalColors[metalPreset] ?? "#C0C0C0"}
-          roughness={0.45}
-          metalness={0.95}
+          color={mc.color}
+          roughness={Math.min(1, mc.roughness + finishRoughMod)}
+          metalness={mc.metalness}
           normalMap={lunarMaps?.normalMap ?? null}
           roughnessMap={lunarMaps?.roughnessMap ?? null}
           aoMap={lunarMaps?.aoMap ?? null}
           aoMapIntensity={1.8}
           normalScale={normalScale}
-          envMapIntensity={2.0}
-          clearcoat={0.08}
-          clearcoatRoughness={0.3}
-          reflectivity={0.95}
+          envMapIntensity={mc.envMapIntensity}
+          clearcoat={mc.clearcoat}
+          clearcoatRoughness={mc.clearcoatRoughness}
+          reflectivity={mc.reflectivity}
+          sheen={mc.sheen}
+          sheenColor={mc.sheenColor}
+          sheenRoughness={mc.sheenRoughness}
+          ior={mc.ior}
         />
       )}
     </mesh>
@@ -205,7 +299,7 @@ function LunarSTLMesh({ params, viewMode, metalPreset, lunarTexture, activeTool,
 }
 
 // ── Procedural ring mesh — high-poly with displacement when lunar enabled ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
   const hasLunar = !!lunarTexture?.enabled;
 
   const geometry = useMemo(() => {
@@ -267,10 +361,8 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
   }, [params, hasLunar]);
 
   const isWax = viewMode === "wax";
-  const metalColors: Record<MetalPreset, string> = {
-    silver: "#C0C0C0", gold: "#FFD700", "rose-gold": "#E8A090",
-    titanium: "#878681", tungsten: "#6B6B6B",
-  };
+  const mc = METAL_CONFIGS[metalPreset] ?? METAL_CONFIGS.silver;
+  const finishRoughMod = FINISH_ROUGHNESS_MOD[finishPreset] ?? 0;
 
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
@@ -349,18 +441,22 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, activeTool, onAddWa
         />
       ) : (
         <meshPhysicalMaterial
-          color={metalColors[metalPreset] ?? "#C0C0C0"}
-          roughness={hasLunar ? 0.45 : 0.35}
-          metalness={0.95}
+          color={mc.color}
+          roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod)}
+          metalness={mc.metalness}
           normalMap={lunarMaps?.normalMap ?? null}
           roughnessMap={lunarMaps?.roughnessMap ?? null}
           aoMap={lunarMaps?.aoMap ?? null}
           aoMapIntensity={hasLunar ? 2.0 : 0}
           normalScale={normalScale}
-          envMapIntensity={hasLunar ? 2.0 : 1.0}
-          clearcoat={hasLunar ? 0.08 : 0}
-          clearcoatRoughness={0.3}
-          reflectivity={hasLunar ? 0.95 : 0.9}
+          envMapIntensity={mc.envMapIntensity}
+          clearcoat={hasLunar ? mc.clearcoat : mc.clearcoat * 1.5}
+          clearcoatRoughness={mc.clearcoatRoughness}
+          reflectivity={mc.reflectivity}
+          sheen={mc.sheen}
+          sheenColor={mc.sheenColor}
+          sheenRoughness={mc.sheenRoughness}
+          ior={mc.ior}
           displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
@@ -665,6 +761,7 @@ interface RingViewportProps {
   params: RingParameters;
   viewMode: ViewMode;
   metalPreset: MetalPreset;
+  finishPreset?: FinishPreset;
   activeTool?: ToolType | null;
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   waxMarks?: WaxMark[];
@@ -712,7 +809,7 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal" }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal" }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -744,46 +841,53 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           dpr={isMobile ? [1, 1.5] : [1, 2]}
         >
           <ClipPlaneManager mode={cutawayMode} />
-          <ambientLight intensity={0.3} />
+          <ambientLight intensity={viewMode === "cast" ? 0.15 : 0.3} />
           {/* Key light — rakes across craters to show relief */}
           <directionalLight
             position={[4, 6, 3]}
-            intensity={1.8}
+            intensity={viewMode === "cast" ? 2.2 : 1.8}
             castShadow
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
             shadow-bias={-0.001}
-            color={viewMode === "wax" ? "#fff5e0" : "#ffffff"}
+            color={viewMode === "wax" ? "#fff5e0" : "#fff8f0"}
           />
-          {/* Fill light — softer, opposite side */}
+          {/* Fill light — cool complement for metal contrast */}
           <directionalLight
             position={[-4, 2, -3]}
-            intensity={0.6}
-            color={viewMode === "wax" ? "#ffe8c0" : "#e8e8ff"}
+            intensity={viewMode === "cast" ? 0.8 : 0.6}
+            color={viewMode === "wax" ? "#ffe8c0" : "#d8e0f8"}
           />
           {/* Rim light — highlights edges and crater rims */}
           <pointLight
             position={[0, -3, 4]}
-            intensity={0.7}
+            intensity={viewMode === "cast" ? 1.0 : 0.7}
             color="#ffffff"
           />
-          {/* Top accent for specular highlights */}
+          {/* Top accent — broad specular highlight on crown */}
           <pointLight
             position={[0, 5, 0]}
-            intensity={0.4}
-            color="#f0f0ff"
+            intensity={viewMode === "cast" ? 0.6 : 0.4}
+            color="#f8f4ff"
           />
-          {/* Side kicker for depth perception */}
+          {/* Side kicker — warm edge for depth on metals */}
           <pointLight
             position={[-5, 1, -2]}
-            intensity={0.3}
-            color="#d0d0ff"
+            intensity={viewMode === "cast" ? 0.5 : 0.3}
+            color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"}
+          />
+          {/* Back-rim grazer — catches crater rims from behind */}
+          <pointLight
+            position={[2, -1, -4]}
+            intensity={viewMode === "cast" ? 0.4 : 0}
+            color="#e8e8ff"
           />
 
           <RingMesh
             params={params}
             viewMode={viewMode}
             metalPreset={metalPreset}
+            finishPreset={finishPreset}
             activeTool={activeTool ?? null}
             onAddWaxMark={onAddWaxMark}
             stampSettings={stampSettings}
@@ -817,7 +921,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             far={4}
           />
 
-          <Environment preset={viewMode === "wax" ? "warehouse" : "studio"} />
+          <Environment preset={viewMode === "wax" ? "warehouse" : "city"} />
           <OrbitControls
             enablePan={false}
             minDistance={isMobile ? 1.2 : 1.5}
