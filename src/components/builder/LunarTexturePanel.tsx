@@ -631,93 +631,171 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             <Switch checked={seedLocked} onCheckedChange={setSeedLocked} />
           </div>
 
-          {/* ── Shape ── */}
-          <SubSection title="Shape">
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Intensity: {state.intensity}%</Label>
+          {/* ── Crater Shape ── */}
+          <SubSection title="Crater Shape">
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5">
+              Control crater size, density, and form
+            </p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Overall Intensity</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.intensity}%</span>
+              </div>
               <Slider value={[state.intensity]} onValueChange={([v]) => patch({ intensity: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">How prominent the texture appears on the surface</p>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5 mt-2">
               <Label className="text-[10px] text-muted-foreground">Crater Density</Label>
-              <Select value={state.craterDensity} onValueChange={(v) => patch({ craterDensity: v as CraterDensity })}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="med">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-3 gap-1">
+                {([
+                  { value: "low" as CraterDensity, label: "Sparse", desc: "Few scattered" },
+                  { value: "med" as CraterDensity, label: "Medium", desc: "Balanced coverage" },
+                  { value: "high" as CraterDensity, label: "Dense", desc: "Heavily cratered" },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => patch({ craterDensity: opt.value })}
+                    className={cn(
+                      "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-md text-center transition-all border",
+                      state.craterDensity === opt.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    )}
+                  >
+                    <span className="text-[10px] font-medium">{opt.label}</span>
+                    <span className="text-[7px] opacity-60">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5 mt-2">
               <Label className="text-[10px] text-muted-foreground">Crater Size</Label>
-              <Select value={state.craterSize} onValueChange={(v) => patch({ craterSize: v as CraterSize })}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="small">Small</SelectItem>
-                  <SelectItem value="med">Medium</SelectItem>
-                  <SelectItem value="large">Large</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-3 gap-1">
+                {([
+                  { value: "small" as CraterSize, label: "Small", desc: "Fine pitting" },
+                  { value: "med" as CraterSize, label: "Medium", desc: "Natural craters" },
+                  { value: "large" as CraterSize, label: "Large", desc: "Deep basins" },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => patch({ craterSize: opt.value })}
+                    className={cn(
+                      "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-md text-center transition-all border",
+                      state.craterSize === opt.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    )}
+                  >
+                    <span className="text-[10px] font-medium">{opt.label}</span>
+                    <span className="text-[7px] opacity-60">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Rim Height: {state.rimHeight}%</Label>
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Rim Height</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.rimHeight}%</span>
+              </div>
               <Slider value={[state.rimHeight]} onValueChange={([v]) => patch({ rimHeight: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Height of raised edges around each crater</p>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Bowl Depth: {state.bowlDepth}%</Label>
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Bowl Depth</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.bowlDepth}%</span>
+              </div>
               <Slider value={[state.bowlDepth]} onValueChange={([v]) => patch({ bowlDepth: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">How deep the crater interiors are carved</p>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Rim Sharpness: {state.rimSharpness}%</Label>
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Rim Sharpness</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.rimSharpness}%</span>
+              </div>
               <Slider value={[state.rimSharpness]} onValueChange={([v]) => patch({ rimSharpness: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Crisp edges (high) vs soft rounded rims (low)</p>
             </div>
           </SubSection>
 
-          {/* ── Surface ── */}
-          <SubSection title="Surface">
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Micro Detail: {state.microDetail}%</Label>
+          {/* ── Surface Texture ── */}
+          <SubSection title="Surface Texture">
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5">
+              Fine-tune the terrain between craters
+            </p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Micro Detail</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.microDetail}%</span>
+              </div>
               <Slider value={[state.microDetail]} onValueChange={([v]) => patch({ microDetail: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Fine grain — adds dust-like surface noise</p>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Terrain Roughness: {state.terrainRoughness}%</Label>
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Terrain Roughness</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.terrainRoughness}%</span>
+              </div>
               <Slider value={[state.terrainRoughness]} onValueChange={([v]) => patch({ terrainRoughness: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Rolling hills and ridges between craters</p>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Overlap: {state.overlapIntensity}%</Label>
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Crater Overlap</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.overlapIntensity}%</span>
+              </div>
               <Slider value={[state.overlapIntensity]} onValueChange={([v]) => patch({ overlapIntensity: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">How much craters merge into each other</p>
             </div>
 
-            <div className="flex items-center justify-between">
-              <Label className="text-[10px] text-muted-foreground">Smooth Edges</Label>
+            <div className="flex items-center justify-between mt-2 p-2 rounded-md bg-secondary/20">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Smooth Edges</Label>
+                <p className="text-[8px] text-muted-foreground/40">Soften transitions between features</p>
+              </div>
               <Switch checked={state.smoothEdges} onCheckedChange={(v) => patch({ smoothEdges: v })} />
             </div>
           </SubSection>
 
-          {/* ── Advanced ── */}
-          <SubSection title="Advanced" defaultOpen={false}>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Erosion: {state.erosion}%</Label>
+          {/* ── Weathering & Seed ── */}
+          <SubSection title="Weathering & Seed" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5">
+              Age the surface and control randomisation
+            </p>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Erosion</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.erosion}%</span>
+              </div>
               <Slider value={[state.erosion]} onValueChange={([v]) => patch({ erosion: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Billions of years of weathering — wears down sharp features</p>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Crater Variation: {state.craterVariation}%</Label>
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Crater Variation</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.craterVariation}%</span>
+              </div>
               <Slider value={[state.craterVariation]} onValueChange={([v]) => patch({ craterVariation: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Randomness in crater shapes — uniform vs chaotic</p>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5 mt-2 p-2 rounded-md bg-secondary/20">
               <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                Seed: {state.seed}
+                Seed: <span className="font-mono text-primary/80">{state.seed}</span>
                 {seedLocked && <Lock className="w-2.5 h-2.5 text-primary" />}
               </Label>
+              <p className="text-[8px] text-muted-foreground/40">Same seed = same pattern. Lock to keep your surface while tweaking.</p>
               <div className="flex gap-1.5">
                 <Slider value={[state.seed]} onValueChange={([v]) => { if (!seedLocked) patch({ seed: v }); }} min={0} max={9999} step={1} className="flex-1" disabled={seedLocked} />
                 <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={handleReseed} disabled={seedLocked}>
