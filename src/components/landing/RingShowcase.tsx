@@ -818,12 +818,64 @@ function PolishedInnerBore({
   );
 }
 
-// ── Interior Engraving Geometry ──────────────────────────────────
-// Creates 3D engraved text on the inner bore of the ring using
-// displaced rectangular blocks arranged along the circumference.
-// Engraving is inset into the polished bore with depth shading.
+// ── Interior Engraving — texture-based (no 3D geometry spikes) ───
+// Renders engraving as a dark texture on the inner bore surface,
+// recessed appearance via material darkening, not extruded boxes.
 
-function InteriorEngraving({
+function useEngravingTexture(text: string, metalColor: string, isWax: boolean) {
+  return useMemo(() => {
+    if (!text) return null;
+
+    const canvas = document.createElement("canvas");
+    const w = 2048;
+    const h = 256;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+
+    // Transparent base — the bore material shows through
+    ctx.clearRect(0, 0, w, h);
+
+    // Engraving color — darker version of metal for recessed illusion
+    const c = new THREE.Color(isWax ? "#3d5228" : metalColor);
+    c.multiplyScalar(0.2);
+    const engravingFill = `rgb(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)})`;
+
+    // Subtle shadow behind text for depth
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
+
+    // Font — clean, elegant, spaced
+    const fontSize = h * 0.45;
+    ctx.font = `600 ${fontSize}px "Cinzel", "Georgia", serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.letterSpacing = "4px";
+
+    // Draw engraving text
+    ctx.fillStyle = engravingFill;
+    ctx.fillText(text, w / 2, h / 2);
+
+    // Second pass — lighter inline for polished engraving highlight
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    const highlight = new THREE.Color(isWax ? "#5a7a3e" : metalColor);
+    highlight.multiplyScalar(0.35);
+    ctx.fillStyle = `rgba(${Math.round(highlight.r * 255)}, ${Math.round(highlight.g * 255)}, ${Math.round(highlight.b * 255)}, 0.4)`;
+    ctx.font = `600 ${fontSize * 0.96}px "Cinzel", "Georgia", serif`;
+    ctx.fillText(text, w / 2, h / 2 - 1);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    return tex;
+  }, [text, metalColor, isWax]);
+}
+
+function InteriorEngravingBand({
   text,
   innerR,
   ringWidth,
@@ -836,134 +888,40 @@ function InteriorEngraving({
   metalColor: string;
   isWax: boolean;
 }) {
-  const glyphMeshes = useMemo(() => {
-    if (!text) return [];
-    const chars = text.split("");
-    const charHeight = ringWidth * 0.38; // larger for cosmic boldness
-    const charWidth = charHeight * 0.6;
-    const spacing = charHeight * 0.22;
-    const totalWidth = chars.length * (charWidth + spacing);
-    const engravingR = innerR - 0.018; // deeper inset for dramatic shadow
-    const depth = 0.025; // much deeper for clearly visible engraving
+  const texture = useEngravingTexture(text, metalColor, isWax);
 
-    const circumference = 2 * Math.PI * engravingR;
-    const totalAngle = (totalWidth / circumference) * 2 * Math.PI;
-    const startAngle = -totalAngle / 2;
+  const geometry = useMemo(() => {
+    // Thin cylinder slightly inside the bore — flush with the polished surface
+    const bandHeight = ringWidth * 0.35;
+    const r = innerR - 0.003; // just barely inside bore
+    const steps = 128;
+    const points: THREE.Vector2[] = [];
 
-    return chars.map((char, i) => {
-      if (char === " ") return null;
-      const charAngle = startAngle + (i * (charWidth + spacing) / circumference) * 2 * Math.PI;
-      const strokes = getCharStrokes(char, charWidth, charHeight);
-      return { char, charAngle, strokes, depth, engravingR, charHeight };
-    });
-  }, [text, innerR, ringWidth]);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const y = -bandHeight / 2 + t * bandHeight;
+      points.push(new THREE.Vector2(r, y));
+    }
 
-  // Darker shade of the metal for engraving depth effect
-  const engravingColor = useMemo(() => {
-    if (isWax) return "#2d3d1e";
-    const c = new THREE.Color(metalColor);
-    c.multiplyScalar(0.25); // much darker for deep shadow contrast
-    return `#${c.getHexString()}`;
-  }, [metalColor, isWax]);
+    return new THREE.LatheGeometry(points, 128);
+  }, [innerR, ringWidth]);
+
+  if (!texture) return null;
 
   return (
-    <group rotation={[Math.PI / 2, 0, 0]}>
-      {glyphMeshes.map((glyph, i) => {
-        if (!glyph) return null;
-        const { charAngle, strokes, depth, engravingR, charHeight } = glyph;
-
-        return (
-          <group key={i}>
-            {strokes.map((stroke, si) => {
-              const angle = charAngle + stroke.offsetX / engravingR;
-              const px = engravingR * Math.cos(angle);
-              const pz = engravingR * Math.sin(angle);
-              const py = stroke.offsetY - charHeight / 2;
-
-              return (
-                <mesh
-                  key={si}
-                  position={[px, py, pz]}
-                  rotation={[0, -angle + Math.PI, 0]}
-                  castShadow
-                >
-                  <boxGeometry args={[stroke.width * 1.15, stroke.height * 1.15, depth]} />
-                  <meshPhysicalMaterial
-                    color={engravingColor}
-                    roughness={isWax ? 0.85 : 0.65}
-                    metalness={isWax ? 0.02 : 0.85}
-                    envMapIntensity={0.15}
-                    clearcoat={isWax ? 0 : 0.15}
-                    clearcoatRoughness={0.6}
-                  />
-                </mesh>
-              );
-            })}
-          </group>
-        );
-      })}
-    </group>
+    <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]}>
+      <meshPhysicalMaterial
+        map={texture}
+        transparent
+        opacity={0.95}
+        roughness={isWax ? 0.8 : 0.45}
+        metalness={isWax ? 0.02 : 0.9}
+        envMapIntensity={0.2}
+        side={THREE.BackSide}
+        depthWrite={false}
+      />
+    </mesh>
   );
-}
-
-// Cosmic-style stroke-based character rendering — wider, bolder, with decorative elements
-interface CharStroke {
-  offsetX: number;
-  offsetY: number;
-  width: number;
-  height: number;
-}
-
-function getCharStrokes(char: string, w: number, h: number): CharStroke[] {
-  const t = w * 0.22; // thicker stroke for cosmic boldness
-  const strokes: CharStroke[] = [];
-  // Cosmic serifs — small caps at stroke ends
-  const serif = t * 0.4;
-
-  const patterns: Record<string, () => void> = {
-    "A": () => { strokes.push({ offsetX: 0, offsetY: h, width: w * 1.1, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.48, width: w*0.75, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.4, height: serif }); },
-    "B": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.9, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "C": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: w/2, offsetY: h-serif/2, width: serif, height: serif }); strokes.push({ offsetX: w/2, offsetY: serif/2, width: serif, height: serif }); },
-    "D": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
-    "E": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: -w*0.05, offsetY: h*0.5, width: w*0.8, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
-    "F": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: -w*0.05, offsetY: h*0.5, width: w*0.75, height: t*0.8 }); strokes.push({ offsetX: -w/2+t/2, offsetY: 0, width: w*0.4, height: serif }); },
-    "G": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w*0.1, offsetY: h*0.5, width: w*0.65, height: t*0.8 }); },
-    "H": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.3, height: serif }); },
-    "I": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.7, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.7, height: t }); },
-    "K": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w*0.05, offsetY: h*0.5, width: w*0.45, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "L": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); },
-    "M": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.65, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.65, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.1, height: t }); },
-    "N": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
-    "O": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
-    "P": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: -w/2+t/2, offsetY: 0, width: w*0.35, height: serif }); },
-    "R": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w/2, offsetY: 0, width: serif, height: serif }); },
-    "S": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.9, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
-    "T": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.15, height: t }); strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.35, height: serif }); },
-    "U": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.3, height: serif }); },
-    "V": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.45, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.3, height: serif }); },
-    "W": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.3, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.3, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.1, height: t }); },
-    "X": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.55, height: t*0.8 }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "Y": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.5, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.8, height: serif }); },
-    "Z": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.6, height: h*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
-    "0": () => { patterns["O"]!(); },
-    "1": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.5, height: serif }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.5, height: serif }); },
-    "2": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t*0.8 }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
-    "3": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.85, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
-    "·": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.4, height: t*1.4 }); },
-    "-": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.75, height: t*0.8 }); },
-    "J": () => { strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.2, width: t, height: h*0.35 }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.5, height: serif }); },
-    "Q": () => { patterns["O"]!(); strokes.push({ offsetX: w*0.25, offsetY: -t*0.3, width: t*1.2, height: t*2 }); },
-  };
-
-  const upperChar = char.toUpperCase();
-  if (patterns[upperChar]) {
-    patterns[upperChar]();
-  } else {
-    // Fallback: cosmic dot
-    strokes.push({ offsetX: 0, offsetY: h * 0.5, width: t * 1.2, height: t * 1.2 });
-  }
-
-  return strokes;
 }
 
 // ── 3D Ring Mesh (enhanced with casting detail) ─────────────────
@@ -1190,7 +1148,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 
       {/* Interior engraving */}
       {design.engraving && (
-        <InteriorEngraving
+        <InteriorEngravingBand
           text={design.engraving}
           innerR={innerR}
           ringWidth={w}
