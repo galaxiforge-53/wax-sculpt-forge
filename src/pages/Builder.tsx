@@ -6,6 +6,7 @@ import ToolRail from "@/components/builder/ToolRail";
 import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import TopBar from "@/components/builder/TopBar";
 import ForgeCinematicModal from "@/components/forge/ForgeCinematicModal";
+import GuidedWorkflow from "@/components/builder/GuidedWorkflow";
 import { isEmbedMode } from "@/config/galaxiforge";
 import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
@@ -13,7 +14,7 @@ import { getProject, saveProject } from "@/lib/projectsStore";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function Builder() {
@@ -30,6 +31,12 @@ export default function Builder() {
   const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
+  const [guidedMode, setGuidedMode] = useState(() => {
+    // Show guided mode for new users (no prior project or template)
+    const hasTemplate = !!sessionStorage.getItem("applyTemplate");
+    const hasProject = !!sessionStorage.getItem("openProjectId");
+    return !hasTemplate && !hasProject;
+  });
 
   const CAMERA_BUTTONS: { id: SnapshotAngle; label: string }[] = [
     { id: "front", label: "Front" },
@@ -163,6 +170,26 @@ export default function Builder() {
     setForgeModalOpen(true);
   };
 
+  const guidedContent = (
+    <GuidedWorkflow
+      params={params}
+      onUpdate={updateParams}
+      lunarTexture={lunarTexture}
+      onLunarChange={setLunarTexture}
+      engraving={engraving}
+      onEngravingChange={setEngraving}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+      metalPreset={metalPreset}
+      onMetalChange={setMetalPreset}
+      finishPreset={finishPreset}
+      onFinishChange={setFinishPreset}
+      castabilityReport={castabilityReport}
+      onSave={handleSave}
+      onExitGuided={() => setGuidedMode(false)}
+    />
+  );
+
   const sidebarContent = (
     <BuilderSidebar
       params={params}
@@ -195,6 +222,8 @@ export default function Builder() {
       onFinishChange={setFinishPreset}
     />
   );
+
+  const panelContent = guidedMode ? guidedContent : sidebarContent;
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -301,18 +330,47 @@ export default function Builder() {
           {isMobile && (
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
               {/* Tool selector as horizontal strip */}
-              <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-1 flex gap-0.5 overflow-x-auto max-w-[65%]">
-                <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
-              </div>
+              {!guidedMode && (
+                <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-1 flex gap-0.5 overflow-x-auto max-w-[55%]">
+                  <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
+                </div>
+              )}
+              {guidedMode && <div />}
 
-              {/* Panel toggle */}
+              <div className="flex gap-2">
+                {!guidedMode && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setGuidedMode(true)}
+                    className="h-10 rounded-full bg-card/90 backdrop-blur-sm border-border shadow-lg px-3"
+                  >
+                    <Wand2 className="h-4 w-4 mr-1" />
+                    <span className="text-[10px]">Guide</span>
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMobilePanel(true)}
+                  className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-sm border-border shadow-lg"
+                >
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Desktop guided mode toggle — bottom-left overlay */}
+          {!isMobile && !guidedMode && (
+            <div className="absolute bottom-3 left-3 z-10">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setMobilePanel(true)}
-                className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-sm border-border shadow-lg"
+                onClick={() => setGuidedMode(true)}
+                className="bg-card/80 backdrop-blur-sm border-border/50 text-xs gap-1.5"
               >
-                <Settings2 className="h-4 w-4" />
+                <Wand2 className="w-3.5 h-3.5" /> Guided Mode
               </Button>
             </div>
           )}
@@ -321,7 +379,7 @@ export default function Builder() {
         {/* Desktop sidebar */}
         {!isMobile && (
           <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
-            {sidebarContent}
+            {panelContent}
           </div>
         )}
 
@@ -330,10 +388,12 @@ export default function Builder() {
           <Sheet open={mobilePanel} onOpenChange={setMobilePanel}>
             <SheetContent side="bottom" className="h-[75vh] p-0 rounded-t-2xl">
               <SheetHeader className="px-4 pt-4 pb-2">
-                <SheetTitle className="text-sm font-display tracking-wider">Controls</SheetTitle>
+                <SheetTitle className="text-sm font-display tracking-wider">
+                  {guidedMode ? "Guided Design" : "Controls"}
+                </SheetTitle>
               </SheetHeader>
               <div className="flex-1 overflow-hidden h-[calc(75vh-60px)]">
-                {sidebarContent}
+                {panelContent}
               </div>
             </SheetContent>
           </Sheet>
