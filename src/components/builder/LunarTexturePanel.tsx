@@ -118,18 +118,24 @@ const LUNAR_PRESETS: LunarPreset[] = [
   },
 ];
 
-// ── Real Moon Surface Presets ─────────────────────────────────────
+// ── Planetary Surface Library ─────────────────────────────────────
 
-interface MoonSurfacePreset {
+interface PlanetaryPreset {
   name: string;
+  emoji: string;
   description: string;
+  parent: string;
+  color: string; // tailwind-safe accent for the card
   build: () => LunarTextureState;
 }
 
-const MOON_SURFACE_PRESETS: MoonSurfacePreset[] = [
+const PLANETARY_PRESETS: PlanetaryPreset[] = [
   {
     name: "Earth's Moon",
-    description: "Classic lunar highlands — mixed crater sizes, moderate erosion, fine regolith dust",
+    emoji: "🌕",
+    parent: "Earth",
+    color: "text-zinc-300",
+    description: "Classic highlands — mixed crater sizes, moderate erosion, fine regolith dust",
     build: () => ({
       enabled: true, intensity: 60, craterDensity: "med", craterSize: "med",
       microDetail: 55, rimSharpness: 50, overlapIntensity: 40, smoothEdges: true, seed: newSeed(),
@@ -137,8 +143,35 @@ const MOON_SURFACE_PRESETS: MoonSurfacePreset[] = [
     }),
   },
   {
+    name: "Mercury",
+    emoji: "☿",
+    parent: "Sun",
+    color: "text-amber-400",
+    description: "No atmosphere — sharp rims preserved, dense overlapping basins, Caloris-scale impacts",
+    build: () => ({
+      enabled: true, intensity: 85, craterDensity: "high", craterSize: "med",
+      microDetail: 40, rimSharpness: 80, overlapIntensity: 70, smoothEdges: false, seed: newSeed(),
+      rimHeight: 75, bowlDepth: 70, erosion: 10, terrainRoughness: 30, craterVariation: 65,
+    }),
+  },
+  {
+    name: "Mars",
+    emoji: "♂",
+    parent: "Sun",
+    color: "text-red-400",
+    description: "Wind-eroded craters, dust-filled basins, volcanic plains with scattered impacts",
+    build: () => ({
+      enabled: true, intensity: 50, craterDensity: "med", craterSize: "large",
+      microDetail: 35, rimSharpness: 35, overlapIntensity: 30, smoothEdges: true, seed: newSeed(),
+      rimHeight: 40, bowlDepth: 50, erosion: 55, terrainRoughness: 60, craterVariation: 70,
+    }),
+  },
+  {
     name: "Phobos",
-    description: "Mars' largest moon — dominated by Stickney crater, grooved terrain, low gravity stretching",
+    emoji: "🪨",
+    parent: "Mars",
+    color: "text-stone-400",
+    description: "Stickney crater dominates — grooved terrain, low gravity stretching, rubble-pile texture",
     build: () => ({
       enabled: true, intensity: 70, craterDensity: "low", craterSize: "large",
       microDetail: 30, rimSharpness: 35, overlapIntensity: 20, smoothEdges: true, seed: newSeed(),
@@ -147,7 +180,10 @@ const MOON_SURFACE_PRESETS: MoonSurfacePreset[] = [
   },
   {
     name: "Deimos",
-    description: "Mars' smaller moon — smooth, buried craters, thick regolith blanket softening all features",
+    emoji: "🌑",
+    parent: "Mars",
+    color: "text-neutral-500",
+    description: "Smooth, buried craters — thick regolith blanket softening all features into gentle undulations",
     build: () => ({
       enabled: true, intensity: 35, craterDensity: "low", craterSize: "med",
       microDetail: 70, rimSharpness: 15, overlapIntensity: 10, smoothEdges: true, seed: newSeed(),
@@ -155,17 +191,11 @@ const MOON_SURFACE_PRESETS: MoonSurfacePreset[] = [
     }),
   },
   {
-    name: "Mercury",
-    description: "Heavily cratered, no atmosphere — sharp rims preserved, dense overlapping basins",
-    build: () => ({
-      enabled: true, intensity: 85, craterDensity: "high", craterSize: "med",
-      microDetail: 40, rimSharpness: 80, overlapIntensity: 70, smoothEdges: false, seed: newSeed(),
-      rimHeight: 75, bowlDepth: 70, erosion: 10, terrainRoughness: 30, craterVariation: 65,
-    }),
-  },
-  {
     name: "Europa",
-    description: "Jupiter's icy moon — very few craters, ultra-smooth ice plains with faint lineae ridges",
+    emoji: "❄",
+    parent: "Jupiter",
+    color: "text-cyan-300",
+    description: "Icy shell — very few craters, ultra-smooth plains with faint lineae ridges and cryovolcanic marks",
     build: () => ({
       enabled: true, intensity: 25, craterDensity: "low", craterSize: "small",
       microDetail: 85, rimSharpness: 60, overlapIntensity: 5, smoothEdges: true, seed: newSeed(),
@@ -174,11 +204,26 @@ const MOON_SURFACE_PRESETS: MoonSurfacePreset[] = [
   },
   {
     name: "Callisto",
-    description: "Jupiter's ancient moon — saturated craters, maximum bombardment, heavily weathered surface",
+    emoji: "🌐",
+    parent: "Jupiter",
+    color: "text-amber-300",
+    description: "Ancient, saturated — maximum bombardment over 4 billion years, heavily weathered Valhalla basin",
     build: () => ({
       enabled: true, intensity: 95, craterDensity: "high", craterSize: "large",
       microDetail: 50, rimSharpness: 30, overlapIntensity: 90, smoothEdges: true, seed: newSeed(),
       rimHeight: 35, bowlDepth: 55, erosion: 75, terrainRoughness: 60, craterVariation: 80,
+    }),
+  },
+  {
+    name: "Titan",
+    emoji: "🟠",
+    parent: "Saturn",
+    color: "text-orange-400",
+    description: "Dense atmosphere — almost no visible craters, methane-eroded dunes, hydrocarbon lakes, organic haze",
+    build: () => ({
+      enabled: true, intensity: 20, craterDensity: "low", craterSize: "small",
+      microDetail: 90, rimSharpness: 10, overlapIntensity: 5, smoothEdges: true, seed: newSeed(),
+      rimHeight: 10, bowlDepth: 15, erosion: 95, terrainRoughness: 85, craterVariation: 15,
     }),
   },
 ];
@@ -283,30 +328,28 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             </Select>
           </div>
 
-          {/* Moon Surface Presets */}
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Globe className="w-3 h-3" /> Moon Surface
-            </Label>
-            <Select value="" onValueChange={(name) => {
-              const preset = MOON_SURFACE_PRESETS.find((p) => p.name === name);
-              if (preset) onApplyPreset(preset.build(), name);
-            }}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Real moon terrain…" />
-              </SelectTrigger>
-              <SelectContent>
-                {MOON_SURFACE_PRESETS.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>
-                    <div className="flex flex-col">
-                      <span>{p.name}</span>
-                      <span className="text-[9px] text-muted-foreground leading-tight">{p.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Planetary Surface Library */}
+          <SubSection title="Planetary Surfaces">
+            <div className="grid grid-cols-2 gap-1.5">
+              {PLANETARY_PRESETS.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => onApplyPreset(p.build(), p.name)}
+                  className={cn(
+                    "flex flex-col items-start gap-0.5 p-2 rounded-lg border text-left transition-all",
+                    "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 w-full">
+                    <span className="text-sm">{p.emoji}</span>
+                    <span className={cn("text-[10px] font-medium", p.color)}>{p.name}</span>
+                  </div>
+                  <span className="text-[8px] text-muted-foreground/70 leading-tight">{p.parent}</span>
+                  <span className="text-[8px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">{p.description}</span>
+                </button>
+              ))}
+            </div>
+          </SubSection>
           {/* Quick actions */}
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleResurface} disabled={seedLocked}>
