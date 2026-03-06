@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_codes: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          current_uses: number
+          id: string
+          max_uses: number | null
+          tier: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          current_uses?: number
+          id?: string
+          max_uses?: number | null
+          tier?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          current_uses?: number
+          id?: string
+          max_uses?: number | null
+          tier?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -71,12 +101,44 @@ export type Database = {
         }
         Relationships: []
       }
+      user_access: {
+        Row: {
+          code_id: string
+          granted_at: string
+          id: string
+          tier: string
+          user_id: string
+        }
+        Insert: {
+          code_id: string
+          granted_at?: string
+          id?: string
+          tier?: string
+          user_id: string
+        }
+        Update: {
+          code_id?: string
+          granted_at?: string
+          id?: string
+          tier?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_access_code_id_fkey"
+            columns: ["code_id"]
+            isOneToOne: false
+            referencedRelation: "access_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      redeem_access_code: { Args: { p_code: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

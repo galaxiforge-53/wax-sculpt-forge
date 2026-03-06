@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
+import { AccessProvider } from "@/hooks/useAccess";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import PlatformNav from "@/components/layout/PlatformNav";
@@ -16,6 +17,7 @@ const Templates = lazy(() => import("./pages/Templates"));
 const MyDesigns = lazy(() => import("./pages/MyDesigns"));
 const Help = lazy(() => import("./pages/Help"));
 const Auth = lazy(() => import("./pages/Auth"));
+const AccessCode = lazy(() => import("./pages/AccessCode"));
 
 const queryClient = new QueryClient();
 
@@ -28,6 +30,7 @@ const Loading = () => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <AccessProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -43,11 +46,13 @@ const App = () => (
               <Route path="/help" element={<Help />} />
               <Route path="/export" element={<Export />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/access" element={<AccessCode />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
       </TooltipProvider>
+      </AccessProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

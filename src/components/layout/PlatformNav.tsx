@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: "Builders", path: "/builders" },
   { label: "Templates", path: "/templates" },
   { label: "My Designs", path: "/my-designs" },
+  { label: "Access", path: "/access" },
   { label: "Help", path: "/help" },
 ];
 
