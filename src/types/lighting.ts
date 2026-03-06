@@ -18,22 +18,34 @@ export interface LightingSettings {
 }
 
 export const DEFAULT_LIGHTING: LightingSettings = {
-  azimuth: 45,
-  elevation: 50,
-  keyIntensity: 2.2,
-  fillIntensity: 0.6,
-  ambientIntensity: 0.2,
-  envIntensity: 1.0,
-  envPreset: "city",
-  warmth: 60,
+  azimuth: 35,
+  elevation: 45,
+  keyIntensity: 2.4,
+  fillIntensity: 0.7,
+  ambientIntensity: 0.15,
+  envIntensity: 1.4,
+  envPreset: "studio",
+  warmth: 55,
 };
 
 export const LIGHTING_PRESETS: { id: string; label: string; icon: string; settings: Partial<LightingSettings> }[] = [
+  {
+    id: "jeweller",
+    label: "Jeweller's Bench",
+    icon: "💎",
+    settings: { azimuth: 35, elevation: 45, keyIntensity: 2.4, fillIntensity: 0.7, ambientIntensity: 0.15, envIntensity: 1.4, envPreset: "studio", warmth: 55 },
+  },
   {
     id: "studio",
     label: "Studio",
     icon: "💡",
     settings: { azimuth: 30, elevation: 55, keyIntensity: 2.5, fillIntensity: 0.8, ambientIntensity: 0.25, envIntensity: 1.2, envPreset: "studio", warmth: 55 },
+  },
+  {
+    id: "product",
+    label: "Product Shot",
+    icon: "📸",
+    settings: { azimuth: 20, elevation: 40, keyIntensity: 2.0, fillIntensity: 1.0, ambientIntensity: 0.3, envIntensity: 1.8, envPreset: "lobby", warmth: 50 },
   },
   {
     id: "dramatic",
