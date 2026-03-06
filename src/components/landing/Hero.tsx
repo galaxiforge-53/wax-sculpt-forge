@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, Suspense } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { Environment, OrbitControls, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
@@ -28,6 +28,53 @@ function useEmbers(count: number) {
   }, [count]);
 }
 
+// ── Fallback ring (procedural) — shown while STL loads or if it fails ──
+
+function FallbackRingMesh() {
+  const groupRef = useRef<THREE.Group>(null);
+
+  const geo = useMemo(() => {
+    const points: THREE.Vector2[] = [];
+    const innerR = 0.75;
+    const outerR = 1.0;
+    const width = 0.5;
+    const steps = 64;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const angle = t * Math.PI;
+      const r = innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
+      points.push(new THREE.Vector2(r, (t - 0.5) * width));
+    }
+    const g = new THREE.LatheGeometry(points, 128);
+    g.computeVertexNormals();
+    return g;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.getElapsedTime();
+    groupRef.current.rotation.y = t * 0.15;
+    groupRef.current.rotation.x = Math.PI * 0.25;
+    groupRef.current.rotation.z = 0.1;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh geometry={geo} castShadow receiveShadow>
+        <meshPhysicalMaterial
+          color="#C8A83E"
+          roughness={0.18}
+          metalness={1.0}
+          envMapIntensity={3.0}
+          clearcoat={0.2}
+          clearcoatRoughness={0.1}
+          reflectivity={1.0}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 // ── Hero Ring 3D — loaded from STL file ──────────────────────────
 
 function HeroRingMesh() {
@@ -39,13 +86,11 @@ function HeroRingMesh() {
     geo.computeVertexNormals();
     geo.computeBoundingBox();
     
-    // Center the geometry
     const box = geo.boundingBox!;
     const center = new THREE.Vector3();
     box.getCenter(center);
     geo.translate(-center.x, -center.y, -center.z);
     
-    // Scale to fit nicely in the scene (normalize to ~2 units)
     const size = new THREE.Vector3();
     box.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
@@ -55,13 +100,12 @@ function HeroRingMesh() {
     return geo;
   }, [geometry]);
 
-  // Slow auto-rotation, tilted 45° with top of ring upward
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
     groupRef.current.rotation.y = t * 0.15;
-    groupRef.current.rotation.x = Math.PI * 0.25; // 45° tilt — top of ring faces viewer
-    groupRef.current.rotation.z = 0.1; // slight lean for drama
+    groupRef.current.rotation.x = Math.PI * 0.25;
+    groupRef.current.rotation.z = 0.1;
   });
 
   return (
@@ -94,11 +138,28 @@ function HeroScene() {
       <pointLight position={[-3, -1, -3]} intensity={0.6} color="#ffa040" />
       <pointLight position={[3, 4, 0]} intensity={0.8} color="#ffecd2" />
       <pointLight position={[0, -3, 2]} intensity={0.3} color="#ff8c00" />
-      <HeroRingMesh />
+      <Suspense fallback={<FallbackRingMesh />}>
+        <HeroRingMesh />
+      </Suspense>
       <ContactShadows position={[0, -1.2, 0]} opacity={0.35} scale={5} blur={2.5} far={4} />
       <Environment preset="city" />
     </>
   );
+}
+
+// ── Error boundary for Canvas crash recovery ─────────────────────
+
+import { Component, type ReactNode } from "react";
+
+class CanvasErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
 }
 
 export default function Hero() {
@@ -117,7 +178,6 @@ export default function Hero() {
       <div className="absolute inset-x-0 bottom-0 h-[45%] pointer-events-none z-[1]">
         <div className="absolute inset-x-0 bottom-0 h-full bg-gradient-to-t from-[hsl(20_90%_12%/0.35)] via-[hsl(25_95%_25%/0.12)] to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[hsl(15_95%_45%/0.15)] to-transparent animate-flicker" />
-        {/* Glowing hearth line */}
         <div className="absolute inset-x-[10%] bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[hsl(25_95%_53%/0.5)] to-transparent blur-[1px]" />
       </div>
 
@@ -158,7 +218,7 @@ export default function Hero() {
         ))}
       </div>
 
-      {/* 3D Hero Ring — centered, full-width, interactive */}
+      {/* 3D Hero Ring — behind text content, fills background */}
       <div className="absolute inset-0 z-[3] flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
@@ -166,28 +226,37 @@ export default function Hero() {
           transition={{ duration: 1.5, delay: 0.3, ease: "easeOut" }}
           className="w-full h-full max-w-[600px] sm:max-w-none mx-auto"
         >
-      <Canvas
-            camera={{ position: [0, 1.5, 3.0], fov: 36 }}
-            gl={{ antialias: true, alpha: true }}
-            dpr={[1, 2]}
+          <CanvasErrorBoundary
+            fallback={
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="w-40 h-40 rounded-full border border-primary/20 animate-pulse" />
+              </div>
+            }
           >
-            <HeroScene />
-            <OrbitControls
-              enablePan={false}
-              enableZoom={true}
-              autoRotate
-              autoRotateSpeed={0.8}
-              minDistance={2}
-              maxDistance={7}
-              minPolarAngle={Math.PI / 4}
-              maxPolarAngle={Math.PI / 1.3}
-            />
-          </Canvas>
+            <Canvas
+              camera={{ position: [0, 1.5, 3.0], fov: 36 }}
+              gl={{ antialias: true, alpha: true }}
+              dpr={[1, 2]}
+            >
+              <HeroScene />
+              <OrbitControls
+                enablePan={false}
+                enableZoom={true}
+                autoRotate
+                autoRotateSpeed={0.8}
+                minDistance={2}
+                maxDistance={7}
+                minPolarAngle={Math.PI / 4}
+                maxPolarAngle={Math.PI / 1.3}
+              />
+            </Canvas>
+          </CanvasErrorBoundary>
         </motion.div>
-        {/* Subtle vignette — minimal so ring stays visible and centered */}
+        {/* Vignette over 3D scene so text reads clearly */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/20 pointer-events-none" />
       </div>
 
+      {/* Text + CTA — always on top */}
       <div className="relative z-10 text-center px-5 sm:px-6 max-w-3xl">
         <motion.p
           initial={{ opacity: 0, y: 20 }}
