@@ -200,6 +200,23 @@ function geometryToSTLBinary(geometry: THREE.BufferGeometry): ArrayBuffer {
   return buffer;
 }
 
+// ── Casting shrinkage profiles ───────────────────────────────────
+
+export type ShrinkageMetal = "silver" | "gold" | "bronze" | "none";
+
+export interface ShrinkageProfile {
+  label: string;
+  factor: number; // multiplicative scale, e.g. 1.02 = 2% oversize
+  description: string;
+}
+
+export const SHRINKAGE_PROFILES: Record<ShrinkageMetal, ShrinkageProfile> = {
+  none:   { label: "None (1:1)",        factor: 1.0,    description: "No compensation — export at exact design size" },
+  silver: { label: "Sterling Silver",   factor: 1.018,  description: "~1.8% oversize to compensate for silver casting shrinkage" },
+  gold:   { label: "14K Gold",          factor: 1.015,  description: "~1.5% oversize to compensate for gold alloy shrinkage" },
+  bronze: { label: "Bronze",            factor: 1.022,  description: "~2.2% oversize to compensate for bronze casting shrinkage" },
+};
+
 // ── Public API ───────────────────────────────────────────────────
 
 export interface STLExportResult {
@@ -207,14 +224,25 @@ export interface STLExportResult {
   geometry: THREE.BufferGeometry;
   triangleCount: number;
   fileSizeKB: number;
+  shrinkageMetal: ShrinkageMetal;
+  scaleFactor: number;
 }
 
 export function generateExportSTL(
   params: RingParameters,
   lunar: LunarTextureState | null,
   engraving: EngravingState | null,
+  shrinkage: ShrinkageMetal = "none",
 ): STLExportResult {
   const geometry = buildExportGeometry(params, lunar, engraving);
+
+  // Apply shrinkage compensation by uniformly scaling the geometry
+  const scaleFactor = SHRINKAGE_PROFILES[shrinkage]?.factor ?? 1.0;
+  if (scaleFactor !== 1.0) {
+    geometry.scale(scaleFactor, scaleFactor, scaleFactor);
+    geometry.computeVertexNormals();
+  }
+
   const stlBuffer = geometryToSTLBinary(geometry);
   const blob = new Blob([stlBuffer], { type: "application/octet-stream" });
 
@@ -226,6 +254,8 @@ export function generateExportSTL(
     geometry,
     triangleCount,
     fileSizeKB: Math.round(stlBuffer.byteLength / 1024),
+    shrinkageMetal: shrinkage,
+    scaleFactor,
   };
 }
 
