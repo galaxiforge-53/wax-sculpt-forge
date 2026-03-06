@@ -7,6 +7,7 @@ import { RingParameters, ViewMode, MetalPreset, ToolType } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
+import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -448,6 +449,49 @@ function InlayBandMarkers({ inlays, params }: { inlays: InlayChannel[]; params: 
   );
 }
 
+// ── Interior Engraving Text ────────────────────────────────────────
+function EngravingText3D({ params, engraving }: { params: RingParameters; engraving: EngravingState }) {
+  if (!engraving.enabled || !engraving.text) return null;
+
+  const innerR = params.innerDiameter / 2 / 10;
+  const depthOffset = engraving.depthMm / 10;
+  const textR = innerR - depthOffset * 0.5;
+  const fontSize = engraving.sizeMm / 10;
+  const letterSpacing = engraving.spacingMm / 10;
+
+  const chars = engraving.text.split("");
+  const charWidth = fontSize * 0.6 + letterSpacing;
+  const totalArc = chars.length * charWidth;
+  const circumference = 2 * Math.PI * textR;
+  const arcFraction = totalArc / circumference;
+  const startAngle = -arcFraction * Math.PI;
+
+  return (
+    <group rotation={[Math.PI / 2, 0, 0]}>
+      {chars.map((char, i) => {
+        const angle = startAngle + (i + 0.5) * (charWidth / textR);
+        const x = Math.cos(angle) * textR;
+        const z = Math.sin(angle) * textR;
+        const rotY = -angle + Math.PI / 2;
+
+        return (
+          <Text
+            key={`${i}-${char}`}
+            position={[x, 0, z]}
+            rotation={[0, rotY, 0]}
+            fontSize={fontSize}
+            color="#555555"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {char}
+          </Text>
+        );
+      })}
+    </group>
+  );
+}
+
 function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, number, number]) => Promise<string> }) => void }) {
   const { gl, camera, scene } = useThree();
   const captureRef = useRef<(pos: [number, number, number]) => Promise<string>>();
@@ -628,10 +672,11 @@ interface RingViewportProps {
   cameraPreset?: SnapshotAngle | null;
   onPresetApplied?: () => void;
   showMeasurements?: boolean;
+  engraving?: EngravingState;
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, cameraPreset, onPresetApplied, showMeasurements }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -714,6 +759,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           {viewMode === "wax" && inlays && inlays.length > 0 && (
             <InlayBandMarkers inlays={inlays} params={params} />
+          )}
+
+          {/* Interior engraving */}
+          {engraving?.enabled && engraving.text && (
+            <EngravingText3D params={params} engraving={engraving} />
           )}
 
           {/* Workbench measurement bed */}

@@ -52,6 +52,7 @@ export default function Builder() {
     stampSettings, setStampSettings,
     inlays, addInlayChannel, removeInlayChannel, clearInlays,
     lunarTexture, setLunarTexture, applyLunarPreset, randomizeLunar,
+    engraving, setEngraving,
   } = useRingDesign();
 
   const embed = isEmbedMode();
@@ -174,6 +175,8 @@ export default function Builder() {
       onApplyLunarPreset={applyLunarPreset}
       onRandomizeLunar={randomizeLunar}
       onApplyTemplate={applyTemplate}
+      engraving={engraving}
+      onEngravingChange={setEngraving}
     />
   );
 
@@ -217,6 +220,7 @@ export default function Builder() {
             stampSettings={stampSettings}
             inlays={inlays}
             lunarTexture={lunarTexture}
+            engraving={engraving}
             cameraPreset={cameraPreset}
             onPresetApplied={() => setCameraPreset(null)}
             showMeasurements={showMeasurements || activeTool === "measure"}
