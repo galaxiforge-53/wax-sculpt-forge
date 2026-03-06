@@ -10,6 +10,7 @@ import { LunarTextureState } from "@/types/lunar";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
 import { useIsMobile } from "@/hooks/use-mobile";
+import MeasurementOverlay from "./MeasurementOverlay";
 
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
 
@@ -626,10 +627,11 @@ interface RingViewportProps {
   lunarTexture?: LunarTextureState;
   cameraPreset?: SnapshotAngle | null;
   onPresetApplied?: () => void;
+  showMeasurements?: boolean;
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, cameraPreset, onPresetApplied }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, cameraPreset, onPresetApplied, showMeasurements }, ref) {
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -716,6 +718,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           {/* Workbench measurement bed */}
           <WorkbenchGrid params={params} />
+
+          {/* Measurement dimension guides */}
+          <MeasurementOverlay params={params} visible={!!showMeasurements} />
 
           <ContactShadows
             position={[0, -0.84, 0]}

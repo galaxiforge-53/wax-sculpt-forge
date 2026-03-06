@@ -28,6 +28,7 @@ export default function Builder() {
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState(false);
   const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
+  const [showMeasurements, setShowMeasurements] = useState(false);
 
   const CAMERA_BUTTONS: { id: SnapshotAngle; label: string }[] = [
     { id: "front", label: "Front" },
@@ -218,6 +219,7 @@ export default function Builder() {
             lunarTexture={lunarTexture}
             cameraPreset={cameraPreset}
             onPresetApplied={() => setCameraPreset(null)}
+            showMeasurements={showMeasurements || activeTool === "measure"}
           />
 
           {/* Camera preset buttons — top-left overlay */}
@@ -236,6 +238,19 @@ export default function Builder() {
               </button>
             ))}
           </div>
+
+          {/* Measurement toggle — top-right */}
+          <button
+            onClick={() => setShowMeasurements((v) => !v)}
+            className={`absolute top-2 right-2 z-10 px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+              ${showMeasurements || activeTool === "measure"
+                ? "bg-primary/30 text-primary border border-primary/40"
+                : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+              }`}
+            title="Toggle dimension guides"
+          >
+            📐 Dims
+          </button>
 
           {/* Mobile floating buttons */}
           {isMobile && (
