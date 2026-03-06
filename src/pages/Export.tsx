@@ -2,17 +2,21 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DesignPackage, ViewMode } from "@/types/ring";
+import { DesignPackage, ViewMode, MetalPreset, FinishPreset, RING_SIZE_MAP } from "@/types/ring";
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
 import { getReturnUrl, getHandoffUrl, isEmbedMode } from "@/config/galaxiforge";
 import { generateExportSTL, downloadBlob, STLExportResult } from "@/lib/stlExporter";
-import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock } from "lucide-react";
+import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles } from "lucide-react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/hooks/useAccess";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ── 3D Preview of export geometry ────────────────────────────────
 
@@ -58,20 +62,60 @@ function SpecBadge({ icon: Icon, label, value, warn }: { icon: React.ElementType
   );
 }
 
+// ── Metals & Finishes ────────────────────────────────────────────
+
+const METALS: { value: MetalPreset; label: string }[] = [
+  { value: "silver", label: "Sterling Silver" },
+  { value: "gold", label: "14K Gold" },
+  { value: "rose-gold", label: "14K Rose Gold" },
+  { value: "titanium", label: "Titanium" },
+  { value: "tungsten", label: "Tungsten Carbide" },
+];
+
+const FINISHES: { value: FinishPreset; label: string }[] = [
+  { value: "polished", label: "High Polish" },
+  { value: "brushed", label: "Brushed" },
+  { value: "hammered", label: "Hammered" },
+  { value: "matte", label: "Matte" },
+  { value: "satin", label: "Satin" },
+];
+
+const RING_SIZES = Object.keys(RING_SIZE_MAP).map(Number);
+
+// ── Submission Steps ─────────────────────────────────────────────
+
+type SubmitStep = "review" | "confirm" | "submitting" | "done";
+
 // ── Main Export page ─────────────────────────────────────────────
 
 export default function Export() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { canExport } = useAccess();
+  const { user } = useAuth();
   const [pkg, setPkg] = useState<DesignPackage | null>(null);
   const [sent, setSent] = useState(false);
   const [stlResult, setStlResult] = useState<STLExportResult | null>(null);
   const [generating, setGenerating] = useState(false);
 
+  // Submission form state
+  const [submitStep, setSubmitStep] = useState<SubmitStep>("review");
+  const [confirmSize, setConfirmSize] = useState<number>(8);
+  const [confirmMetal, setConfirmMetal] = useState<MetalPreset>("silver");
+  const [confirmFinish, setConfirmFinish] = useState<FinishPreset>("polished");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     const raw = sessionStorage.getItem("designPackage");
-    if (raw) setPkg(JSON.parse(raw));
+    if (raw) {
+      const parsed = JSON.parse(raw) as DesignPackage;
+      setPkg(parsed);
+      // Initialize confirmation fields from design
+      setConfirmSize(parsed.parameters.size);
+      setConfirmMetal(parsed.metalPreset);
+      setConfirmFinish(parsed.finishPreset);
+    }
   }, []);
 
   // Generate STL when package loads
@@ -79,7 +123,6 @@ export default function Export() {
     if (!pkg) return;
     setGenerating(true);
 
-    // Use requestAnimationFrame to avoid blocking UI
     requestAnimationFrame(() => {
       try {
         const lunar: LunarTextureState = pkg.craftState?.lunarTexture ?? DEFAULT_LUNAR_TEXTURE;
@@ -107,10 +150,61 @@ export default function Export() {
     toast({ title: "STL Downloaded", description: `${name} (${stlResult.fileSizeKB} KB)` });
   };
 
+  const handleSubmitToForge = async () => {
+    if (!pkg || !user) return;
+    setSubmitting(true);
+    setSubmitStep("submitting");
+
+    try {
+      // Build the full manufacturing package
+      const manufacturingPackage = {
+        ...pkg,
+        parameters: {
+          ...pkg.parameters,
+          size: confirmSize,
+          innerDiameter: RING_SIZE_MAP[confirmSize] || pkg.parameters.innerDiameter,
+        },
+        metalPreset: confirmMetal,
+        finishPreset: confirmFinish,
+      };
+
+      const { error } = await supabase
+        .from("production_orders")
+        .insert({
+          user_id: user.id,
+          ring_size: confirmSize,
+          metal: confirmMetal,
+          finish: confirmFinish,
+          notes: notes.trim(),
+          design_package: manufacturingPackage as any,
+          status: "submitted",
+        });
+
+      if (error) throw error;
+
+      setSubmitStep("done");
+      setSent(true);
+      toast({ title: "Order Submitted! 🔥", description: "Your design has been sent to Galaxy Forge for production." });
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      toast({ title: "Submission Failed", description: err.message, variant: "destructive" });
+      setSubmitStep("confirm");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Keep the old handleSend for non-authenticated fallback
   const handleSend = async () => {
     if (!pkg) return;
-    console.log("Sending design package to:", getHandoffUrl(), pkg);
-    setSent(true);
+    if (user) {
+      // Open submission flow
+      setSubmitStep("confirm");
+    } else {
+      // Legacy: just mark as sent without DB
+      console.log("Sending design package to:", getHandoffUrl(), pkg);
+      setSent(true);
+    }
   };
 
   // Manufacturing warnings
@@ -244,8 +338,144 @@ export default function Export() {
           </pre>
         </details>
 
-        {/* Actions */}
-        {!sent ? (
+        {/* ── Production Submission Form ─────────────────────────── */}
+        <AnimatePresence mode="wait">
+          {submitStep === "confirm" && !sent && (
+            <motion.div
+              key="confirm-form"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              className="bg-card border-2 border-primary/30 rounded-xl p-5 sm:p-6 space-y-5"
+            >
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <h2 className="font-display text-base tracking-wide text-foreground">
+                  Submit to Galaxy Forge
+                </h2>
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Confirm the final specifications before sending your design for production.
+                All parameters, surface textures, and geometry are included in the manufacturing package.
+              </p>
+
+              {/* Ring Size */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-display">
+                  Confirm Ring Size (US)
+                </label>
+                <Select value={String(confirmSize)} onValueChange={(v) => setConfirmSize(Number(v))}>
+                  <SelectTrigger className="w-full h-9 text-sm bg-secondary border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RING_SIZES.map((s) => (
+                      <SelectItem key={s} value={String(s)}>
+                        Size {s} — {RING_SIZE_MAP[s]}mm inner diameter
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Metal */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-display">
+                  Confirm Metal
+                </label>
+                <Select value={confirmMetal} onValueChange={(v) => setConfirmMetal(v as MetalPreset)}>
+                  <SelectTrigger className="w-full h-9 text-sm bg-secondary border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METALS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Finish */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-display">
+                  Confirm Finish
+                </label>
+                <Select value={confirmFinish} onValueChange={(v) => setConfirmFinish(v as FinishPreset)}>
+                  <SelectTrigger className="w-full h-9 text-sm bg-secondary border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FINISHES.map((f) => (
+                      <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-display flex items-center gap-1">
+                  <FileText className="w-3 h-3" /> Production Notes (optional)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="Any special instructions, engraving requests, shipping notes..."
+                  className="w-full bg-secondary/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all resize-none"
+                />
+                <p className="text-[9px] text-muted-foreground/50 text-right">{notes.length}/1000</p>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                <p className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-display">Order Summary</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="text-muted-foreground">Ring Size</span>
+                  <span className="text-foreground font-mono">{confirmSize} US ({RING_SIZE_MAP[confirmSize]}mm)</span>
+                  <span className="text-muted-foreground">Metal</span>
+                  <span className="text-foreground font-mono capitalize">{METALS.find(m => m.value === confirmMetal)?.label}</span>
+                  <span className="text-muted-foreground">Finish</span>
+                  <span className="text-foreground font-mono capitalize">{FINISHES.find(f => f.value === confirmFinish)?.label}</span>
+                  <span className="text-muted-foreground">Profile</span>
+                  <span className="text-foreground font-mono capitalize">{pkg.parameters.profile}</span>
+                  <span className="text-muted-foreground">Width × Thickness</span>
+                  <span className="text-foreground font-mono">{pkg.parameters.width}mm × {pkg.parameters.thickness}mm</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setSubmitStep("review")} className="flex-1">
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmitToForge} className="flex-1 bg-primary text-primary-foreground hover:bg-ember-glow gap-2">
+                  <Send className="h-4 w-4" />
+                  Submit Order
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {submitStep === "submitting" && (
+            <motion.div
+              key="submitting"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="bg-card border border-border rounded-xl p-8 text-center space-y-4"
+            >
+              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground">Submitting your design to Galaxy Forge…</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Actions — shown when not in submission flow */}
+        {!sent && submitStep === "review" ? (
           <div className="flex flex-col sm:flex-row gap-3">
             <Button variant="outline" onClick={() => navigate("/builder")} className="flex-1">
               <ArrowLeft className="h-4 w-4 mr-2" /> Back
@@ -260,31 +490,39 @@ export default function Export() {
               {!canExport ? "Premium Required" : `Download STL ${stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}`}
             </Button>
             <Button onClick={handleSend} className="flex-1 bg-primary text-primary-foreground hover:bg-ember-glow">
-              <Send className="h-4 w-4 mr-2" /> Send to GalaxiForge
+              <Send className="h-4 w-4 mr-2" /> Send to Galaxy Forge
             </Button>
           </div>
-        ) : (
+        ) : sent ? (
           <div className="text-center space-y-4">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary/20 text-primary border border-primary/30"
+            >
               <Check className="h-5 w-5" />
-              <span className="font-medium text-sm">Design Sent Successfully</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Your design has been submitted to GalaxiForge for casting.
+              <span className="font-display text-sm tracking-wide">Design Submitted to Galaxy Forge</span>
+            </motion.div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              Your ring design with all manufacturing parameters has been submitted for production.
+              {user && " You can view your orders in your design library."}
             </p>
-            <div className="flex justify-center gap-3">
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
               <Button variant="outline" onClick={handleDownloadSTL} disabled={!stlResult}>
                 <Download className="h-4 w-4 mr-2" /> Download STL
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/builder")}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> New Design
               </Button>
               <a
                 href={getReturnUrl(pkg.id)}
                 className="inline-block text-sm text-primary hover:text-molten transition-colors underline leading-9"
               >
-                View on GalaxiForge →
+                View on Galaxy Forge →
               </a>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
