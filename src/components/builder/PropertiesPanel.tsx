@@ -1,4 +1,4 @@
-import { RingParameters, RingProfile, RING_SIZE_MAP, ViewMode } from "@/types/ring";
+import { RingParameters, RingProfile, RING_SIZE_MAP, ViewMode, MetalPreset } from "@/types/ring";
 import { WaxMarkType } from "@/types/waxmarks";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { Slider } from "@/components/ui/slider";
@@ -7,7 +7,51 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { Scale } from "lucide-react";
+
+// ── Metal density data (g/cm³) ───────────────────────────────────
+const METAL_DENSITY: Record<MetalPreset, { density: number; label: string }> = {
+  silver:     { density: 10.49, label: "Sterling Silver" },
+  gold:       { density: 15.58, label: "14K Gold" },
+  "rose-gold": { density: 14.85, label: "14K Rose Gold" },
+  titanium:   { density: 4.51, label: "Titanium" },
+  tungsten:   { density: 19.25, label: "Tungsten Carbide" },
+};
+
+/**
+ * Estimate ring weight in grams using hollow cylinder volume.
+ * Volume = π × width × (outerR² − innerR²) adjusted for profile.
+ */
+function estimateRingWeight(params: RingParameters, metal: MetalPreset): number {
+  const innerR = params.innerDiameter / 2;          // mm
+  const outerR = innerR + params.thickness;          // mm
+  const width = params.width;                         // mm
+
+  // Base hollow cylinder volume in mm³
+  let volumeMm3 = Math.PI * width * (outerR * outerR - innerR * innerR);
+
+  // Profile adjustments — dome/comfort removes material, square adds slightly
+  const profileFactors: Record<RingProfile, number> = {
+    flat: 1.0,
+    dome: 0.88,
+    comfort: 0.85,
+    square: 1.0,
+    "knife-edge": 0.78,
+  };
+  volumeMm3 *= profileFactors[params.profile] ?? 1.0;
+
+  // Subtract groove material
+  if (params.grooveCount > 0) {
+    const grooveVolPerGroove = Math.PI * params.innerDiameter * params.grooveDepth * 0.8; // approx
+    volumeMm3 -= grooveVolPerGroove * params.grooveCount;
+  }
+
+  // Convert mm³ → cm³ (÷ 1000)
+  const volumeCm3 = Math.max(0, volumeMm3) / 1000;
+  const density = METAL_DENSITY[metal]?.density ?? 10.49;
+  return volumeCm3 * density;
+}
 
 interface PropertiesPanelProps {
   params: RingParameters;
@@ -18,6 +62,7 @@ interface PropertiesPanelProps {
   onClearWaxMarks?: () => void;
   stampSettings?: StampSettings;
   onStampSettingsChange?: (s: StampSettings) => void;
+  metalPreset?: MetalPreset;
 }
 
 const PROFILES: { value: RingProfile; label: string; desc: string }[] = [
@@ -38,8 +83,18 @@ const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
   { value: "smooth-sculpt", label: "Smooth" },
 ];
 
-export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange }: PropertiesPanelProps) {
+export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange, metalPreset = "silver" }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
+
+  // Weight calculation for all metals
+  const weightEstimates = useMemo(() => {
+    return (Object.keys(METAL_DENSITY) as MetalPreset[]).map((metal) => ({
+      metal,
+      label: METAL_DENSITY[metal].label,
+      weight: estimateRingWeight(params, metal),
+      isActive: metal === metalPreset,
+    }));
+  }, [params, metalPreset]);
 
   const handleDirectInput = useCallback((field: keyof RingParameters, value: string, min: number, max: number, step: number) => {
     let num = parseFloat(value);
@@ -191,7 +246,35 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         />
       </div>
 
-      {/* ── Dimension Summary ── */}
+      {/* ── Weight Estimate ── */}
+      <div className="mt-1 p-3 rounded-lg bg-secondary/60 border border-border space-y-2">
+        <div className="flex items-center gap-1.5">
+          <Scale className="w-3.5 h-3.5 text-primary" />
+          <h4 className="text-[11px] font-display text-primary uppercase tracking-wider">Est. Weight</h4>
+        </div>
+        <div className="space-y-1">
+          {weightEstimates.map(({ metal, label, weight, isActive }) => (
+            <div
+              key={metal}
+              className={`flex items-center justify-between py-1 px-2 rounded-md transition-colors ${
+                isActive ? "bg-primary/10 border border-primary/20" : ""
+              }`}
+            >
+              <span className={`text-[10px] ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                {label}
+                {isActive && <span className="ml-1 text-primary text-[8px]">●</span>}
+              </span>
+              <span className={`text-[11px] font-mono ${isActive ? "text-primary font-semibold" : "text-foreground"}`}>
+                {weight.toFixed(1)}g
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[9px] text-muted-foreground/60 leading-relaxed">
+          Approximate weight based on ring geometry. Actual weight varies with surface texture and finishing.
+        </p>
+      </div>
+
       {showMeasure && (
         <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-2">
           <h4 className="text-xs font-display text-primary uppercase tracking-wider">Dimensions</h4>

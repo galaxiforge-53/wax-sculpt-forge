@@ -143,6 +143,7 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
         onClearWaxMarks={props.onClearWaxMarks}
         stampSettings={props.stampSettings}
         onStampSettingsChange={props.onStampSettingsChange}
+        metalPreset={props.metalPreset}
       />
       <div className="border-t border-border pt-3">
         <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60 mb-2 font-display">Templates</p>
