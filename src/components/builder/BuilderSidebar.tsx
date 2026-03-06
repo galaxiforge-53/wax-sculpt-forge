@@ -4,6 +4,7 @@ import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
 import { CastabilityReport } from "@/types/castability";
+import { BalanceAnalysis } from "@/lib/surfaceBalancer";
 import { ForgePipelineState } from "@/types/pipeline";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { ToolType } from "@/types/ring";
@@ -60,6 +61,8 @@ interface BuilderSidebarProps {
   onFinishChange: (finish: FinishPreset) => void;
   lighting: LightingSettings;
   onLightingChange: (settings: LightingSettings) => void;
+  balanceAnalysis?: BalanceAnalysis;
+  onAutoBalance?: () => void;
 }
 
 interface SectionProps {
@@ -124,6 +127,7 @@ export default function BuilderSidebar({
   metalPreset, finishPreset,
   onViewModeChange, onMetalChange, onFinishChange,
   lighting, onLightingChange,
+  balanceAnalysis, onAutoBalance,
 }: BuilderSidebarProps) {
   const { isPremium } = useAccess();
 
@@ -163,7 +167,7 @@ export default function BuilderSidebar({
         </Section>
 
         <Section title="Castability" defaultOpen={true}>
-          <CastabilityPanel report={castabilityReport} />
+          <CastabilityPanel report={castabilityReport} balanceAnalysis={balanceAnalysis} onAutoBalance={onAutoBalance} />
         </Section>
 
         <Section title="Forge Pipeline">
