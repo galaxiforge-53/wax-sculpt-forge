@@ -275,3 +275,8 @@
     opacity: 0.15;
   }
 }
+
+/* Safe area for mobile bottom panels */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

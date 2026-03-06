@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer } from "lucide-react";
+import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import { Button } from "@/components/ui/button";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
@@ -527,39 +528,42 @@ function BuilderInner() {
             </div>
           )}
 
-          {/* Mobile floating buttons */}
           {isMobile && (
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-              {/* Tool selector as horizontal strip */}
-              {!guidedMode && (
-                <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-1 flex gap-0.5 overflow-x-auto max-w-[55%]">
-                  <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
-                </div>
-              )}
-              {guidedMode && <div />}
-
-              <div className="flex gap-2">
-                {!guidedMode && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setGuidedMode(true)}
-                    className="h-10 rounded-full bg-card/90 backdrop-blur-sm border-border shadow-lg px-3"
-                  >
-                    <Wand2 className="h-4 w-4 mr-1" />
-                    <span className="text-[10px]">Guide</span>
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMobilePanel(true)}
-                  className="h-10 w-10 rounded-full bg-card/90 backdrop-blur-sm border-border shadow-lg"
-                >
-                  <Settings2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <MobileBuilderPanel
+              params={params}
+              onUpdate={updateParams}
+              activeTool={activeTool}
+              viewMode={viewMode}
+              metalPreset={metalPreset}
+              finishPreset={finishPreset}
+              onViewModeChange={setViewMode}
+              onMetalChange={setMetalPreset}
+              onFinishChange={setFinishPreset}
+              waxMarks={waxMarks}
+              onClearWaxMarks={clearWaxMarks}
+              stampSettings={stampSettings}
+              onStampSettingsChange={setStampSettings}
+              castabilityReport={castabilityReport}
+              inlays={inlays}
+              onAddInlay={addInlayChannel}
+              onRemoveInlay={removeInlayChannel}
+              onClearInlays={clearInlays}
+              lunarTexture={lunarTexture}
+              onLunarChange={setLunarTexture}
+              onApplyLunarPreset={applyLunarPreset}
+              onRandomizeLunar={randomizeLunar}
+              engraving={engraving}
+              onEngravingChange={setEngraving}
+              onApplyTemplate={applyTemplate}
+              lighting={lighting}
+              onLightingChange={setLighting}
+              balanceAnalysis={balanceAnalysis}
+              onAutoBalance={autoBalance}
+              onSave={handleSave}
+              onExport={handleExport}
+              onForgeNow={handleForgeNow}
+              isSaving={isSaving}
+            />
           )}
 
           {/* Desktop guided mode toggle — bottom-left overlay */}
@@ -582,22 +586,6 @@ function BuilderInner() {
           <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
             {panelContent}
           </div>
-        )}
-
-        {/* Mobile bottom sheet */}
-        {isMobile && (
-          <Sheet open={mobilePanel} onOpenChange={setMobilePanel}>
-            <SheetContent side="bottom" className="h-[75vh] p-0 rounded-t-2xl">
-              <SheetHeader className="px-4 pt-4 pb-2">
-                <SheetTitle className="text-sm font-display tracking-wider">
-                  {guidedMode ? "Guided Design" : "Controls"}
-                </SheetTitle>
-              </SheetHeader>
-              <div className="flex-1 overflow-hidden h-[calc(75vh-60px)]">
-                {panelContent}
-              </div>
-            </SheetContent>
-          </Sheet>
         )}
       </div>
 
