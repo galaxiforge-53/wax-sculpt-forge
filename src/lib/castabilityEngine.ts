@@ -1,12 +1,20 @@
 import { RingParameters } from "@/types/ring";
 import { CastabilityReport, CastabilityCheck, CastabilityLevel } from "@/types/castability";
+import { LunarTextureState } from "@/types/lunar";
+import { EngravingState } from "@/types/engraving";
 
-export function evaluateCastability(params: RingParameters): CastabilityReport {
+export interface ManufacturingInput {
+  params: RingParameters;
+  lunar?: LunarTextureState | null;
+  engraving?: EngravingState | null;
+}
+
+export function evaluateCastability(params: RingParameters, lunar?: LunarTextureState | null, engraving?: EngravingState | null): CastabilityReport {
   const targetMinThicknessMm = 1.5;
   const checks: CastabilityCheck[] = [];
   let score = 100;
 
-  // Thickness checks
+  // ── Wall thickness checks ──────────────────────────────────
   if (params.thickness < 1.2) {
     score -= 35;
     checks.push({
@@ -34,7 +42,7 @@ export function evaluateCastability(params: RingParameters): CastabilityReport {
     });
   }
 
-  // Groove depth vs thickness
+  // ── Groove depth vs thickness ──────────────────────────────
   if (params.grooveCount > 0) {
     const depthRatio = params.grooveDepth / params.thickness;
     if (depthRatio > 0.5) {
@@ -58,7 +66,7 @@ export function evaluateCastability(params: RingParameters): CastabilityReport {
     }
   }
 
-  // Knife-edge + small bevel
+  // ── Knife-edge + small bevel ───────────────────────────────
   if (params.profile === "knife-edge" && params.bevelSize < 0.2) {
     score -= 10;
     checks.push({
@@ -70,7 +78,7 @@ export function evaluateCastability(params: RingParameters): CastabilityReport {
     });
   }
 
-  // Bevel vs thickness
+  // ── Bevel vs thickness ─────────────────────────────────────
   if (params.bevelSize > 0.6 * params.thickness) {
     score -= 15;
     checks.push({
@@ -82,7 +90,7 @@ export function evaluateCastability(params: RingParameters): CastabilityReport {
     });
   }
 
-  // Delicate band
+  // ── Delicate band ──────────────────────────────────────────
   if (params.width < 3 && params.thickness < 1.5) {
     score -= 15;
     checks.push({
@@ -91,6 +99,142 @@ export function evaluateCastability(params: RingParameters): CastabilityReport {
       status: "warn",
       detail: `Narrow (${params.width}mm) and thin (${params.thickness}mm) band is fragile.`,
       suggestedFix: "Increase width or thickness for structural integrity.",
+    });
+  }
+
+  // ── Engraving depth checks ─────────────────────────────────
+  if (engraving?.enabled && engraving.text) {
+    const engravingDepthRatio = engraving.depthMm / params.thickness;
+
+    if (engravingDepthRatio > 0.3) {
+      score -= 25;
+      checks.push({
+        id: "engraving_too_deep",
+        label: "Engraving too deep",
+        status: "risk",
+        detail: `Engraving depth (${engraving.depthMm}mm) is ${Math.round(engravingDepthRatio * 100)}% of wall thickness.`,
+        suggestedFix: "Reduce engraving depth below 0.3mm or increase wall thickness.",
+      });
+    } else if (engravingDepthRatio > 0.2) {
+      score -= 10;
+      checks.push({
+        id: "engraving_deep",
+        label: "Deep engraving",
+        status: "warn",
+        detail: `Engraving depth uses ${Math.round(engravingDepthRatio * 100)}% of wall thickness.`,
+        suggestedFix: "Consider reducing engraving depth for structural safety.",
+      });
+    }
+
+    if (engraving.sizeMm < 0.8) {
+      score -= 10;
+      checks.push({
+        id: "engraving_small",
+        label: "Tiny engraving text",
+        status: "warn",
+        detail: `Text height ${engraving.sizeMm}mm may not resolve clearly in casting.`,
+        suggestedFix: "Increase text size to at least 0.8mm for legibility.",
+      });
+    }
+
+    // Engraving + grooves on thin ring
+    if (params.grooveCount > 0 && params.thickness < 1.8) {
+      score -= 10;
+      checks.push({
+        id: "engraving_groove_conflict",
+        label: "Engraving + grooves on thin ring",
+        status: "warn",
+        detail: "Combined engraving and grooves on a thin ring reduce structural integrity.",
+        suggestedFix: "Increase thickness to 2mm+ when combining features.",
+      });
+    }
+  }
+
+  // ── Lunar surface detail checks ────────────────────────────
+  if (lunar?.enabled) {
+    // Very high intensity on thin walls
+    if (lunar.intensity > 75 && params.thickness < 1.8) {
+      score -= 15;
+      checks.push({
+        id: "lunar_intensity_thin",
+        label: "Heavy texture on thin wall",
+        status: "warn",
+        detail: `Lunar intensity ${lunar.intensity}% with ${params.thickness}mm wall may create weak spots.`,
+        suggestedFix: "Reduce texture intensity below 60% or increase thickness to 2mm+.",
+      });
+    }
+
+    // Very small craters below casting resolution
+    if (lunar.craterSize === "small") {
+      score -= 10;
+      checks.push({
+        id: "lunar_craters_tiny",
+        label: "Craters too small for casting",
+        status: "warn",
+        detail: `Small crater size may produce details below casting resolution (~0.1mm).`,
+        suggestedFix: "Increase crater size to 'med' or 'large' for reliable casting.",
+      });
+    }
+
+    // Extreme density + high intensity = fragile surface
+    if (lunar.craterDensity === "high" && lunar.intensity > 70) {
+      score -= 15;
+      checks.push({
+        id: "lunar_dense_intense",
+        label: "Excessive surface disruption",
+        status: "warn",
+        detail: "High crater density with strong intensity may weaken the ring surface.",
+        suggestedFix: "Lower crater density or intensity for reliable manufacturing.",
+      });
+    }
+
+    // Micro detail below printable threshold
+    if (lunar.microDetail > 80) {
+      score -= 8;
+      checks.push({
+        id: "lunar_micro_fine",
+        label: "Micro detail too fine",
+        status: "warn",
+        detail: `Micro detail ${lunar.microDetail}% may not survive the casting process.`,
+        suggestedFix: "Reduce micro detail below 80% — fine grain is lost in investment casting.",
+      });
+    }
+  }
+
+  // ── Wax printing geometry checks ───────────────────────────
+  // Very wide + thin = warping risk
+  if (params.width > 10 && params.thickness < 1.5) {
+    score -= 20;
+    checks.push({
+      id: "wax_warp_risk",
+      label: "Wax print warping risk",
+      status: "risk",
+      detail: `Wide band (${params.width}mm) with thin wall (${params.thickness}mm) is prone to warping during wax printing.`,
+      suggestedFix: "Either reduce width below 10mm or increase thickness above 1.5mm.",
+    });
+  }
+
+  // Comfort fit + knife-edge = undercut concern
+  if (params.comfortFit && params.profile === "knife-edge") {
+    score -= 8;
+    checks.push({
+      id: "comfort_knife_undercut",
+      label: "Comfort fit undercut",
+      status: "warn",
+      detail: "Comfort fit combined with knife-edge creates thin edges on the inner surface.",
+      suggestedFix: "Switch to dome profile or disable comfort fit for knife-edge rings.",
+    });
+  }
+
+  // Extremely small ring + features
+  if (params.size <= 4 && (params.grooveCount > 2 || (engraving?.enabled && engraving?.text))) {
+    score -= 8;
+    checks.push({
+      id: "small_ring_features",
+      label: "Features crowded on small ring",
+      status: "warn",
+      detail: `Size ${params.size} ring has limited surface area for detailed features.`,
+      suggestedFix: "Reduce groove count or simplify engraving for small ring sizes.",
     });
   }
 
