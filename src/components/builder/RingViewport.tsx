@@ -318,8 +318,8 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
   const halfW = params.width / 2 / 10;
   const bevel = params.bevelSize / 10;
 
-  const radSegs = hasLunar ? 512 : 128;
-  const profileSteps = hasLunar ? 128 : 32;
+  const radSegs = hasLunar ? 768 : 128;
+  const profileSteps = hasLunar ? 192 : 32;
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];

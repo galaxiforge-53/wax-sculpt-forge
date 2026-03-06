@@ -18,8 +18,8 @@ export interface LunarSurfaceMapSet {
   craterCount: number;
 }
 
-export const MAP_W = 2048;
-export const MAP_H = 512;
+export const MAP_W = 4096;
+export const MAP_H = 1024;
 export const MAP_DIMENSIONS = { width: MAP_W, height: MAP_H } as const;
 
 const cache = new Map<string, LunarSurfaceMapSet>();
@@ -442,14 +442,14 @@ export function buildHeightmap(
 
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
-  // ─── 1) fBm base terrain layer ─────────────────────────
+  // ─── 1) fBm base terrain layer (6 octaves for high-res detail) ──
   const baseNoise = makeNoise2D(lunar.seed + 500);
   const baseAmp = (0.04 + terrainRough * 0.12) * depthScale;
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
-      const u = x / MAP_W * 6;
-      const v = y / MAP_H * 6;
-      const n = fbm(baseNoise, u, v, 4, 2.0, 0.5);
+      const u = x / MAP_W * 8;
+      const v = y / MAP_H * 8;
+      const n = fbm(baseNoise, u, v, 6, 2.0, 0.5);
       const mask = edgeMask[y * MAP_W + x];
       hmap[y * MAP_W + x] += n * baseAmp * mask;
     }
@@ -609,24 +609,37 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 6) Regolith micro-texture (coherent noise + grain) ─────
+  // ─── 6) Regolith micro-texture (high-frequency coherent noise + grain) ─────
   if (microFactor > 0) {
-    // Coherent regolith noise — gives a powdery surface feel
+    // Primary regolith noise — powdery surface at medium scale
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
     const regolithStrength = microFactor * 0.05 * depthScale;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        const u = x / MAP_W * 24;  // high frequency
-        const v = y / MAP_H * 24;
-        const n = fbm(regolithNoise, u, v, 3, 2.2, 0.45);
+        const u = x / MAP_W * 48;  // higher frequency for 4K maps
+        const v = y / MAP_H * 48;
+        const n = fbm(regolithNoise, u, v, 5, 2.2, 0.45);
         const mask = edgeMask[y * MAP_W + x];
         hmap[y * MAP_W + x] += n * regolithStrength * mask;
       }
     }
 
-    // Fine grain noise on top
+    // Secondary high-frequency regolith — very fine powdery detail
+    const fineRegolith = makeNoise2D(lunar.seed + 4444);
+    const fineStrength = microFactor * 0.025 * depthScale;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const u = x / MAP_W * 96;
+        const v = y / MAP_H * 96;
+        const n = fineRegolith(u, v);
+        const mask = edgeMask[y * MAP_W + x];
+        hmap[y * MAP_W + x] += n * fineStrength * mask;
+      }
+    }
+
+    // Fine grain noise on top — per-pixel randomness for gritty texture
     const grainRng = seededRng(lunar.seed + 9999);
-    const grainStrength = microFactor * 0.04 * depthScale;
+    const grainStrength = microFactor * 0.035 * depthScale;
     for (let i = 0; i < hmap.length; i++) {
       const mask = edgeMask[i];
       hmap[i] += (grainRng() - 0.5) * grainStrength * mask;
@@ -642,7 +655,7 @@ export function buildHeightmap(
   return { hmap, craterCount: totalCraterCount };
 }
 
-// ── Normal map from heightmap (Sobel) ─────────────────────────────
+// ── Normal map from heightmap (enhanced Sobel with 3×3 kernel) ────
 
 function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, strength: number, physicalAspect: number = 1): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -654,20 +667,29 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
   // Correct Y gradient for physical aspect ratio so normals match circular craters
   const yScale = physicalAspect * (h / w);
 
+  // Helper to sample with wrapping (U wraps, V clamps)
+  const sample = (sx: number, sy: number) => {
+    const wx = ((sx % w) + w) % w;
+    const wy = Math.max(0, Math.min(h - 1, sy));
+    return hmap[wy * w + wx];
+  };
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const xl = ((x - 1) + w) % w;
-      const xr = (x + 1) % w;
-      const yu = Math.max(0, y - 1);
-      const yd = Math.min(h - 1, y + 1);
+      // Full 3×3 Sobel kernel for sharper gradients
+      const tl = sample(x - 1, y - 1);
+      const tc = sample(x,     y - 1);
+      const tr = sample(x + 1, y - 1);
+      const ml = sample(x - 1, y);
+      const mr = sample(x + 1, y);
+      const bl = sample(x - 1, y + 1);
+      const bc = sample(x,     y + 1);
+      const br = sample(x + 1, y + 1);
 
-      const left = hmap[y * w + xl];
-      const right = hmap[y * w + xr];
-      const up = hmap[yu * w + x];
-      const down = hmap[yd * w + x];
-
-      let nx = (left - right) * strength;
-      let ny = (up - down) * strength * yScale;
+      // Sobel X: [-1 0 1; -2 0 2; -1 0 1]
+      let nx = (tl - tr + 2 * (ml - mr) + bl - br) * strength * 0.25;
+      // Sobel Y: [-1 -2 -1; 0 0 0; 1 2 1]
+      let ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * strength * yScale * 0.25;
       let nz = 1.0;
       const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
       nx /= len; ny /= len; nz /= len;
