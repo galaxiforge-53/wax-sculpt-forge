@@ -938,6 +938,148 @@ function CameraPresetAnimator({ targetPreset, onComplete }: { targetPreset: Snap
   return null;
 }
 
+// ── 3D Printer Bed Simulation ──────────────────────────────────────
+function PrinterBedSimulation({ params }: { params: RingParameters }) {
+  const outerR = (params.innerDiameter / 2 + params.thickness) / 10;
+  const bedY = -(outerR + 0.12);
+  const bedSize = 12; // 120mm build plate
+  const outerDiam = (params.innerDiameter + 2 * params.thickness) / 10;
+  const ringWidth = params.width / 10;
+
+  // Concentric circles for build area reference
+  const circleSegs = 64;
+  const circleRadii = [2, 4, 6]; // 20mm, 40mm, 60mm radius circles
+
+  return (
+    <group position={[0, bedY, 0]}>
+      {/* Printer bed platform — raised aluminum look */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <boxGeometry args={[bedSize, bedSize, 0.08]} />
+        <meshStandardMaterial color="#2a2a30" roughness={0.4} metalness={0.7} />
+      </mesh>
+
+      {/* Build surface — slightly inset glass/flex plate */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.041, 0]}>
+        <planeGeometry args={[bedSize - 0.3, bedSize - 0.3]} />
+        <meshStandardMaterial color="#1a1a22" roughness={0.6} metalness={0.3} transparent opacity={0.9} />
+      </mesh>
+
+      {/* Grid lines — print bed grid */}
+      <gridHelper
+        args={[bedSize - 0.3, 12, "#3a3a4a", "#252530"]}
+        position={[0, 0.045, 0]}
+      />
+      <gridHelper
+        args={[bedSize - 0.3, 60, "#1e1e28", "#1a1a24"]}
+        position={[0, 0.044, 0]}
+      />
+
+      {/* Concentric build area circles */}
+      {circleRadii.map((r) => (
+        <mesh key={r} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.046, 0]}>
+          <torusGeometry args={[r, 0.005, 4, circleSegs]} />
+          <meshBasicMaterial color="#3a3a50" transparent opacity={0.4} />
+        </mesh>
+      ))}
+
+      {/* Center crosshair */}
+      <group position={[0, 0.047, 0]}>
+        <mesh>
+          <boxGeometry args={[0.6, 0.001, 0.008]} />
+          <meshBasicMaterial color="#5a5a70" />
+        </mesh>
+        <mesh>
+          <boxGeometry args={[0.008, 0.001, 0.6]} />
+          <meshBasicMaterial color="#5a5a70" />
+        </mesh>
+      </group>
+
+      {/* Ring footprint outline — shows print contact area */}
+      {(() => {
+        const innerR = params.innerDiameter / 2 / 10;
+        return (
+          <>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.048, 0]}>
+              <torusGeometry args={[outerR, 0.006, 4, circleSegs]} />
+              <meshBasicMaterial color="#ff6644" transparent opacity={0.6} />
+            </mesh>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.048, 0]}>
+              <torusGeometry args={[innerR, 0.004, 4, circleSegs]} />
+              <meshBasicMaterial color="#ff6644" transparent opacity={0.4} />
+            </mesh>
+          </>
+        );
+      })()}
+
+      {/* Scale rulers — X and Z axes */}
+      {[
+        { axis: "X", pos: [0, 0.05, -bedSize / 2 + 0.3] as [number, number, number], rot: [0, 0, 0] as [number, number, number] },
+        { axis: "Z", pos: [-bedSize / 2 + 0.3, 0.05, 0] as [number, number, number], rot: [0, Math.PI / 2, 0] as [number, number, number] },
+      ].map(({ axis, pos, rot }) => (
+        <group key={axis} position={pos} rotation={rot}>
+          {/* Ruler ticks every 10mm */}
+          {Array.from({ length: 13 }, (_, i) => {
+            const x = (i - 6) * 1; // 10mm spacing = 1 unit
+            const isMajor = i % 2 === 0;
+            return (
+              <group key={i} position={[x, 0, 0]}>
+                <mesh>
+                  <boxGeometry args={[0.005, 0.001, isMajor ? 0.12 : 0.06]} />
+                  <meshBasicMaterial color={isMajor ? "#6a6a80" : "#4a4a5a"} />
+                </mesh>
+                {isMajor && (
+                  <Text
+                    position={[0, 0, 0.14]}
+                    rotation={[-Math.PI / 2, 0, 0]}
+                    fontSize={0.04}
+                    color="#6a6a80"
+                    anchorX="center"
+                    anchorY="middle"
+                  >
+                    {`${(i - 6) * 10}`}
+                  </Text>
+                )}
+              </group>
+            );
+          })}
+        </group>
+      ))}
+
+      {/* Dimension callouts */}
+      <Text
+        position={[bedSize / 2 - 0.5, 0.06, bedSize / 2 - 0.3]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.06}
+        color="#5a7a5a"
+        anchorX="right"
+        anchorY="middle"
+      >
+        {`⌀${outerDiam.toFixed(1)}mm × ${ringWidth.toFixed(1)}mm`}
+      </Text>
+
+      {/* Build plate label */}
+      <Text
+        position={[-bedSize / 2 + 0.5, 0.06, bedSize / 2 - 0.3]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.05}
+        color="#4a4a5a"
+        anchorX="left"
+        anchorY="middle"
+      >
+        120×120mm Build Plate
+      </Text>
+
+      {/* Platform legs — subtle industrial look */}
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z], i) => (
+        <mesh key={i} position={[x * (bedSize / 2 - 0.3), -0.15, z * (bedSize / 2 - 0.3)]}>
+          <cylinderGeometry args={[0.08, 0.1, 0.26, 8]} />
+          <meshStandardMaterial color="#222228" roughness={0.5} metalness={0.6} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export type CutawayMode = "normal" | "inside" | "cross-section";
 
 interface RingViewportProps {
@@ -960,6 +1102,7 @@ interface RingViewportProps {
   showcaseMode?: boolean;
   ringPosition?: [number, number, number];
   ringRotation?: [number, number, number];
+  showPrinterBed?: boolean;
 }
 
 // ── Clipping plane manager ─────────────────────────────────────────
@@ -996,7 +1139,7 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false, ringPosition, ringRotation }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false, ringPosition, ringRotation, showPrinterBed = false }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const rPos = ringPosition ?? [0, 0, 0];
@@ -1115,8 +1258,12 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             <MeasurementOverlay params={params} visible={viewMode === "wax-print" || !!showMeasurements} />
           </group>
 
-          {/* Workbench measurement bed — always at world origin */}
-          <WorkbenchGrid params={params} />
+          {/* Environment bed — printer bed or workbench */}
+          {showPrinterBed ? (
+            <PrinterBedSimulation params={params} />
+          ) : (
+            <WorkbenchGrid params={params} />
+          )}
 
           {(() => {
             const outerR = (params.innerDiameter / 2 + params.thickness) / 10;
