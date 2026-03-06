@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2 } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 
@@ -37,6 +37,7 @@ function BuilderInner() {
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
+  const [showcaseMode, setShowcaseMode] = useState(false);
   const [guidedMode, setGuidedMode] = useState(() => {
     // Show guided mode for new users (no prior project or template)
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
@@ -328,6 +329,7 @@ function BuilderInner() {
             showMeasurements={showMeasurements || activeTool === "measure"}
             cutawayMode={cutawayMode}
             lighting={lighting}
+            showcaseMode={showcaseMode}
           />
 
           {/* Camera preset buttons — top-left overlay */}
@@ -380,6 +382,17 @@ function BuilderInner() {
               title="Toggle dimension guides"
             >
               📐 Dims
+            </button>
+            <button
+              onClick={() => setShowcaseMode((v) => !v)}
+              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                ${showcaseMode
+                  ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                }`}
+              title="High-quality showcase render mode — stronger reflections, sharper details"
+            >
+              <Sparkles className="w-3 h-3" /> Showcase
             </button>
           </div>
 
