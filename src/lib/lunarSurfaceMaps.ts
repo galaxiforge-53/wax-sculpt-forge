@@ -131,6 +131,10 @@ interface CraterStamp {
   warpSeed: number;
   tier: number; // 0=mega, 1=hero, 2=medium, 3=small, 4=micro
   age: number;  // 0=oldest(mega), 1=newest(micro) — for erosion weighting
+  rimAsymmetry: number;    // 0-1 angular rim height variation
+  rimAsymAngle: number;    // preferred direction for thicker rim
+  slumpAngle: number;      // wall slump direction
+  slumpStrength: number;   // 0-1
 }
 
 function stampCrater(
@@ -146,32 +150,38 @@ function stampCrater(
   hasTerraces: boolean,
   physicalAspect: number = 1,
 ) {
-  // Physical aspect correction: stretch V so craters are circular on the ring surface
+  // Physical aspect correction: V is stretched so craters are circular on the ring surface
+  // U maps to circumference, V maps to width. physicalAspect = circumference / width.
+  // A circle of physical radius R covers:
+  //   U extent (in UV) = R / circumference
+  //   V extent (in UV) = R / width = (R / circumference) * physicalAspect
+  // So in pixel space, V pixels = U pixels * physicalAspect * (MAP_H / MAP_W)
   const vStretch = physicalAspect;
 
+  // Pixel radii for distance normalisation — ensures circular craters
   const pxR = c.radius * w;
   const pyR = c.radius * h * vStretch;
 
-  const spreadU = c.radius * 1.6;
-  const spreadV = c.radius * 1.6 * vStretch;
+  const spreadU = c.radius * 1.7;
+  const spreadV = c.radius * 1.7 * vStretch;
   const x0 = Math.floor((c.cu - spreadU) * w);
   const x1 = Math.ceil((c.cu + spreadU) * w);
   const y0 = Math.max(0, Math.floor((c.cv - spreadV) * h));
   const y1 = Math.min(h - 1, Math.ceil((c.cv + spreadV) * h));
 
-  // Realistic crater profile zones
-  const bowlFloor = 0.42;           // flat floor ends here
-  const bowlWall = 0.55;            // steep inner wall transition
-  const rimInner = 0.60 + rimSharpness * 0.05 + c.rimCenterJitter;
-  const rimPeak = 0.68 + rimSharpness * 0.06 + c.rimCenterJitter;
-  const rimOuter = 0.82;            // outer slope
-  const ejectaEnd = 1.35;           // faint ejecta blanket
+  // ── Realistic crater profile zones (based on lunar morphology) ──
+  // Bowl uses hemispherical parabolic profile instead of flat floor
+  const bowlEnd = 0.58;             // where bowl wall meets rim inner face
+  const rimInner = 0.62 + rimSharpness * 0.04 + c.rimCenterJitter;
+  const rimPeak = 0.72 + rimSharpness * 0.05 + c.rimCenterJitter;
+  const rimOuter = 0.88 + c.rimWidthJitter;
+  const ejectaEnd = 1.45;           // faint ejecta blanket
 
   const noiseScale = 6 + c.warpSeed * 3;
 
   // Central peak parameters (for mega/hero craters)
-  const peakRadius = 0.20;
-  const peakHeight = c.depth * 0.30;
+  const peakRadius = 0.18;
+  const peakHeight = c.depth * 0.35;
 
   // Terrace parameters
   const terraceCount = hasTerraces ? 3 : 0;
@@ -187,65 +197,99 @@ function stampCrater(
       // Domain warp for organic shapes
       const wU = warpNoise(px * noiseScale / w, py * noiseScale / h);
       const wV = warpNoise(py * noiseScale / h + 100, px * noiseScale / w + 100);
-      const wdu = du + warpAmp * 0.25 * wU;
-      const wdv = dv + warpAmp * 0.25 * wV;
+      const wdu = du + warpAmp * 0.22 * wU;
+      const wdv = dv + warpAmp * 0.22 * wV;
 
       const dist = Math.sqrt(wdu * wdu + wdv * wdv);
       if (dist > ejectaEnd) continue;
 
+      // Angular position for asymmetric rim
+      const angle = Math.atan2(wdv, wdu);
+
+      // Rim asymmetry — one side higher (simulates oblique impact / gravity slump)
+      const angleDiff = Math.cos(angle - c.rimAsymAngle);
+      const rimAsymFactor = 1.0 + c.rimAsymmetry * 0.4 * angleDiff;
+
+      // Wall slump — shifts bowl slightly off-center
+      const slumpShift = c.slumpStrength * 0.08;
+      const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
+      const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
+      const slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
+
       let delta = 0;
+      const effectiveRimH = c.rimHeight * rimAsymFactor;
 
-      if (dist < bowlFloor) {
-        // Flat bowl floor with gentle parabolic center
-        const t = dist / bowlFloor;
-        delta = -c.depth * (1 - 0.15 * t * t);
+      if (dist < bowlEnd) {
+        // ── Hemispherical parabolic bowl ──
+        // Smooth parabolic curve: depth * (dist/bowlEnd)^2 - depth
+        // This creates a natural concave bowl, deepest at center
+        const t = slumpDist / bowlEnd;  // use slumped distance for asymmetry
+        const tClamped = Math.min(t, 1.0);
 
-        // Central peak — smooth bell mound
+        // Parabolic bowl: -depth at center, rises to ~0 at bowlEnd
+        const parabola = tClamped * tClamped;
+        delta = -c.depth * (1.0 - parabola * 0.92);
+
+        // Central peak — smooth bell mound (complex craters only)
         if (hasCentralPeak && dist < peakRadius) {
           const pt = dist / peakRadius;
-          const bell = Math.exp(-pt * pt * 4.0);
+          const bell = Math.exp(-pt * pt * 5.0);
           delta += peakHeight * bell;
         }
-      } else if (dist < bowlWall) {
-        // Steep inner wall — cubic interpolation from floor to wall
-        const t = (dist - bowlFloor) / (bowlWall - bowlFloor);
-        const s = t * t * (3 - 2 * t); // smoothstep
-        delta = -c.depth * (1 - s * 0.85);
 
-        // Terraced inner walls
-        if (terraceCount > 0) {
-          const terraceT = t;
+        // Terraced inner walls (mega craters — concentric step-downs)
+        if (terraceCount > 0 && tClamped > 0.35) {
+          const terraceT = (tClamped - 0.35) / 0.65;
           const step = Math.floor(terraceT * terraceCount);
           const frac = terraceT * terraceCount - step;
-          const stepSmooth = smoothstep(0.0, 0.35, frac);
-          delta += c.depth * 0.06 * stepSmooth;
+          const stepSmooth = smoothstep(0.0, 0.3, frac);
+          delta += c.depth * 0.08 * stepSmooth;
         }
       } else if (dist < rimInner) {
-        // Transition from wall to rim — steep inner face
-        const t = (dist - bowlWall) / (rimInner - bowlWall);
+        // ── Steep inner wall — transition from bowl to rim ──
+        const t = (dist - bowlEnd) / (rimInner - bowlEnd);
+        // Cubic ease for steep inner wall face
         const s = t * t * (3 - 2 * t);
-        delta = lerp(-c.depth * 0.15, c.rimHeight * 0.3, s);
+        delta = lerp(-c.depth * 0.08, effectiveRimH * 0.35, s);
       } else if (dist < rimPeak) {
-        // Rim crest — sharp peak
+        // ── Rim crest — sharp raised peak ──
         const t = (dist - rimInner) / (rimPeak - rimInner);
-        const s = Math.sin(t * Math.PI * 0.5);
-        delta = lerp(c.rimHeight * 0.3, c.rimHeight * 0.5, s);
+        // Sinusoidal peak for natural rounded crest
+        const s = Math.sin(t * Math.PI);
+        delta = effectiveRimH * 0.35 + s * effectiveRimH * 0.65;
       } else if (dist < rimOuter) {
-        // Outer rim slope — gentler decline (asymmetric)
+        // ── Outer rim slope — gentler asymmetric decline ──
         const t = (dist - rimPeak) / (rimOuter - rimPeak);
-        const s = t * t; // quadratic falloff
-        delta = c.rimHeight * 0.5 * (1 - s);
+        // Cubic falloff for natural outer slope
+        const s = 1 - (1 - t) * (1 - t) * (1 - t);
+        delta = effectiveRimH * (1 - s);
       } else if (dist < ejectaEnd) {
-        // Ejecta blanket — very faint raised material
+        // ── Ejecta blanket — very faint raised material ──
         const t = (dist - rimOuter) / (ejectaEnd - rimOuter);
-        delta = c.rimHeight * 0.06 * Math.max(0, (1 - t) * (1 - t));
+        const falloff = (1 - t) * (1 - t) * (1 - t);
+        delta = effectiveRimH * 0.05 * Math.max(0, falloff);
       }
 
       const mask = edgeMask[py * w + wpx];
       delta *= mask;
 
       const idx = py * w + wpx;
-      hmap[idx] = Math.max(0, Math.min(1, hmap[idx] + delta));
+      // For overlapping impacts: newer craters can carve INTO older rims
+      // Use additive for bowls (negative delta) and max for rims (positive delta)
+      if (delta < 0) {
+        // Bowl excavation — always applies (newer impact digs through old material)
+        hmap[idx] = Math.max(0, Math.min(1, hmap[idx] + delta));
+      } else {
+        // Rim deposition — only raise if this rim is higher than existing surface
+        // This prevents weird double-rim artifacts from overlapping craters
+        const target = 0.5 + delta;
+        if (target > hmap[idx]) {
+          hmap[idx] = Math.min(1, hmap[idx] + delta * 0.7);
+        } else {
+          // Faint contribution even when below existing surface
+          hmap[idx] = Math.min(1, hmap[idx] + delta * 0.15);
+        }
+      }
     }
   }
 }
@@ -308,6 +352,10 @@ function stampEjectaRays(
           warpSeed: rand(),
           tier: 4,
           age: 0.9,
+          rimAsymmetry: rand() * 0.3,
+          rimAsymAngle: rand() * Math.PI * 2,
+          slumpAngle: rand() * Math.PI * 2,
+          slumpStrength: rand() * 0.15,
         });
       }
     }
@@ -411,7 +459,8 @@ export function buildHeightmap(lunar: LunarTextureState, physicalAspect: number 
 
   function addCraters(count: number, rMin: number, rMax: number, depthMul: number, tier: number) {
     for (let i = 0; i < count; i++) {
-      const t = rand();
+      // Power-law size distribution: more small craters, fewer large ones
+      const t = Math.pow(rand(), 1.5);
       const radius = rMin + (rMax - rMin) * t;
       const cu = rand();
       const cv = 0.12 + rand() * 0.76;
@@ -426,7 +475,17 @@ export function buildHeightmap(lunar: LunarTextureState, physicalAspect: number 
       const warpSeed = rand();
       const age = tier / 4; // mega=0 (oldest), micro=1 (newest)
 
-      stamps.push({ cu, cv, radius, depth, rimHeight: rimH, rimCenterJitter, rimWidthJitter, warpSeed, tier, age });
+      // Asymmetric rim and slump for realism
+      const rimAsymmetry = rand() * (tier <= 1 ? 0.5 : 0.3);
+      const rimAsymAngle = rand() * Math.PI * 2;
+      const slumpAngle = rand() * Math.PI * 2;
+      const slumpStrength = rand() * (tier <= 1 ? 0.3 : 0.15);
+
+      stamps.push({
+        cu, cv, radius, depth, rimHeight: rimH,
+        rimCenterJitter, rimWidthJitter, warpSeed, tier, age,
+        rimAsymmetry, rimAsymAngle, slumpAngle, slumpStrength,
+      });
     }
   }
 
@@ -456,6 +515,10 @@ export function buildHeightmap(lunar: LunarTextureState, physicalAspect: number 
         rimCenterJitter: (rand() - 0.5) * 0.03,
         rimWidthJitter: (rand() - 0.5) * 0.02,
         warpSeed: rand(), tier: 3, age: 0.7,
+        rimAsymmetry: rand() * 0.4,
+        rimAsymAngle: rand() * Math.PI * 2,
+        slumpAngle: rand() * Math.PI * 2,
+        slumpStrength: rand() * 0.2,
       });
     }
   }
