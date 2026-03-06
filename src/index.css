@@ -6,23 +6,23 @@
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 30 10% 90%;
+    --background: 220 14% 5%;
+    --foreground: 220 10% 92%;
 
-    --card: 0 0% 10%;
-    --card-foreground: 30 10% 90%;
+    --card: 220 12% 8%;
+    --card-foreground: 220 10% 92%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 30 10% 90%;
+    --popover: 220 14% 10%;
+    --popover-foreground: 220 10% 92%;
 
     --primary: 25 95% 53%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 30 10% 85%;
+    --secondary: 220 10% 13%;
+    --secondary-foreground: 220 8% 80%;
 
-    --muted: 0 0% 14%;
-    --muted-foreground: 30 5% 55%;
+    --muted: 220 10% 12%;
+    --muted-foreground: 220 6% 50%;
 
     --accent: 35 100% 50%;
     --accent-foreground: 0 0% 5%;
@@ -30,8 +30,8 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
+    --border: 220 10% 15%;
+    --input: 220 10% 15%;
     --ring: 25 95% 53%;
 
     --radius: 0.5rem;
@@ -40,9 +40,9 @@
     --ember: 25 95% 53%;
     --ember-glow: 15 90% 45%;
     --molten: 35 100% 50%;
-    --forge-dark: 0 0% 5%;
-    --forge-panel: 0 0% 10%;
-    --forge-surface: 0 0% 13%;
+    --forge-dark: 220 14% 4%;
+    --forge-panel: 220 12% 8%;
+    --forge-surface: 220 10% 11%;
     --wax-green: 80 40% 45%;
     --wax-muted: 70 20% 35%;
     --metal-silver: 210 5% 75%;
@@ -53,13 +53,19 @@
     --cosmic-nebula: 260 40% 25%;
     --cosmic-star: 45 90% 85%;
 
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 30 10% 85%;
+    /* Builder-specific tokens */
+    --builder-viewport: 220 16% 6%;
+    --builder-rail: 220 12% 7%;
+    --builder-topbar: 220 14% 7%;
+    --builder-divider: 220 10% 13%;
+
+    --sidebar-background: 220 12% 7%;
+    --sidebar-foreground: 220 8% 82%;
     --sidebar-primary: 25 95% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 30 10% 85%;
-    --sidebar-border: 0 0% 18%;
+    --sidebar-accent: 220 10% 12%;
+    --sidebar-accent-foreground: 220 8% 82%;
+    --sidebar-border: 220 10% 14%;
     --sidebar-ring: 25 95% 53%;
   }
 }
@@ -155,29 +161,55 @@
 .panel-premium {
   background: linear-gradient(
     135deg,
-    hsl(0 0% 10%) 0%,
-    hsl(0 0% 8%) 50%,
-    hsl(230 10% 9%) 100%
+    hsl(220 12% 8%) 0%,
+    hsl(220 14% 6%) 50%,
+    hsl(225 12% 7%) 100%
   );
-  border: 1px solid hsl(0 0% 18%);
+  border: 1px solid hsl(220 10% 15%);
   box-shadow:
-    inset 0 1px 0 hsl(0 0% 20% / 0.3),
-    0 4px 20px hsl(0 0% 0% / 0.4);
+    inset 0 1px 0 hsl(220 10% 18% / 0.2),
+    0 4px 20px hsl(0 0% 0% / 0.5);
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(0 0% 22%);
-  border-radius: 3px;
+  background: hsl(220 10% 18%);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(25 95% 53% / 0.5);
+  background: hsl(25 60% 40% / 0.6);
+}
+
+/* Builder-specific layout polish */
+.builder-topbar {
+  background: hsl(var(--builder-topbar));
+  border-bottom: 1px solid hsl(var(--builder-divider));
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.3);
+}
+
+.builder-rail {
+  background: hsl(var(--builder-rail));
+  border-right: 1px solid hsl(var(--builder-divider));
+}
+
+.builder-sidebar {
+  background: hsl(var(--sidebar-background));
+  border-left: 1px solid hsl(var(--builder-divider));
+}
+
+.builder-viewport-bg {
+  background: radial-gradient(
+    ellipse at 50% 40%,
+    hsl(220 12% 9%) 0%,
+    hsl(220 16% 5%) 70%,
+    hsl(220 18% 3%) 100%
+  );
 }
 
 /* Forge cinematic spark animation */

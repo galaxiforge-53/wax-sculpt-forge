@@ -293,7 +293,7 @@ function BuilderInner() {
   const panelContent = guidedMode ? guidedContent : sidebarContent;
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-screen flex flex-col bg-forge-dark overflow-hidden">
       <TopBar
         viewMode={viewMode}
         onViewModeChange={setViewMode}
@@ -316,13 +316,13 @@ function BuilderInner() {
       <div className="flex flex-1 min-h-0 relative">
         {/* Tool rail - compact on mobile */}
         {!isMobile && (
-          <div className="w-16 p-1.5 border-r border-border flex-shrink-0">
+          <div className="w-16 p-1.5 builder-rail flex-shrink-0">
             <ToolRail activeTool={activeTool} onSelectTool={setActiveTool} onApplyTool={applyTool} />
           </div>
         )}
 
         {/* Viewport */}
-        <div className="flex-1 p-0 sm:p-1 relative">
+        <div className="flex-1 p-0 sm:p-1 relative builder-viewport-bg">
           <RingViewport
             ref={viewportRef}
             params={params}
@@ -354,10 +354,10 @@ function BuilderInner() {
               <button
                 key={cam.id}
                 onClick={() => setCameraPreset(cam.id)}
-                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                className={`px-2.5 py-1 text-[10px] font-medium rounded-md backdrop-blur-xl transition-all
                   ${cameraPreset === cam.id
-                    ? "bg-primary/30 text-primary border border-primary/40"
-                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    ? "bg-primary/20 text-primary border border-primary/30 shadow-sm shadow-primary/10"
+                    : "bg-card/60 text-muted-foreground border border-builder-divider hover:bg-card/80 hover:text-foreground"
                   }`}
               >
                 {cam.label}
@@ -470,7 +470,7 @@ function BuilderInner() {
 
           {/* XYZ Position & Rotation controls — bottom-right overlay (desktop) */}
           {!isMobile && (
-            <div className="absolute bottom-3 right-3 z-10 bg-card/85 backdrop-blur-md border border-border/50 rounded-xl p-2.5 space-y-2 min-w-[180px]">
+            <div className="absolute bottom-3 right-3 z-10 bg-card/90 backdrop-blur-xl border border-builder-divider rounded-xl p-2.5 space-y-2 min-w-[180px] shadow-lg shadow-black/30">
               <div className="flex items-center justify-between">
                 <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-display flex items-center gap-1">
                   <Move className="w-3 h-3" /> Transform
@@ -617,14 +617,14 @@ function BuilderInner() {
 
         {/* Desktop sidebar */}
         {!isMobile && (
-          <div className="w-80 border-l border-border flex-shrink-0 overflow-hidden">
+          <div className="w-80 builder-sidebar flex-shrink-0 overflow-hidden">
             {panelContent}
           </div>
         )}
       </div>
 
       {!embed && !isMobile && (
-        <div className="px-4 py-1.5 border-t border-border text-[10px] text-muted-foreground text-center">
+        <div className="px-4 py-1.5 border-t border-builder-divider bg-builder-topbar text-[10px] text-muted-foreground text-center">
           Orbit: drag · Zoom: scroll · Select a tool and click to apply
         </div>
       )}

@@ -26,7 +26,7 @@ export default function ToolRail({ activeTool, onSelectTool, onApplyTool }: Tool
   const sculptTools = TOOLS.filter((t) => t.sculpt);
 
   return (
-    <div className="flex flex-col gap-1 p-2 bg-card rounded-lg border border-border">
+    <div className="flex flex-col gap-1 p-2 bg-builder-rail rounded-lg border border-builder-divider">
       <span className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 py-1 font-display">
         Tools
       </span>
