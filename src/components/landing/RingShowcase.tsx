@@ -254,11 +254,11 @@ const STONE_DESIGNS: RingDesign[] = [
 const DESIGNS: RingDesign[] = [...BAND_DESIGNS, ...STONE_DESIGNS];
 
 const METALS: MetalDef[] = [
-  { id: "silver", label: "Silver", color: "#C0C0C0", roughness: 0.12, metalness: 0.95, envIntensity: 1.6 },
-  { id: "gold", label: "Gold", color: "#FFD700", roughness: 0.1, metalness: 0.98, envIntensity: 1.8 },
-  { id: "rose-gold", label: "Rose Gold", color: "#E8A090", roughness: 0.15, metalness: 0.92, envIntensity: 1.5 },
-  { id: "titanium", label: "Titanium", color: "#878681", roughness: 0.2, metalness: 0.88, envIntensity: 1.3 },
-  { id: "tungsten", label: "Tungsten", color: "#555555", roughness: 0.08, metalness: 0.97, envIntensity: 1.4 },
+  { id: "gold", label: "Gold", color: "#D4A520", roughness: 0.08, metalness: 1.0, envIntensity: 3.0 },
+  { id: "silver", label: "Silver", color: "#C8C8C8", roughness: 0.1, metalness: 1.0, envIntensity: 2.8 },
+  { id: "rose-gold", label: "Rose Gold", color: "#C6897B", roughness: 0.1, metalness: 1.0, envIntensity: 2.6 },
+  { id: "titanium", label: "Titanium", color: "#8A8A85", roughness: 0.22, metalness: 0.92, envIntensity: 2.0 },
+  { id: "tungsten", label: "Tungsten", color: "#4A4A4A", roughness: 0.06, metalness: 1.0, envIntensity: 2.4 },
   { id: "wax", label: "Wax", color: "#78A85B", roughness: 0.85, metalness: 0.05, envIntensity: 0.2 },
 ];
 
@@ -751,9 +751,13 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
   const groupRef = useRef<THREE.Group>(null);
   const castingTex = useCastingTextures(42 + design.id.length * 7);
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.25;
+      const t = clock.getElapsedTime();
+      groupRef.current.rotation.y += delta * 0.2;
+      // Gentle cinematic tilt — reveals top & bottom surfaces
+      groupRef.current.rotation.x = Math.sin(t * 0.3) * 0.12;
+      groupRef.current.rotation.z = Math.sin(t * 0.2 + 1.0) * 0.06;
     }
   });
 
@@ -898,12 +902,13 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
             normalMap={castingTex.normalMap}
             normalScale={normalScale}
             roughnessMap={castingTex.roughnessMap}
-            clearcoat={0.15}
-            clearcoatRoughness={0.2}
-            reflectivity={0.95}
-            sheen={0.05}
-            sheenRoughness={0.3}
-            sheenColor={new THREE.Color(metal.color).multiplyScalar(0.3)}
+            clearcoat={0.3}
+            clearcoatRoughness={0.15}
+            reflectivity={1.0}
+            sheen={0.08}
+            sheenRoughness={0.25}
+            sheenColor={new THREE.Color(metal.color).multiplyScalar(0.4)}
+            ior={2.5}
           />
         )}
       </mesh>
@@ -941,30 +946,32 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef }) {
   return (
     <>
-      <ambientLight intensity={0.15} />
-      {/* Key light — raking angle to reveal surface texture and carving detail */}
-      <directionalLight position={[3, 6, 4]} intensity={1.8} castShadow color="#fff8f0" />
-      {/* Fill — warm, opposite side */}
-      <directionalLight position={[-4, 2, -3]} intensity={0.45} color="#ff9040" />
-      {/* Rim lights — catch edges and groove walls */}
-      <pointLight position={[0, 0, 3.5]} intensity={0.7} color="#ffffff" />
-      <pointLight position={[2, -1, -3]} intensity={0.45} color="#e879f9" />
-      <pointLight position={[-2, 1, 2]} intensity={0.4} color="#38bdf8" />
-      {/* Top accent — reveals surface pitting and casting grain */}
-      <pointLight position={[0, 3, 0]} intensity={0.5} color="#fbbf24" />
-      {/* Under-light — fills shadows in grooves */}
-      <pointLight position={[0, -2, 2]} intensity={0.2} color="#94a3b8" />
+      <ambientLight intensity={0.08} />
+      {/* Key light — warm, high angle for dramatic rim highlights */}
+      <directionalLight position={[4, 8, 5]} intensity={2.2} castShadow color="#fff5e6" />
+      {/* Fill — cooler, softer, opposite side */}
+      <directionalLight position={[-5, 3, -4]} intensity={0.5} color="#c8d8f0" />
+      {/* Rim light — catches edges sharply */}
+      <spotLight position={[0, 0, 4]} intensity={1.2} angle={0.6} penumbra={0.8} color="#ffffff" />
+      {/* Back rim — silhouette edge separation */}
+      <pointLight position={[-3, -1, -4]} intensity={0.6} color="#ffa040" />
+      {/* Top accent — reveals surface detail and grooves */}
+      <pointLight position={[0, 4, 0]} intensity={0.8} color="#ffecd2" />
+      {/* Side kicker — adds dimensionality */}
+      <pointLight position={[3, -1, 2]} intensity={0.4} color="#e0d4f5" />
+      {/* Under-fill — subtle groove/shadow fill */}
+      <pointLight position={[0, -3, 2]} intensity={0.15} color="#94a3b8" />
 
       <ShowcaseRing design={design} metal={metal} />
 
-      <ContactShadows position={[0, -0.7, 0]} opacity={0.55} scale={5} blur={2.5} far={3} />
-      <Environment preset="studio" />
+      <ContactShadows position={[0, -0.7, 0]} opacity={0.6} scale={6} blur={2.8} far={3.5} />
+      <Environment preset="city" />
       <OrbitControls
         enablePan={false}
         enableZoom={false}
         autoRotate={false}
-        minPolarAngle={Math.PI / 3}
-        maxPolarAngle={Math.PI / 1.8}
+        minPolarAngle={Math.PI / 3.2}
+        maxPolarAngle={Math.PI / 1.7}
       />
     </>
   );
@@ -1063,7 +1070,7 @@ export default function RingShowcase() {
             />
 
             <Canvas
-              camera={{ position: [0, 1.5, 3.5], fov: 35 }}
+              camera={{ position: [0.5, 1.8, 3.2], fov: 32 }}
               shadows
               gl={{ antialias: true, alpha: true }}
               dpr={[1, 2]}
