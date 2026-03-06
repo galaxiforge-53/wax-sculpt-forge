@@ -756,10 +756,72 @@ function GemStoneGroup({
   );
 }
 
+// ── Polished Inner Bore ──────────────────────────────────────────
+// Separate smooth polished cylinder for the ring interior — no casting
+// textures, mirror-finish metal that catches light and shows reflections.
+
+function PolishedInnerBore({
+  innerR,
+  ringWidth,
+  metalColor,
+  isWax,
+  comfortInset = 0.012,
+}: {
+  innerR: number;
+  ringWidth: number;
+  metalColor: string;
+  isWax: boolean;
+  comfortInset?: number;
+}) {
+  const geometry = useMemo(() => {
+    const steps = 64;
+    const points: THREE.Vector2[] = [];
+    const w = ringWidth;
+
+    // Trace inner bore profile with comfort-fit curve
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const y = -w / 2 + t * w;
+      const edgeDist = Math.abs(t - 0.5) * 2;
+      const comfort = (1 - edgeDist * edgeDist) * comfortInset;
+      // Slightly inset from ring's inner bore so it overlaps cleanly
+      points.push(new THREE.Vector2(innerR - comfort - 0.001, y));
+    }
+
+    return new THREE.LatheGeometry(points, 128);
+  }, [innerR, ringWidth, comfortInset]);
+
+  return (
+    <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]}>
+      {isWax ? (
+        <meshStandardMaterial
+          color="#6b9a4e"
+          roughness={0.7}
+          metalness={0.02}
+          envMapIntensity={0.2}
+          side={THREE.BackSide}
+        />
+      ) : (
+        <meshPhysicalMaterial
+          color={metalColor}
+          roughness={0.03}
+          metalness={1.0}
+          envMapIntensity={4.0}
+          clearcoat={1.0}
+          clearcoatRoughness={0.02}
+          reflectivity={1.0}
+          ior={2.5}
+          side={THREE.BackSide}
+        />
+      )}
+    </mesh>
+  );
+}
+
 // ── Interior Engraving Geometry ──────────────────────────────────
 // Creates 3D engraved text on the inner bore of the ring using
 // displaced rectangular blocks arranged along the circumference.
-// The group is rotated PI/2 around X to match the ring mesh orientation.
+// Engraving is inset into the polished bore with depth shading.
 
 function InteriorEngraving({
   text,
@@ -777,12 +839,12 @@ function InteriorEngraving({
   const glyphMeshes = useMemo(() => {
     if (!text) return [];
     const chars = text.split("");
-    const charHeight = ringWidth * 0.28;
+    const charHeight = ringWidth * 0.32; // larger for readability
     const charWidth = charHeight * 0.55;
-    const spacing = charHeight * 0.15;
+    const spacing = charHeight * 0.18;
     const totalWidth = chars.length * (charWidth + spacing);
-    const engravingR = innerR - 0.008; // inset into inner surface
-    const depth = 0.006;
+    const engravingR = innerR - 0.012; // deeper inset into bore
+    const depth = 0.018; // significantly deeper for visible shadow
 
     const circumference = 2 * Math.PI * engravingR;
     const totalAngle = (totalWidth / circumference) * 2 * Math.PI;
@@ -796,8 +858,15 @@ function InteriorEngraving({
     });
   }, [text, innerR, ringWidth]);
 
+  // Darker shade of the metal for engraving depth effect
+  const engravingColor = useMemo(() => {
+    if (isWax) return "#3d5228";
+    const c = new THREE.Color(metalColor);
+    c.multiplyScalar(0.35); // darken significantly for depth illusion
+    return `#${c.getHexString()}`;
+  }, [metalColor, isWax]);
+
   return (
-    // Match the ring mesh rotation so engraving sits on the inner bore
     <group rotation={[Math.PI / 2, 0, 0]}>
       {glyphMeshes.map((glyph, i) => {
         if (!glyph) return null;
@@ -806,7 +875,6 @@ function InteriorEngraving({
         return (
           <group key={i}>
             {strokes.map((stroke, si) => {
-              // Position on inner bore — characters face inward (readable from inside)
               const angle = charAngle + stroke.offsetX / engravingR;
               const px = engravingR * Math.cos(angle);
               const pz = engravingR * Math.sin(angle);
@@ -817,13 +885,16 @@ function InteriorEngraving({
                   key={si}
                   position={[px, py, pz]}
                   rotation={[0, -angle + Math.PI, 0]}
+                  castShadow
                 >
-                  <boxGeometry args={[stroke.width, stroke.height, depth]} />
-                  <meshStandardMaterial
-                    color={isWax ? "#5a7a42" : metalColor}
-                    roughness={isWax ? 0.9 : 0.25}
-                    metalness={isWax ? 0.02 : 0.85}
-                    envMapIntensity={0.8}
+                  <boxGeometry args={[stroke.width * 1.1, stroke.height * 1.1, depth]} />
+                  <meshPhysicalMaterial
+                    color={engravingColor}
+                    roughness={isWax ? 0.85 : 0.5}
+                    metalness={isWax ? 0.02 : 0.9}
+                    envMapIntensity={0.3}
+                    clearcoat={isWax ? 0 : 0.2}
+                    clearcoatRoughness={0.4}
                   />
                 </mesh>
               );
@@ -1081,6 +1152,14 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
         )}
       </mesh>
 
+      {/* Polished inner bore — smooth mirror finish, no casting texture */}
+      <PolishedInnerBore
+        innerR={innerR}
+        ringWidth={w}
+        metalColor={metal.color}
+        isWax={isWax}
+      />
+
       {/* Inlay channels */}
       {design.inlays.map((inlay, i) => (
         <InlayChannel
@@ -1125,7 +1204,7 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
 function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef }) {
   return (
     <>
-      <ambientLight intensity={0.08} />
+      <ambientLight intensity={0.12} />
       {/* Key light — warm, high angle for dramatic rim highlights */}
       <directionalLight position={[4, 8, 5]} intensity={2.2} castShadow color="#fff5e6" />
       {/* Fill — cooler, softer, opposite side */}
@@ -1140,6 +1219,9 @@ function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef 
       <pointLight position={[3, -1, 2]} intensity={0.4} color="#e0d4f5" />
       {/* Under-fill — subtle groove/shadow fill */}
       <pointLight position={[0, -3, 2]} intensity={0.15} color="#94a3b8" />
+      {/* Interior bore light — illuminates engraving from inside */}
+      <pointLight position={[0, 0, 0]} intensity={0.6} color="#fff8f0" distance={2} />
+      <pointLight position={[0.5, 0, -0.3]} intensity={0.3} color="#ffecd2" distance={1.5} />
 
       <ShowcaseRing design={design} metal={metal} />
 
