@@ -178,6 +178,11 @@ export default function Builder() {
       onApplyTemplate={applyTemplate}
       engraving={engraving}
       onEngravingChange={setEngraving}
+      metalPreset={metalPreset}
+      finishPreset={finishPreset}
+      onViewModeChange={setViewMode}
+      onMetalChange={setMetalPreset}
+      onFinishChange={setFinishPreset}
     />
   );
 
