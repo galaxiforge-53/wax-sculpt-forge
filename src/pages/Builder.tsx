@@ -64,7 +64,17 @@ export default function Builder() {
     if (templateId) {
       sessionStorage.removeItem("applyTemplate");
       const t = getTemplate(templateId);
-      if (t) applyTemplate(t.params);
+      if (t) {
+        applyTemplate(t.params);
+        if (t.lunar) {
+          setLunarTexture({ ...lunarTexture, seed: Math.floor(Math.random() * 9999), ...t.lunar });
+        }
+        if (t.metalPreset) setMetalPreset(t.metalPreset);
+        if (t.finishPreset) setFinishPreset(t.finishPreset);
+        if (t.engraving) {
+          setEngraving({ ...engraving, ...t.engraving });
+        }
+      }
       return;
     }
 
