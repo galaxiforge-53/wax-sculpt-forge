@@ -11,6 +11,8 @@ import { isEmbedMode } from "@/config/galaxiforge";
 import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
 import { getProject, saveProject } from "@/lib/projectsStore";
+import { saveCloudDesign, getCloudDesign } from "@/lib/cloudDesignsStore";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -22,6 +24,7 @@ export default function Builder() {
   const viewportRef = useRef<RingViewportHandle>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
   const [forgeModalOpen, setForgeModalOpen] = useState(false);
   const [livePreviews, setLivePreviews] = useState<DesignPreview[]>([]);
@@ -85,6 +88,21 @@ export default function Builder() {
       return;
     }
 
+    // Cloud design
+    const cloudId = sessionStorage.getItem("openCloudDesignId");
+    if (cloudId) {
+      sessionStorage.removeItem("openCloudDesignId");
+      getCloudDesign(cloudId).then((design) => {
+        if (design) {
+          restoreDesign(design.design_package);
+          setCurrentProjectId(design.id);
+          setCurrentProjectName(design.name);
+        }
+      });
+      return;
+    }
+
+    // Local design
     const projectId = sessionStorage.getItem("openProjectId");
     if (projectId) {
       sessionStorage.removeItem("openProjectId");
@@ -132,21 +150,36 @@ export default function Builder() {
         const input = window.prompt("Name your design:", "My Ring Design");
         if (!input) { setIsSaving(false); return; }
         name = input;
-        id = `PRJ-${Date.now().toString(36).toUpperCase()}`;
       }
 
       const anglePrev = previews.find((p) => p.id === "angle");
       const thumbnail = anglePrev?.dataUrl ?? previews[0]?.dataUrl;
-      const now = new Date().toISOString();
-      saveProject({
-        id: id!, name: name!,
-        createdAt: currentProjectId ? (getProject(currentProjectId)?.createdAt ?? now) : now,
-        updatedAt: now, designPackage: pkg, thumbnail,
-      });
 
-      setCurrentProjectId(id!);
-      setCurrentProjectName(name!);
-      toast({ title: "Saved to My Designs", description: `"${name}" saved successfully.` });
+      // Save to cloud if authenticated
+      if (user) {
+        const isExistingCloud = id && !id.startsWith("PRJ-");
+        const saved = await saveCloudDesign(
+          { name: name!, design_package: pkg, thumbnail },
+          isExistingCloud ? id! : undefined,
+        );
+        setCurrentProjectId(saved.id);
+        setCurrentProjectName(saved.name);
+        toast({ title: "Saved to Cloud ☁️", description: `"${name}" synced.` });
+      } else {
+        // Fallback to local storage
+        if (!id) id = `PRJ-${Date.now().toString(36).toUpperCase()}`;
+        const now = new Date().toISOString();
+        saveProject({
+          id: id!, name: name!,
+          createdAt: currentProjectId ? (getProject(currentProjectId)?.createdAt ?? now) : now,
+          updatedAt: now, designPackage: pkg, thumbnail,
+        });
+        setCurrentProjectId(id!);
+        setCurrentProjectName(name!);
+        toast({ title: "Saved Locally", description: `"${name}" saved. Sign in to sync to cloud.` });
+      }
+    } catch (err: any) {
+      toast({ title: "Save Error", description: err.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
