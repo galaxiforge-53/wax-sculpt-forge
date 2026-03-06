@@ -66,8 +66,9 @@ export function AccessProvider({ children }: { children: ReactNode }) {
     return TIER_RANK[highestTier] >= TIER_RANK[minTier];
   };
 
-  const canExport = hasAccess("export");
+  // Premium tier unlocks STL export, advanced surfaces, and AI assistant
   const isPremium = hasAccess("premium");
+  const canExport = isPremium;
 
   const redeemCode = async (code: string): Promise<{ success: boolean; error?: string; tier?: string }> => {
     const { data, error } = await supabase.rpc("redeem_access_code", { p_code: code });

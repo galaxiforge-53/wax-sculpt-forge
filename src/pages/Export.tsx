@@ -254,10 +254,10 @@ export default function Export() {
               onClick={handleDownloadSTL}
               disabled={!stlResult || generating || !canExport}
               className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              title={!canExport ? "Requires Export Pro access code" : ""}
+              title={!canExport ? "Requires Premium access code" : ""}
             >
               {!canExport ? <Lock className="h-4 w-4 mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-              {!canExport ? "Export Pro Required" : `Download STL ${stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}`}
+              {!canExport ? "Premium Required" : `Download STL ${stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}`}
             </Button>
             <Button onClick={handleSend} className="flex-1 bg-primary text-primary-foreground hover:bg-ember-glow">
               <Send className="h-4 w-4 mr-2" /> Send to GalaxiForge

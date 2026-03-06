@@ -10,23 +10,26 @@ import { motion } from "framer-motion";
 import { KeyRound, Sparkles, Download, Palette, Check, ArrowLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const TIER_INFO: Record<AccessTier, { label: string; icon: typeof Sparkles; description: string; color: string }> = {
+const TIER_INFO: Record<AccessTier, { label: string; icon: typeof Sparkles; description: string; features: string[]; color: string }> = {
   free: {
     label: "Free Access",
     icon: Palette,
     description: "Design rings with all basic tools",
+    features: ["Ring design & sculpting", "Save designs", "Send to Galaxy Forge"],
     color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
   },
   premium: {
     label: "Premium Member",
     icon: Sparkles,
-    description: "Advanced features including lunar textures, inlays, and AI assistant",
+    description: "Full access including advanced features and STL export",
+    features: ["STL file export", "Advanced surface controls", "AI design assistant", "All free features included"],
     color: "text-primary border-primary/30 bg-primary/10",
   },
   export: {
     label: "Export Pro",
     icon: Download,
-    description: "Full access including STL downloads and production submission",
+    description: "Legacy export tier — same as Premium",
+    features: ["Same as Premium"],
     color: "text-accent border-accent/30 bg-accent/10",
   },
 };
@@ -105,24 +108,31 @@ export default function AccessCode() {
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground text-center">Your active access</p>
             <div className="space-y-2">
-              {(Object.keys(TIER_INFO) as AccessTier[]).map((tier) => {
+              {(["free", "premium"] as AccessTier[]).map((tier) => {
                 const info = TIER_INFO[tier];
-                const active = activeTiers.includes(tier);
+                const active = activeTiers.includes(tier) || (tier === "premium" && activeTiers.includes("export"));
                 const Icon = info.icon;
                 return (
                   <div
                     key={tier}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl border transition-all",
+                      "flex items-start gap-3 px-4 py-3 rounded-xl border transition-all",
                       active ? info.color : "border-border/50 bg-card/50 opacity-40"
                     )}
                   >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">{info.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{info.description}</p>
+                      <p className="text-[10px] text-muted-foreground mb-1.5">{info.description}</p>
+                      <ul className="space-y-0.5">
+                        {info.features.map((f) => (
+                          <li key={f} className="text-[10px] text-muted-foreground/80 flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5 flex-shrink-0" /> {f}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    {active && <Check className="w-4 h-4 flex-shrink-0" />}
+                    {active && <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />}
                   </div>
                 );
               })}
