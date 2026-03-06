@@ -802,6 +802,7 @@ interface RingViewportProps {
   engraving?: EngravingState;
   cutawayMode?: CutawayMode;
   lighting?: LightingSettings;
+  showcaseMode?: boolean;
 }
 
 // ── Clipping plane manager ─────────────────────────────────────────
@@ -838,8 +839,9 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
+    const sc = showcaseMode; // shorthand
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -866,9 +868,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none">
         <Canvas
           camera={{ position: initialCamPos, fov: isMobile ? 30 : 35 }}
-          shadows
-          gl={{ preserveDrawingBuffer: true, antialias: true }}
-          dpr={isMobile ? [1, 1.5] : [1, 2]}
+          shadows={sc ? "soft" : true}
+          gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: sc ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping, toneMappingExposure: sc ? 1.1 : 1.0 }}
+          dpr={sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2])}
         >
           <ClipPlaneManager mode={cutawayMode} />
 
@@ -907,11 +909,19 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             return (
               <>
                 <ambientLight intensity={lighting.ambientIntensity} />
-                <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color={keyColor} />
+                <directionalLight position={[keyX, keyY, keyZ]} intensity={sc ? lighting.keyIntensity * 1.3 : lighting.keyIntensity} castShadow shadow-mapSize-width={sc ? 2048 : 1024} shadow-mapSize-height={sc ? 2048 : 1024} shadow-bias={-0.0005} color={keyColor} />
                 <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity} color={fillColor} />
                 <pointLight position={[0, -3, 4]} intensity={viewMode === "cast" ? 1.0 : 0.7} color="#ffffff" />
                 <pointLight position={[0, 5, 0]} intensity={viewMode === "cast" ? 0.6 : 0.4} color="#f8f4ff" />
                 <pointLight position={[-5, 1, -2]} intensity={viewMode === "cast" ? 0.5 : 0.3} color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"} />
+                {/* Showcase extra lights — rim light and accent */}
+                {sc && (
+                  <>
+                    <spotLight position={[-keyX * 1.2, keyY * 0.3, -keyZ * 1.2]} intensity={1.8} angle={0.35} penumbra={0.9} color="#e0e8ff" />
+                    <pointLight position={[keyX * 0.5, -1, keyZ * 0.5]} intensity={0.8} color="#fff0d8" />
+                    <rectAreaLight width={3} height={3} position={[0, 4, 0]} intensity={0.6} color="#ffffff" />
+                  </>
+                )}
               </>
             );
           })()}
@@ -949,13 +959,14 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           <ContactShadows
             position={[0, -0.84, 0]}
-            opacity={0.5}
-            scale={6}
-            blur={2}
-            far={4}
+            opacity={sc ? 0.65 : 0.5}
+            scale={sc ? 8 : 6}
+            blur={sc ? 3 : 2}
+            far={sc ? 5 : 4}
+            resolution={sc ? 512 : 256}
           />
 
-          <Environment preset={lighting.envPreset} environmentIntensity={lighting.envIntensity} />
+          <Environment preset={lighting.envPreset} environmentIntensity={sc ? lighting.envIntensity * 1.8 : lighting.envIntensity} />
           <OrbitControls
             enablePan={false}
             minDistance={isMobile ? 1.2 : 1.5}
