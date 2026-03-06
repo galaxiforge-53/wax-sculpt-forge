@@ -20,6 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search } from "lucide-react";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
+import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
 import { Button } from "@/components/ui/button";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 
@@ -44,6 +45,7 @@ function BuilderInner() {
   const [ringPosition, setRingPosition] = useState<[number, number, number]>([0, 0, 0]);
   const [ringRotation, setRingRotation] = useState<[number, number, number]>([0, 0, 0]);
   const [showPrinterBed, setShowPrinterBed] = useState(false);
+  const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
   const [guidedMode, setGuidedMode] = useState(() => {
     // Show guided mode for new users (no prior project or template)
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
@@ -445,6 +447,14 @@ function BuilderInner() {
             >
               <Printer className="w-3 h-3" /> Print Bed
             </button>
+            <button
+              onClick={() => setRenderGalleryOpen(true)}
+              className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+              title="Generate high-quality beauty renders for sharing and marketing"
+            >
+              <Camera className="w-3 h-3" /> Renders
+            </button>
           </div>
 
           {/* XYZ Position & Rotation controls — bottom-right overlay (desktop) */}
@@ -624,6 +634,16 @@ function BuilderInner() {
         hasInlays={inlays.length > 0}
         onSave={() => { setForgeModalOpen(false); handleSave(); }}
         onSendToGalaxiForge={() => { setForgeModalOpen(false); handleExport(); }}
+      />
+
+      <RenderGalleryModal
+        open={renderGalleryOpen}
+        onClose={() => setRenderGalleryOpen(false)}
+        viewportRef={viewportRef}
+        viewMode={viewMode}
+        metalPreset={metalPreset}
+        finishPreset={finishPreset}
+        params={params}
       />
     </div>
   );
