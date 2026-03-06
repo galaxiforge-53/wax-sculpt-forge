@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Undo2, Redo2, Save, Send, Flame, MoreVertical } from "lucide-react";
+import { Undo2, Redo2, Save, Send, Flame, MoreVertical, Wand2 } from "lucide-react";
 import { isEmbedMode, getReturnUrl } from "@/config/galaxiforge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -27,6 +27,8 @@ interface TopBarProps {
   onSave: () => void;
   isSaving?: boolean;
   onForgeNow: () => void;
+  onEnhance?: () => void;
+  isEnhancing?: boolean;
 }
 
 const METALS: { value: MetalPreset; label: string }[] = [
@@ -48,6 +50,7 @@ const FINISHES: { value: FinishPreset; label: string }[] = [
 export default function TopBar({
   viewMode, onViewModeChange, metalPreset, onMetalChange,
   finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving, onForgeNow,
+  onEnhance, isEnhancing,
 }: TopBarProps) {
   const embed = isEmbedMode();
   const isMobile = useIsMobile();
@@ -142,6 +145,16 @@ export default function TopBar({
             <Button
               variant="outline"
               size="sm"
+              onClick={onEnhance}
+              disabled={isEnhancing}
+              className="border-accent/50 text-accent hover:bg-accent/10 hover:text-accent"
+              title="Intelligently optimize your design"
+            >
+              <Wand2 className="h-4 w-4 mr-1" /> {isEnhancing ? "Enhancing…" : "Enhance Design"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onForgeNow}
               className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary animate-ember-pulse"
             >
@@ -202,6 +215,9 @@ export default function TopBar({
                     ))}
                   </>
                 )}
+                <DropdownMenuItem onClick={onEnhance} disabled={isEnhancing} className="text-xs">
+                  <Wand2 className="h-3.5 w-3.5 mr-2" /> {isEnhancing ? "Enhancing…" : "Enhance Design"}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onSave} disabled={isSaving} className="text-xs">
                   <Save className="h-3.5 w-3.5 mr-2" /> {isSaving ? "Saving…" : "Save"}
                 </DropdownMenuItem>
