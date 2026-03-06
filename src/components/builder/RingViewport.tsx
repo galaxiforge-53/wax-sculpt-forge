@@ -60,64 +60,64 @@ interface MetalMaterialConfig {
 
 const METAL_CONFIGS: Record<MetalPreset, MetalMaterialConfig> = {
   silver: {
-    color: "#D4D4D8",
-    roughness: 0.12,
-    metalness: 1.0,
-    envMapIntensity: 2.5,
-    clearcoat: 0.15,
-    clearcoatRoughness: 0.05,
-    reflectivity: 1.0,
-    sheen: 0.1,
-    sheenColor: "#E8E8F0",
-    sheenRoughness: 0.2,
-    ior: 2.5,
-  },
-  gold: {
-    color: "#D4A520",
-    roughness: 0.1,
+    color: "#C8C8CC",
+    roughness: 0.08,
     metalness: 1.0,
     envMapIntensity: 3.0,
     clearcoat: 0.2,
-    clearcoatRoughness: 0.04,
+    clearcoatRoughness: 0.03,
     reflectivity: 1.0,
-    sheen: 0.15,
-    sheenColor: "#FFE4A0",
+    sheen: 0.08,
+    sheenColor: "#E0E0E8",
     sheenRoughness: 0.15,
     ior: 2.5,
   },
-  "rose-gold": {
-    color: "#C47A6A",
-    roughness: 0.12,
+  gold: {
+    color: "#C8962D",
+    roughness: 0.06,
     metalness: 1.0,
-    envMapIntensity: 2.8,
-    clearcoat: 0.18,
-    clearcoatRoughness: 0.04,
+    envMapIntensity: 3.5,
+    clearcoat: 0.25,
+    clearcoatRoughness: 0.02,
     reflectivity: 1.0,
-    sheen: 0.2,
-    sheenColor: "#F0C0B0",
-    sheenRoughness: 0.18,
+    sheen: 0.12,
+    sheenColor: "#FFD870",
+    sheenRoughness: 0.12,
+    ior: 2.5,
+  },
+  "rose-gold": {
+    color: "#B76E5E",
+    roughness: 0.08,
+    metalness: 1.0,
+    envMapIntensity: 3.2,
+    clearcoat: 0.22,
+    clearcoatRoughness: 0.03,
+    reflectivity: 1.0,
+    sheen: 0.18,
+    sheenColor: "#E8B0A0",
+    sheenRoughness: 0.14,
     ior: 2.4,
   },
   titanium: {
-    color: "#8A8A85",
-    roughness: 0.22,
+    color: "#7A7A78",
+    roughness: 0.18,
     metalness: 0.95,
-    envMapIntensity: 1.8,
-    clearcoat: 0.05,
-    clearcoatRoughness: 0.15,
-    reflectivity: 0.85,
-    sheen: 0.05,
-    sheenColor: "#B0B0B8",
-    sheenRoughness: 0.4,
+    envMapIntensity: 2.2,
+    clearcoat: 0.08,
+    clearcoatRoughness: 0.1,
+    reflectivity: 0.9,
+    sheen: 0.06,
+    sheenColor: "#A0A0A8",
+    sheenRoughness: 0.35,
     ior: 2.6,
   },
   tungsten: {
-    color: "#5A5A5E",
-    roughness: 0.15,
+    color: "#4A4A50",
+    roughness: 0.1,
     metalness: 1.0,
-    envMapIntensity: 2.2,
-    clearcoat: 0.1,
-    clearcoatRoughness: 0.08,
+    envMapIntensity: 2.8,
+    clearcoat: 0.12,
+    clearcoatRoughness: 0.06,
     reflectivity: 0.95,
     sheen: 0.0,
     sheenColor: "#888888",
@@ -1214,7 +1214,12 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         <Canvas
           camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
           shadows={sc || insp ? "soft" : true}
-          gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: (sc || insp) ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping, toneMappingExposure: insp ? 1.25 : (sc ? 1.1 : 1.0) }}
+          gl={{
+            preserveDrawingBuffer: true,
+            antialias: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : 0.95),
+          }}
           dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
         >
           <ClipPlaneManager mode={cutawayMode} />
@@ -1251,20 +1256,82 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               );
             }
 
+            // ── Jewellery photography lighting rig ──
+            // Key: directional with soft shadow, Fill: opposite-side softbox,
+            // Rim/kicker: backlight for edge sparkle, Overhead softbox: even illumination,
+            // Under-fill: subtle uplight to reduce harsh shadows under the band
+            const isCast = viewMode === "cast";
+            const rimX = -keyX * 1.1;
+            const rimZ = -keyZ * 1.1;
+
             return (
               <>
-                <ambientLight intensity={lighting.ambientIntensity} />
-                <directionalLight position={[keyX, keyY, keyZ]} intensity={sc ? lighting.keyIntensity * 1.3 : lighting.keyIntensity} castShadow shadow-mapSize-width={sc ? 2048 : 1024} shadow-mapSize-height={sc ? 2048 : 1024} shadow-bias={-0.0005} color={keyColor} />
-                <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity} color={fillColor} />
-                <pointLight position={[0, -3, 4]} intensity={viewMode === "cast" ? 1.0 : 0.7} color="#ffffff" />
-                <pointLight position={[0, 5, 0]} intensity={viewMode === "cast" ? 0.6 : 0.4} color="#f8f4ff" />
-                <pointLight position={[-5, 1, -2]} intensity={viewMode === "cast" ? 0.5 : 0.3} color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"} />
+                <ambientLight intensity={lighting.ambientIntensity} color="#f0f0f5" />
+
+                {/* Key light — slightly warm, soft shadow */}
+                <directionalLight
+                  position={[keyX, keyY, keyZ]}
+                  intensity={sc ? lighting.keyIntensity * 1.3 : lighting.keyIntensity}
+                  castShadow
+                  shadow-mapSize-width={sc || insp ? 2048 : 1024}
+                  shadow-mapSize-height={sc || insp ? 2048 : 1024}
+                  shadow-bias={-0.0003}
+                  shadow-radius={4}
+                  color={keyColor}
+                />
+
+                {/* Fill light — cool-tinted softbox from opposite side */}
+                <directionalLight
+                  position={[fillX, fillY, fillZ]}
+                  intensity={lighting.fillIntensity}
+                  color={fillColor}
+                />
+
+                {/* Overhead softbox — large area light for smooth gradients on curved surfaces */}
+                <rectAreaLight
+                  width={5}
+                  height={5}
+                  position={[0, 5, 0]}
+                  intensity={isCast ? 0.8 : 0.5}
+                  color="#ffffff"
+                />
+
+                {/* Rim / kicker light — edge highlights that separate ring from background */}
+                <spotLight
+                  position={[rimX, keyY * 0.3, rimZ]}
+                  intensity={isCast ? 2.0 : 1.2}
+                  angle={0.45}
+                  penumbra={0.85}
+                  color="#e8eeff"
+                />
+
+                {/* Front-bottom accent — lifts shadow under the band, reveals inner bore */}
+                <pointLight
+                  position={[0, -2.5, 3.5]}
+                  intensity={isCast ? 0.8 : 0.5}
+                  color="#ffffff"
+                />
+
+                {/* Top-back hair light — subtle rim highlight on upper edge */}
+                <pointLight
+                  position={[0, 4, -3]}
+                  intensity={isCast ? 0.6 : 0.3}
+                  color="#f0f0ff"
+                />
+
+                {/* Side accent — warm kiss light that catches crater rims */}
+                <pointLight
+                  position={[-4, 0.5, 1]}
+                  intensity={isCast ? 0.5 : 0.3}
+                  color={isCast ? "#ffe0c0" : "#d0d0ff"}
+                />
+
                 {/* Showcase extra lights — rim light and accent */}
                 {sc && (
                   <>
-                    <spotLight position={[-keyX * 1.2, keyY * 0.3, -keyZ * 1.2]} intensity={1.8} angle={0.35} penumbra={0.9} color="#e0e8ff" />
+                    <spotLight position={[rimX * 1.3, keyY * 0.5, rimZ * 1.3]} intensity={2.5} angle={0.3} penumbra={0.95} color="#e0e8ff" />
                     <pointLight position={[keyX * 0.5, -1, keyZ * 0.5]} intensity={0.8} color="#fff0d8" />
-                    <rectAreaLight width={3} height={3} position={[0, 4, 0]} intensity={0.6} color="#ffffff" />
+                    <rectAreaLight width={3} height={3} position={[0, 4.5, 1]} intensity={0.8} color="#ffffff" />
                   </>
                 )}
                 {/* Inspection mode — strong multi-angle lighting to reveal surface detail */}
