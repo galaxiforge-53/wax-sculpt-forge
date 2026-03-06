@@ -146,29 +146,31 @@ function stampCrater(
   physicalAspect: number = 1,
 ) {
   // Physical aspect correction: stretch V so craters are circular on the ring surface
-  // physicalAspect = circumference / width. We need craters to cover more V-range.
   const vStretch = physicalAspect;
 
   const pxR = c.radius * w;
-  // pyR is enlarged by vStretch so the crater extends further in V, appearing circular on ring
   const pyR = c.radius * h * vStretch;
 
-  const spreadU = c.radius * 1.5;
-  const spreadV = c.radius * 1.5 * vStretch;
+  const spreadU = c.radius * 1.6;
+  const spreadV = c.radius * 1.6 * vStretch;
   const x0 = Math.floor((c.cu - spreadU) * w);
   const x1 = Math.ceil((c.cu + spreadU) * w);
   const y0 = Math.max(0, Math.floor((c.cv - spreadV) * h));
   const y1 = Math.min(h - 1, Math.ceil((c.cv + spreadV) * h));
 
-  const bowlEnd = 0.5;
-  const rimPeak = (0.62 + rimSharpness * 0.08) + c.rimCenterJitter;
-  const rimHalf = Math.max(0.03, (0.08 - rimSharpness * 0.03) + c.rimWidthJitter);
+  // Realistic crater profile zones
+  const bowlFloor = 0.42;           // flat floor ends here
+  const bowlWall = 0.55;            // steep inner wall transition
+  const rimInner = 0.60 + rimSharpness * 0.05 + c.rimCenterJitter;
+  const rimPeak = 0.68 + rimSharpness * 0.06 + c.rimCenterJitter;
+  const rimOuter = 0.82;            // outer slope
+  const ejectaEnd = 1.35;           // faint ejecta blanket
 
   const noiseScale = 6 + c.warpSeed * 3;
 
   // Central peak parameters (for mega/hero craters)
-  const peakRadius = 0.18; // relative to crater radius
-  const peakHeight = c.depth * 0.35;
+  const peakRadius = 0.20;
+  const peakHeight = c.depth * 0.30;
 
   // Terrace parameters
   const terraceCount = hasTerraces ? 3 : 0;
@@ -181,44 +183,61 @@ function stampCrater(
       const du = (px - c.cu * w) / pxR;
       const dv = (py - c.cv * h) / pyR;
 
+      // Domain warp for organic shapes
       const wU = warpNoise(px * noiseScale / w, py * noiseScale / h);
       const wV = warpNoise(py * noiseScale / h + 100, px * noiseScale / w + 100);
-      const wdu = du + warpAmp * 0.3 * wU;
-      const wdv = dv + warpAmp * 0.3 * wV;
+      const wdu = du + warpAmp * 0.25 * wU;
+      const wdv = dv + warpAmp * 0.25 * wV;
 
       const dist = Math.sqrt(wdu * wdu + wdv * wdv);
-      if (dist > 1.3) continue;
+      if (dist > ejectaEnd) continue;
 
       let delta = 0;
-      if (dist < bowlEnd) {
-        const t = dist / bowlEnd;
-        delta = -c.depth * (1 - t * t);
 
-        // Terraced inner walls — step the bowl at intervals
-        if (terraceCount > 0 && dist > 0.15) {
-          const terraceT = (dist - 0.15) / (bowlEnd - 0.15);
-          const step = Math.floor(terraceT * terraceCount);
-          const frac = terraceT * terraceCount - step;
-          const stepSmooth = smoothstep(0.0, 0.3, frac);
-          delta += c.depth * 0.08 * stepSmooth;
-        }
+      if (dist < bowlFloor) {
+        // Flat bowl floor with gentle parabolic center
+        const t = dist / bowlFloor;
+        delta = -c.depth * (1 - 0.15 * t * t);
 
-        // Central peak — mound rising from bowl center
+        // Central peak — smooth bell mound
         if (hasCentralPeak && dist < peakRadius) {
           const pt = dist / peakRadius;
-          const bell = Math.exp(-pt * pt * 3.0);
+          const bell = Math.exp(-pt * pt * 4.0);
           delta += peakHeight * bell;
         }
-      } else if (dist < rimPeak - rimHalf) {
-        const t = (dist - bowlEnd) / (rimPeak - rimHalf - bowlEnd);
-        const smooth = t * t * (3 - 2 * t);
-        delta = -c.depth * (1 - smooth) * 0.15 + c.rimHeight * smooth * 0.5;
-      } else if (dist < rimPeak + rimHalf) {
-        const t = (dist - (rimPeak - rimHalf)) / (2 * rimHalf);
-        delta = c.rimHeight * 0.5 * Math.sin(t * Math.PI);
-      } else if (dist < 1.3) {
-        const t = (dist - (rimPeak + rimHalf)) / (1.3 - (rimPeak + rimHalf));
-        delta = c.rimHeight * 0.08 * Math.max(0, 1 - t * t);
+      } else if (dist < bowlWall) {
+        // Steep inner wall — cubic interpolation from floor to wall
+        const t = (dist - bowlFloor) / (bowlWall - bowlFloor);
+        const s = t * t * (3 - 2 * t); // smoothstep
+        delta = -c.depth * (1 - s * 0.85);
+
+        // Terraced inner walls
+        if (terraceCount > 0) {
+          const terraceT = t;
+          const step = Math.floor(terraceT * terraceCount);
+          const frac = terraceT * terraceCount - step;
+          const stepSmooth = smoothstep(0.0, 0.35, frac);
+          delta += c.depth * 0.06 * stepSmooth;
+        }
+      } else if (dist < rimInner) {
+        // Transition from wall to rim — steep inner face
+        const t = (dist - bowlWall) / (rimInner - bowlWall);
+        const s = t * t * (3 - 2 * t);
+        delta = lerp(-c.depth * 0.15, c.rimHeight * 0.3, s);
+      } else if (dist < rimPeak) {
+        // Rim crest — sharp peak
+        const t = (dist - rimInner) / (rimPeak - rimInner);
+        const s = Math.sin(t * Math.PI * 0.5);
+        delta = lerp(c.rimHeight * 0.3, c.rimHeight * 0.5, s);
+      } else if (dist < rimOuter) {
+        // Outer rim slope — gentler decline (asymmetric)
+        const t = (dist - rimPeak) / (rimOuter - rimPeak);
+        const s = t * t; // quadratic falloff
+        delta = c.rimHeight * 0.5 * (1 - s);
+      } else if (dist < ejectaEnd) {
+        // Ejecta blanket — very faint raised material
+        const t = (dist - rimOuter) / (ejectaEnd - rimOuter);
+        delta = c.rimHeight * 0.06 * Math.max(0, (1 - t) * (1 - t));
       }
 
       const mask = edgeMask[py * w + wpx];
@@ -498,13 +517,27 @@ function buildHeightmap(lunar: LunarTextureState, physicalAspect: number = 1): H
     }
   }
 
-  // ─── 6) High-frequency grain noise ─────────────────────
+  // ─── 6) Regolith micro-texture (coherent noise + grain) ─────
   if (microFactor > 0) {
+    // Coherent regolith noise — gives a powdery surface feel
+    const regolithNoise = makeNoise2D(lunar.seed + 3333);
+    const regolithStrength = microFactor * 0.05 * depthScale;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const u = x / MAP_W * 24;  // high frequency
+        const v = y / MAP_H * 24;
+        const n = fbm(regolithNoise, u, v, 3, 2.2, 0.45);
+        const mask = edgeMask[y * MAP_W + x];
+        hmap[y * MAP_W + x] += n * regolithStrength * mask;
+      }
+    }
+
+    // Fine grain noise on top
     const grainRng = seededRng(lunar.seed + 9999);
-    const strength = microFactor * 0.07 * depthScale;
+    const grainStrength = microFactor * 0.04 * depthScale;
     for (let i = 0; i < hmap.length; i++) {
       const mask = edgeMask[i];
-      hmap[i] += (grainRng() - 0.5) * strength * mask;
+      hmap[i] += (grainRng() - 0.5) * grainStrength * mask;
     }
   }
 
@@ -718,7 +751,7 @@ export function generateLunarSurfaceMaps(lunar: LunarTextureState, physicalAspec
   const { hmap, craterCount } = buildHeightmap(lunar, aspect);
 
   // Scale normal map Y gradient by aspect ratio so lighting responds to circular craters correctly
-  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.0, aspect);
+  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
   const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
