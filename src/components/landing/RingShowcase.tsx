@@ -52,6 +52,7 @@ interface RingDesign {
   thickness: number;
   inlays: InlayDef[];
   stones?: StoneSetting[];
+  engraving?: string;
 }
 
 interface MetalDef {
@@ -77,6 +78,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.3,
     width: 8,
     thickness: 2.2,
+    engraving: "YGGDRASIL · ETERNAL",
     inlays: [
       { material: "crystal", name: "Emerald", placement: -0.32, widthMm: 1.2, color: "#22c55e", emissive: "#0a6b2e", emissiveIntensity: 0.8, roughness: 0.08, metalness: 0.05, opacity: 0.82, depthMm: 0.4 },
       { material: "meteorite", name: "Muonionalusta", placement: 0.0, widthMm: 1.4, color: "#9ca3af", emissive: "#4b5563", emissiveIntensity: 0.15, roughness: 0.55, metalness: 0.7, opacity: 0.95, depthMm: 0.3 },
@@ -94,6 +96,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.1,
     width: 7,
     thickness: 2.0,
+    engraving: "GALAXIFORGE · EHAND3D",
     inlays: [
       { material: "crystal", name: "Tanzanite", placement: -0.22, widthMm: 0.9, color: "#7c3aed", emissive: "#5b21b6", emissiveIntensity: 0.7, roughness: 0.06, metalness: 0.04, opacity: 0.8, depthMm: 0.3 },
       { material: "opal", name: "Fire Opal", placement: 0.0, widthMm: 1.6, color: "#ff6b2b", emissive: "#ff4500", emissiveIntensity: 1.1, roughness: 0.04, metalness: 0.02, opacity: 0.85, depthMm: 0.5 },
@@ -111,6 +114,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.5,
     width: 10,
     thickness: 2.8,
+    engraving: "FORGED IN THUNDER",
     inlays: [
       { material: "crystal", name: "Lapis Lazuli", placement: -0.28, widthMm: 1.3, color: "#2563eb", emissive: "#1e3a8a", emissiveIntensity: 0.6, roughness: 0.1, metalness: 0.06, opacity: 0.88, depthMm: 0.4 },
       { material: "meteorite", name: "Campo del Cielo", placement: 0.0, widthMm: 1.8, color: "#78716c", emissive: "#57534e", emissiveIntensity: 0.12, roughness: 0.6, metalness: 0.75, opacity: 0.95, depthMm: 0.5 },
@@ -128,6 +132,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.0,
     width: 7,
     thickness: 2.0,
+    engraving: "AURORA · BOREALIS",
     inlays: [
       { material: "crystal", name: "Diamond Dust", placement: -0.2, widthMm: 0.6, color: "#f0f9ff", emissive: "#bae6fd", emissiveIntensity: 0.9, roughness: 0.02, metalness: 0.03, opacity: 0.75, depthMm: 0.25 },
       { material: "opal", name: "White Opal", placement: 0.0, widthMm: 2.2, color: "#e0f0ff", emissive: "#93c5fd", emissiveIntensity: 0.85, roughness: 0.03, metalness: 0.02, opacity: 0.8, depthMm: 0.5 },
@@ -145,6 +150,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.2,
     width: 9,
     thickness: 2.4,
+    engraving: "GALAXIFORGE · EHAND3D",
     inlays: [
       { material: "opal", name: "Black Opal", placement: -0.35, widthMm: 0.9, color: "#1e293b", emissive: "#3b82f6", emissiveIntensity: 1.2, roughness: 0.03, metalness: 0.08, opacity: 0.88, depthMm: 0.35 },
       { material: "crystal", name: "Moldavite", placement: -0.15, widthMm: 0.8, color: "#4ade80", emissive: "#16a34a", emissiveIntensity: 0.8, roughness: 0.1, metalness: 0.06, opacity: 0.82, depthMm: 0.3 },
@@ -164,6 +170,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.6,
     width: 12,
     thickness: 3.0,
+    engraving: "FENRIR · UNBOUND",
     inlays: [
       { material: "crystal", name: "Labradorite", placement: -0.25, widthMm: 1.8, color: "#6366f1", emissive: "#4f46e5", emissiveIntensity: 0.75, roughness: 0.08, metalness: 0.1, opacity: 0.85, depthMm: 0.5 },
       { material: "meteorite", name: "Muonionalusta", placement: 0.0, widthMm: 1.5, color: "#a1a1aa", emissive: "#71717a", emissiveIntensity: 0.12, roughness: 0.5, metalness: 0.8, opacity: 0.95, depthMm: 0.4 },
@@ -186,6 +193,7 @@ const STONE_DESIGNS: RingDesign[] = [
     bevel: 0,
     width: 7,
     thickness: 2.2,
+    engraving: "CELESTIAL · FORGELAB",
     inlays: [],
     stones: [
       { shape: "cabochon", name: "Amethyst Cabochon", sizeMm: 5.0, color: "#9333ea", emissive: "#7e22ce", emissiveIntensity: 0.9, opacity: 0.85, angleFromTop: 0 },
@@ -204,6 +212,7 @@ const STONE_DESIGNS: RingDesign[] = [
     bevel: 0.2,
     width: 5,
     thickness: 2.0,
+    engraving: "EHAND3D · FOREVER",
     inlays: [],
     stones: [
       { shape: "faceted", name: "Brilliant Diamond", sizeMm: 6.0, color: "#f0f9ff", emissive: "#e0f2fe", emissiveIntensity: 1.2, opacity: 0.75, angleFromTop: 0 },
@@ -220,6 +229,7 @@ const STONE_DESIGNS: RingDesign[] = [
     bevel: 0.2,
     width: 8,
     thickness: 2.4,
+    engraving: "SERPENT · AWAKENED",
     inlays: [
       { material: "meteorite", name: "Gibeon", placement: 0.0, widthMm: 1.2, color: "#a1a1aa", emissive: "#71717a", emissiveIntensity: 0.1, roughness: 0.5, metalness: 0.8, opacity: 0.95, depthMm: 0.3 },
     ],
@@ -240,6 +250,7 @@ const STONE_DESIGNS: RingDesign[] = [
     bevel: 0,
     width: 10,
     thickness: 2.6,
+    engraving: "GALAXIFORGE · EHAND3D",
     inlays: [],
     stones: [
       { shape: "faceted", name: "Ruby", sizeMm: 3.0, color: "#ef4444", emissive: "#b91c1c", emissiveIntensity: 0.9, opacity: 0.82, angleFromTop: -0.5 },
@@ -745,6 +756,146 @@ function GemStoneGroup({
   );
 }
 
+// ── Interior Engraving Geometry ──────────────────────────────────
+// Creates 3D engraved text on the inner bore of the ring using
+// displaced rectangular blocks arranged along the circumference.
+
+function InteriorEngraving({
+  text,
+  innerR,
+  ringWidth,
+  metalColor,
+  isWax,
+}: {
+  text: string;
+  innerR: number;
+  ringWidth: number;
+  metalColor: string;
+  isWax: boolean;
+}) {
+  const glyphMeshes = useMemo(() => {
+    if (!text) return [];
+    const chars = text.split("");
+    const charHeight = ringWidth * 0.28; // 28% of ring width
+    const charWidth = charHeight * 0.55;
+    const spacing = charHeight * 0.15;
+    const totalWidth = chars.length * (charWidth + spacing);
+    const engravingR = innerR - 0.004; // slightly inset from inner surface
+    const depth = 0.008; // engraving depth
+
+    // Angle per character around the circumference
+    const circumference = 2 * Math.PI * engravingR;
+    const totalAngle = (totalWidth / circumference) * 2 * Math.PI;
+    const startAngle = -totalAngle / 2;
+
+    return chars.map((char, i) => {
+      if (char === " ") return null;
+      const charAngle = startAngle + (i * (charWidth + spacing) / circumference) * 2 * Math.PI;
+
+      // Each character is built from simple rectangular strokes
+      const strokes = getCharStrokes(char, charWidth, charHeight);
+      return { char, charAngle, strokes, depth, engravingR, charHeight };
+    });
+  }, [text, innerR, ringWidth]);
+
+  return (
+    <group>
+      {glyphMeshes.map((glyph, i) => {
+        if (!glyph) return null;
+        const { charAngle, strokes, depth, engravingR, charHeight } = glyph;
+
+        return (
+          <group key={i}>
+            {strokes.map((stroke, si) => {
+              // Position on inner bore
+              const px = engravingR * Math.cos(charAngle + stroke.offsetX / engravingR);
+              const pz = engravingR * Math.sin(charAngle + stroke.offsetX / engravingR);
+              const py = stroke.offsetY - charHeight / 2;
+
+              return (
+                <mesh
+                  key={si}
+                  position={[px, py, pz]}
+                  rotation={[
+                    Math.PI / 2,
+                    0,
+                    -charAngle - stroke.offsetX / engravingR + Math.PI / 2,
+                  ]}
+                >
+                  <boxGeometry args={[stroke.width, depth, stroke.height]} />
+                  <meshStandardMaterial
+                    color={isWax ? "#5a7a42" : metalColor}
+                    roughness={isWax ? 0.9 : 0.3}
+                    metalness={isWax ? 0.02 : 0.8}
+                    envMapIntensity={0.5}
+                  />
+                </mesh>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+// Simple stroke-based character rendering (sans-serif block letters)
+interface CharStroke {
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+}
+
+function getCharStrokes(char: string, w: number, h: number): CharStroke[] {
+  const t = w * 0.18; // stroke thickness
+  const strokes: CharStroke[] = [];
+
+  const patterns: Record<string, () => void> = {
+    "A": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); },
+    "B": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "C": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "D": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
+    "E": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.7, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "F": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.7, height: t }); },
+    "G": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.5, width: w*0.7, height: t }); },
+    "H": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); },
+    "I": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.6, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.6, height: t }); },
+    "K": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w*0.1, offsetY: h*0.5, width: w*0.5, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "L": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "M": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.7, width: t, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.7, width: t, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); },
+    "N": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "O": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "P": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); },
+    "R": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "S": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "T": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); },
+    "U": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "V": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.5, height: t }); },
+    "W": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.3, width: t, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.3, width: t, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "X": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.5, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "Y": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.5, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.25, width: t, height: h/2 }); },
+    "Z": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.5, height: h*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "0": () => { patterns["O"]!(); },
+    "1": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); },
+    "2": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "3": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
+    "·": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.2, height: t*1.2 }); },
+    "-": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.7, height: t }); },
+    "J": () => { strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.2, width: t, height: h*0.35 }); },
+  };
+
+  const upperChar = char.toUpperCase();
+  if (patterns[upperChar]) {
+    patterns[upperChar]();
+  } else {
+    // Fallback: small square dot
+    strokes.push({ offsetX: 0, offsetY: h * 0.5, width: t, height: t });
+  }
+
+  return strokes;
+}
+
 // ── 3D Ring Mesh (enhanced with casting detail) ─────────────────
 
 function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }) {
@@ -937,6 +1088,17 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
           idx={i}
         />
       ))}
+
+      {/* Interior engraving */}
+      {design.engraving && (
+        <InteriorEngraving
+          text={design.engraving}
+          innerR={innerR}
+          ringWidth={w}
+          metalColor={metal.color}
+          isWax={isWax}
+        />
+      )}
     </group>
   );
 }
@@ -968,10 +1130,12 @@ function ShowcaseScene({ design, metal }: { design: RingDesign; metal: MetalDef 
       <Environment preset="city" />
       <OrbitControls
         enablePan={false}
-        enableZoom={false}
+        enableZoom={true}
         autoRotate={false}
-        minPolarAngle={Math.PI / 3.2}
-        maxPolarAngle={Math.PI / 1.7}
+        minPolarAngle={Math.PI / 4}
+        maxPolarAngle={Math.PI / 1.4}
+        minDistance={1.5}
+        maxDistance={6}
       />
     </>
   );
@@ -1092,6 +1256,13 @@ export default function RingShowcase() {
               </span>
             </button>
 
+            {/* Interaction hint */}
+            <div className="absolute bottom-4 left-4 px-2 py-1 rounded-md bg-card/60 backdrop-blur-sm border border-border/30">
+              <span className="text-[9px] text-muted-foreground/70">
+                Drag to orbit · Scroll to zoom · See inside engraving
+              </span>
+            </div>
+
             {/* Design counter */}
             <div className="absolute top-4 left-4 px-2 py-1 rounded-md bg-card/60 backdrop-blur-sm border border-border/30">
               <span className="text-[10px] font-mono text-muted-foreground">
@@ -1208,6 +1379,31 @@ export default function RingShowcase() {
               </AnimatePresence>
             )}
 
+            {/* Interior engraving */}
+            {design.engraving && (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={design.id + "-engraving"}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="space-y-1.5"
+                >
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                    ✒️ Interior Engraving
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[11px] font-mono tracking-wider border border-primary/20 bg-primary/5 text-primary/90">
+                      {design.engraving}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground/60 italic">
+                    Zoom in and rotate to see the 3D engraving on the inner bore
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+            )}
+
             {/* Specs grid */}
             <AnimatePresence mode="wait">
               <motion.div
@@ -1225,6 +1421,9 @@ export default function RingShowcase() {
                   { label: "Grooves", value: String(design.grooves) },
                   { label: "Stones", value: String(design.stones?.length ?? 0) },
                   { label: "Metal", value: metal.label },
+                  { label: "Engraving", value: design.engraving ? "Yes" : "No" },
+                  { label: "Inlays", value: String(design.inlays.length) },
+                  { label: "Castable", value: "✓" },
                 ].map((spec) => (
                   <div key={spec.label} className="p-2 rounded-lg bg-card/50 border border-border/50">
                     <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70 mb-0.5">{spec.label}</p>
