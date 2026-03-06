@@ -27,53 +27,362 @@ function useEmbers(count: number) {
   }, [count]);
 }
 
-// ── Hero Ring 3D ─────────────────────────────────────────────────
+// ── Seeded RNG ────────────────────────────────────────────────────
+
+function seededRng(seed: number) {
+  let s = seed | 0 || 1;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s & 0x7fffffff) / 0x7fffffff;
+  };
+}
+
+// ── Perlin-like 2D noise ──────────────────────────────────────────
+
+function makeNoise2D(seed: number) {
+  const rng = seededRng(seed);
+  const SIZE = 256;
+  const perm = new Uint8Array(SIZE * 2);
+  const grad: number[][] = [];
+  for (let i = 0; i < SIZE; i++) {
+    perm[i] = i;
+    const angle = rng() * Math.PI * 2;
+    grad.push([Math.cos(angle), Math.sin(angle)]);
+  }
+  for (let i = SIZE - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [perm[i], perm[j]] = [perm[j], perm[i]];
+  }
+  for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
+
+  function fade(t: number) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function lerp(a: number, b: number, t: number) { return a + t * (b - a); }
+  function dot2(g: number[], x: number, y: number) { return g[0] * x + g[1] * y; }
+
+  return (x: number, y: number): number => {
+    const xi = Math.floor(x) & 255;
+    const yi = Math.floor(y) & 255;
+    const xf = x - Math.floor(x);
+    const yf = y - Math.floor(y);
+    const u = fade(xf);
+    const v = fade(yf);
+    const aa = perm[perm[xi] + yi] & 255;
+    const ab = perm[perm[xi] + yi + 1] & 255;
+    const ba = perm[perm[xi + 1] + yi] & 255;
+    const bb = perm[perm[xi + 1] + yi + 1] & 255;
+    return lerp(
+      lerp(dot2(grad[aa], xf, yf), dot2(grad[ba], xf - 1, yf), u),
+      lerp(dot2(grad[ab], xf, yf - 1), dot2(grad[bb], xf - 1, yf - 1), u),
+      v
+    );
+  };
+}
+
+// ── Build lunar heightmap with multi-tier craters ─────────────────
+
+interface CraterTier {
+  count: number;
+  minR: number;
+  maxR: number;
+  depth: number;
+  rimHeight: number;
+  hasCentralPeak: boolean;
+  hasEjecta: boolean;
+  hasTerraces: boolean;
+}
+
+function buildLunarHeightmap(w: number, h: number, seed: number): Float32Array {
+  const hmap = new Float32Array(w * h);
+  const rng = seededRng(seed);
+  const noise = makeNoise2D(seed + 7);
+
+  // Base terrain: multi-octave fractal noise (highland/mare topography)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+      const v = y / h;
+      let val = 0;
+      val += noise(u * 6, v * 4) * 0.3;
+      val += noise(u * 12 + 3.7, v * 8 + 1.2) * 0.15;
+      val += noise(u * 24 + 7.1, v * 16 + 4.5) * 0.08;
+      val += noise(u * 48 + 13.3, v * 32 + 9.8) * 0.04;
+      val += noise(u * 96 + 21.0, v * 64 + 15.0) * 0.02;
+      hmap[y * w + x] = val * 0.5;
+    }
+  }
+
+  // 5-tier crater distribution (Mega → Micro)
+  const tiers: CraterTier[] = [
+    { count: 2,   minR: 40, maxR: 70, depth: 0.45, rimHeight: 0.18, hasCentralPeak: true,  hasEjecta: true,  hasTerraces: true },
+    { count: 5,   minR: 20, maxR: 40, depth: 0.35, rimHeight: 0.14, hasCentralPeak: true,  hasEjecta: true,  hasTerraces: true },
+    { count: 15,  minR: 10, maxR: 22, depth: 0.28, rimHeight: 0.10, hasCentralPeak: false, hasEjecta: true,  hasTerraces: false },
+    { count: 40,  minR: 4,  maxR: 12, depth: 0.20, rimHeight: 0.06, hasCentralPeak: false, hasEjecta: false, hasTerraces: false },
+    { count: 120, minR: 1,  maxR: 5,  depth: 0.12, rimHeight: 0.03, hasCentralPeak: false, hasEjecta: false, hasTerraces: false },
+  ];
+
+  for (const tier of tiers) {
+    for (let c = 0; c < tier.count; c++) {
+      const cx = Math.floor(rng() * w);
+      const cy = Math.floor(rng() * h);
+      const radius = tier.minR + rng() * (tier.maxR - tier.minR);
+      const depth = tier.depth * (0.7 + rng() * 0.6);
+      const rimH = tier.rimHeight * (0.6 + rng() * 0.8);
+      const ellipticity = 0.85 + rng() * 0.3;
+      const rotAngle = rng() * Math.PI;
+      const cosA = Math.cos(rotAngle);
+      const sinA = Math.sin(rotAngle);
+
+      // Central peak params
+      const peakHeight = tier.hasCentralPeak ? depth * (0.25 + rng() * 0.2) : 0;
+      const peakRadius = radius * (0.12 + rng() * 0.08);
+
+      // Terraced walls
+      const terraceCount = tier.hasTerraces ? 2 + Math.floor(rng() * 2) : 0;
+
+      const rr = Math.ceil(radius * 1.8);
+
+      for (let dy = -rr; dy <= rr; dy++) {
+        for (let dx = -rr; dx <= rr; dx++) {
+          // Rotate for ellipticity
+          const lx = cosA * dx + sinA * dy;
+          const ly = -sinA * dx + cosA * dy;
+          const dist = Math.sqrt((lx * lx) + (ly * ly) / (ellipticity * ellipticity));
+
+          if (dist > radius * 1.8) continue;
+
+          const px = ((cx + dx) % w + w) % w;
+          const py = Math.max(0, Math.min(h - 1, cy + dy));
+          const idx = py * w + px;
+
+          const normDist = dist / radius;
+
+          if (normDist <= 1.0) {
+            // Inside crater bowl
+            let bowlProfile: number;
+            if (normDist < 0.15 && tier.hasCentralPeak) {
+              // Central peak
+              const peakDist = normDist / 0.15;
+              bowlProfile = -depth * 0.4 + peakHeight * (1 - peakDist * peakDist);
+            } else {
+              // Parabolic bowl with optional terraces
+              bowlProfile = -depth * normDist * normDist;
+
+              // Add terraces
+              if (terraceCount > 0 && normDist > 0.3 && normDist < 0.9) {
+                const terracePhase = normDist * terraceCount * Math.PI;
+                const terrace = Math.sin(terracePhase) * depth * 0.06;
+                bowlProfile += terrace;
+              }
+            }
+
+            // Crater rim (raised lip near edge)
+            const rimFactor = Math.pow(normDist, 8);
+            bowlProfile += rimH * rimFactor;
+
+            hmap[idx] += bowlProfile;
+          } else if (normDist <= 1.8) {
+            // Rim and ejecta blanket
+            const rimDist = (normDist - 1.0) / 0.8;
+            const rimProfile = rimH * Math.exp(-rimDist * 3);
+
+            // Ejecta rays
+            let ejecta = 0;
+            if (tier.hasEjecta && rimDist < 0.6) {
+              const angle = Math.atan2(ly, lx);
+              const rayCount = 5 + Math.floor(rng() * 4);
+              ejecta = Math.pow(Math.abs(Math.sin(angle * rayCount * 0.5)), 3) * rimH * 0.3 * (1 - rimDist);
+            }
+
+            hmap[idx] += rimProfile + ejecta;
+          }
+        }
+      }
+
+      // Secondary impacts around large craters
+      if (tier.hasEjecta && radius > 15) {
+        const secondaryCount = 3 + Math.floor(rng() * 5);
+        for (let s = 0; s < secondaryCount; s++) {
+          const sAngle = rng() * Math.PI * 2;
+          const sDist = radius * (1.3 + rng() * 0.8);
+          const sx = Math.round(cx + Math.cos(sAngle) * sDist);
+          const sy = Math.round(cy + Math.sin(sAngle) * sDist);
+          const sRadius = 1 + rng() * 3;
+          const sDepth = depth * 0.08;
+
+          for (let dy2 = -Math.ceil(sRadius); dy2 <= Math.ceil(sRadius); dy2++) {
+            for (let dx2 = -Math.ceil(sRadius); dx2 <= Math.ceil(sRadius); dx2++) {
+              const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+              if (d2 > sRadius) continue;
+              const spx = ((sx + dx2) % w + w) % w;
+              const spy = Math.max(0, Math.min(h - 1, sy + dy2));
+              const norm2 = d2 / sRadius;
+              hmap[spy * w + spx] -= sDepth * (1 - norm2 * norm2);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Normalize to 0–1
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < hmap.length; i++) {
+    if (hmap[i] < min) min = hmap[i];
+    if (hmap[i] > max) max = hmap[i];
+  }
+  const range = max - min || 1;
+  for (let i = 0; i < hmap.length; i++) {
+    hmap[i] = (hmap[i] - min) / range;
+  }
+
+  return hmap;
+}
+
+// ── Generate textures from heightmap ──────────────────────────────
+
+function useLunarTextures() {
+  return useMemo(() => {
+    const W = 1024;
+    const H = 256;
+    const hmap = buildLunarHeightmap(W, H, 4207);
+
+    // Normal map from heightmap
+    const normalData = new Uint8Array(W * H * 4);
+    const strength = 3.0;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        const xn = ((x - 1) + W) % W;
+        const xp = (x + 1) % W;
+        const yn = Math.max(0, y - 1);
+        const yp = Math.min(H - 1, y + 1);
+        const dhdx = (hmap[y * W + xp] - hmap[y * W + xn]) * strength;
+        const dhdy = (hmap[yp * W + x] - hmap[yn * W + x]) * strength;
+        const len = Math.sqrt(dhdx * dhdx + dhdy * dhdy + 1);
+        normalData[idx * 4]     = Math.round(((-dhdx / len) * 0.5 + 0.5) * 255);
+        normalData[idx * 4 + 1] = Math.round(((dhdy / len) * 0.5 + 0.5) * 255);
+        normalData[idx * 4 + 2] = Math.round(((1 / len) * 0.5 + 0.5) * 255);
+        normalData[idx * 4 + 3] = 255;
+      }
+    }
+
+    const normalTex = new THREE.DataTexture(normalData, W, H, THREE.RGBAFormat);
+    normalTex.wrapS = THREE.RepeatWrapping;
+    normalTex.wrapT = THREE.ClampToEdgeWrapping;
+    normalTex.needsUpdate = true;
+
+    // Roughness map: craters = smoother inside, rough at rims
+    const roughData = new Uint8Array(W * H * 4);
+    for (let i = 0; i < W * H; i++) {
+      // Low areas (craters) are slightly smoother, high areas rougher
+      const h = hmap[i];
+      const rough = Math.round((0.35 + h * 0.45) * 255);
+      roughData[i * 4] = rough;
+      roughData[i * 4 + 1] = rough;
+      roughData[i * 4 + 2] = rough;
+      roughData[i * 4 + 3] = 255;
+    }
+
+    const roughTex = new THREE.DataTexture(roughData, W, H, THREE.RGBAFormat);
+    roughTex.wrapS = THREE.RepeatWrapping;
+    roughTex.wrapT = THREE.ClampToEdgeWrapping;
+    roughTex.needsUpdate = true;
+
+    // Displacement map
+    const dispData = new Uint8Array(W * H * 4);
+    for (let i = 0; i < W * H; i++) {
+      const v = Math.round(hmap[i] * 255);
+      dispData[i * 4] = v;
+      dispData[i * 4 + 1] = v;
+      dispData[i * 4 + 2] = v;
+      dispData[i * 4 + 3] = 255;
+    }
+
+    const dispTex = new THREE.DataTexture(dispData, W, H, THREE.RGBAFormat);
+    dispTex.wrapS = THREE.RepeatWrapping;
+    dispTex.wrapT = THREE.ClampToEdgeWrapping;
+    dispTex.needsUpdate = true;
+
+    return { normalTex, roughTex, dispTex, hmap, W, H };
+  }, []);
+}
+
+// ── Hero Ring 3D with baked lunar displacement ────────────────────
 
 function HeroRingMesh() {
   const groupRef = useRef<THREE.Group>(null);
+  const { normalTex, roughTex, hmap, W, H } = useLunarTextures();
 
   const geometry = useMemo(() => {
     const innerR = 0.85;
     const outerR = 1.07;
     const w = 0.8;
-    const steps = 96;
+    const profileSteps = 128;
+    const radialSteps = 256;
     const points: THREE.Vector2[] = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
+
+    for (let i = 0; i <= profileSteps; i++) {
+      const t = i / profileSteps;
       const angle = t * Math.PI;
       const r = innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
       points.push(new THREE.Vector2(r, (t - 0.5) * w));
     }
-    const lathe = new THREE.LatheGeometry(points, 192);
 
-    // Subtle organic surface perturbation
+    const lathe = new THREE.LatheGeometry(points, radialSteps);
     const posAttr = lathe.attributes.position;
-    let seed = 42;
-    const rng = () => { seed = (seed * 16807) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
-    for (let i = 0; i < 50; i++) rng();
+    const uvAttr = lathe.attributes.uv;
+
+    // Bake lunar heightmap displacement into outer surface vertices
+    const displacementScale = 0.018;
     for (let i = 0; i < posAttr.count; i++) {
       const x = posAttr.getX(i);
       const y = posAttr.getY(i);
       const z = posAttr.getZ(i);
       const r = Math.sqrt(x * x + z * z);
-      if (r < innerR + 0.005) continue;
-      const ang = Math.atan2(z, x);
-      const disp = Math.sin(ang * 23 + y * 40) * 0.0006 + Math.sin(ang * 47 + y * 80 + 1.3) * 0.0003;
+
+      // Only displace outer surface (not inner bore)
+      if (r < innerR + 0.02) continue;
+
+      const u = uvAttr.getX(i);
+      const v = uvAttr.getY(i);
+
+      // Sample heightmap with bilinear interpolation
+      const fx = u * W;
+      const fy = v * H;
+      const ix = Math.floor(fx) % W;
+      const iy = Math.min(Math.floor(fy), H - 1);
+      const ix1 = (ix + 1) % W;
+      const iy1 = Math.min(iy + 1, H - 1);
+      const fracX = fx - Math.floor(fx);
+      const fracY = fy - Math.floor(fy);
+
+      const h00 = hmap[iy * W + ix];
+      const h10 = hmap[iy * W + ix1];
+      const h01 = hmap[iy1 * W + ix];
+      const h11 = hmap[iy1 * W + ix1];
+      const heightVal = h00 * (1 - fracX) * (1 - fracY)
+                      + h10 * fracX * (1 - fracY)
+                      + h01 * (1 - fracX) * fracY
+                      + h11 * fracX * fracY;
+
+      // Displace along radial direction (outward)
+      const disp = (heightVal - 0.5) * displacementScale;
       const scale = (r + disp) / r;
       posAttr.setX(i, x * scale);
       posAttr.setZ(i, z * scale);
     }
+
     posAttr.needsUpdate = true;
     lathe.computeVertexNormals();
     return lathe;
-  }, []);
+  }, [hmap, W, H]);
 
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
-    groupRef.current.rotation.y = t * 0.15;
-    groupRef.current.rotation.x = Math.sin(t * 0.25) * 0.15;
-    groupRef.current.rotation.z = Math.sin(t * 0.18 + 0.5) * 0.08;
+    groupRef.current.rotation.y = t * 0.12;
+    groupRef.current.rotation.x = Math.sin(t * 0.2) * 0.12;
+    groupRef.current.rotation.z = Math.sin(t * 0.15 + 0.5) * 0.06;
   });
 
   return (
@@ -81,13 +390,16 @@ function HeroRingMesh() {
       <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <meshPhysicalMaterial
           color="#D4A520"
-          roughness={0.08}
+          roughness={0.12}
           metalness={1.0}
           envMapIntensity={3.5}
-          clearcoat={0.4}
-          clearcoatRoughness={0.1}
+          clearcoat={0.3}
+          clearcoatRoughness={0.15}
           reflectivity={1.0}
           ior={2.5}
+          normalMap={normalTex}
+          normalScale={new THREE.Vector2(1.5, 1.5)}
+          roughnessMap={roughTex}
         />
       </mesh>
     </group>
@@ -114,7 +426,10 @@ export default function Hero() {
   const embers = useEmbers(30);
 
   return (
-    <section className="relative min-h-[85vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden cosmic-noise starfield">
+    <section
+      className="relative min-h-[85vh] sm:min-h-[90vh] flex items-center justify-center overflow-hidden cosmic-noise starfield"
+      aria-label="Hero section showcasing a lunar-textured ring"
+    >
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-forge-dark via-background to-background" />
 
@@ -172,17 +487,17 @@ export default function Hero() {
           className="absolute inset-0"
         >
           <Canvas
-            camera={{ position: [0, 0.8, 3.0], fov: 30 }}
+            camera={{ position: [0, 0.6, 2.6], fov: 32 }}
             gl={{ antialias: true, alpha: true }}
-            dpr={[1, 1.5]}
+            dpr={[1, 2]}
             style={{ pointerEvents: "none" }}
           >
             <HeroScene />
           </Canvas>
         </motion.div>
-        {/* Gradient vignette to fade ring into background */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/60" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
+        {/* Subtle vignette — keep ring visible */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-transparent to-background/50" />
       </div>
 
       <div className="relative z-10 text-center px-5 sm:px-6 max-w-3xl">
