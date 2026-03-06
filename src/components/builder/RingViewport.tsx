@@ -435,10 +435,17 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return width > 0 ? circumference / width : 1;
   }, [params.innerDiameter, params.thickness, params.width]);
 
+  // Ring dimensions for surface-area-aware texture scaling
+  const ringDims = useMemo(() => ({
+    innerDiameterMm: params.innerDiameter,
+    widthMm: params.width,
+    thicknessMm: params.thickness,
+  }), [params.innerDiameter, params.width, params.thickness]);
+
   // Generate lunar procedural maps for outer surface only
   const lunarMaps = useMemo(() => {
     if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture, physicalAspect);
+    return generateLunarSurfaceMaps(lunarTexture, physicalAspect, ringDims);
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
@@ -447,20 +454,34 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
     lunarTexture?.erosion, lunarTexture?.terrainRoughness,
     lunarTexture?.craterVariation,
-    physicalAspect,
+    physicalAspect, ringDims,
   ]);
+
+  // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
+  // Smaller rings → stronger normals per-texel; larger rings → softer
+  const dimScale = useMemo(() => {
+    const refOuterR = 18.1 / 2 + 2; // reference outer radius for size 8
+    const outerR = params.innerDiameter / 2 + params.thickness;
+    const refWidth = 6;
+    // Geometric mean so both radius and width contribute
+    const sizeRatio = Math.sqrt((outerR / refOuterR) * (params.width / refWidth));
+    return Math.max(0.5, Math.min(2.0, 1 / sizeRatio));
+  }, [params.innerDiameter, params.thickness, params.width]);
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
-    const strength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
+    const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
+    const strength = baseStrength * dimScale;
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity]);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale]);
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = params.innerDiameter / 2 / 10 + params.thickness / 10;
-    return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10);
-  }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness]);
+    // Base displacement scales with intensity and ring radius, modulated by dimScale
+    // so that craters maintain proportional physical depth
+    return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
+  }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness, dimScale]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
