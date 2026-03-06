@@ -7,6 +7,7 @@ import { CastabilityReport } from "@/types/castability";
 import { ForgePipelineState } from "@/types/pipeline";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { ToolType } from "@/types/ring";
+import { LightingSettings } from "@/types/lighting";
 import PropertiesPanel from "./PropertiesPanel";
 import CastabilityPanel from "./CastabilityPanel";
 import ForgePipelinePanel from "./ForgePipelinePanel";
@@ -15,6 +16,7 @@ import LunarTexturePanel from "./LunarTexturePanel";
 import EngravingPanel from "./EngravingPanel";
 import TemplatesPanel from "./TemplatesPanel";
 import AIAssistantPanel from "./AIAssistantPanel";
+import LightingStudioPanel from "./LightingStudioPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
@@ -56,6 +58,8 @@ interface BuilderSidebarProps {
   onViewModeChange: (mode: ViewMode) => void;
   onMetalChange: (metal: MetalPreset) => void;
   onFinishChange: (finish: FinishPreset) => void;
+  lighting: LightingSettings;
+  onLightingChange: (settings: LightingSettings) => void;
 }
 
 interface SectionProps {
@@ -119,6 +123,7 @@ export default function BuilderSidebar({
   engraving, onEngravingChange,
   metalPreset, finishPreset,
   onViewModeChange, onMetalChange, onFinishChange,
+  lighting, onLightingChange,
 }: BuilderSidebarProps) {
   const { isPremium } = useAccess();
 
@@ -194,6 +199,10 @@ export default function BuilderSidebar({
             onMetalChange={onMetalChange}
             onFinishChange={onFinishChange}
           />
+        </Section>
+
+        <Section title="Lighting Studio" defaultOpen={false}>
+          <LightingStudioPanel settings={lighting} onChange={onLightingChange} />
         </Section>
       </div>
     </ScrollArea>
