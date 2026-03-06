@@ -1,4 +1,4 @@
-import { TEMPLATE_REGISTRY, TemplateMeta } from "@/config/templates";
+import { TEMPLATE_REGISTRY, TEMPLATE_CATEGORIES, TemplateMeta } from "@/config/templates";
 import { RingParameters } from "@/types/ring";
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
@@ -19,10 +19,7 @@ interface TemplatesPanelProps {
 
 const CATEGORIES = [
   { id: "all", label: "All" },
-  { id: "classic", label: "Classic" },
-  { id: "modern", label: "Modern" },
-  { id: "mythic", label: "Mythic" },
-  { id: "cosmic", label: "Cosmic" },
+  ...TEMPLATE_CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
 ] as const;
 
 export default function TemplatesPanel({
