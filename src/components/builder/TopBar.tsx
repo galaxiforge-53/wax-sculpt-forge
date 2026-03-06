@@ -31,12 +31,12 @@ interface TopBarProps {
   isEnhancing?: boolean;
 }
 
-const METALS: { value: MetalPreset; label: string }[] = [
-  { value: "silver", label: "Silver" },
-  { value: "gold", label: "Gold" },
-  { value: "rose-gold", label: "Rose Gold" },
-  { value: "titanium", label: "Titanium" },
-  { value: "tungsten", label: "Tungsten" },
+const METALS: { value: MetalPreset; label: string; gradient: string }[] = [
+  { value: "silver", label: "Silver", gradient: "linear-gradient(135deg, hsl(210,8%,82%), hsl(210,5%,65%), hsl(210,10%,88%))" },
+  { value: "gold", label: "Gold", gradient: "linear-gradient(135deg, hsl(43,75%,50%), hsl(38,80%,40%), hsl(48,85%,60%))" },
+  { value: "rose-gold", label: "Rose Gold", gradient: "linear-gradient(135deg, hsl(10,45%,70%), hsl(5,50%,55%), hsl(15,40%,75%))" },
+  { value: "titanium", label: "Titanium", gradient: "linear-gradient(135deg, hsl(215,8%,65%), hsl(220,5%,50%), hsl(210,10%,72%))" },
+  { value: "tungsten", label: "Tungsten", gradient: "linear-gradient(135deg, hsl(210,4%,50%), hsl(215,3%,35%), hsl(205,5%,55%))" },
 ];
 
 const FINISHES: { value: FinishPreset; label: string }[] = [
@@ -115,19 +115,29 @@ export default function TopBar({
       <div className="flex items-center gap-1 sm:gap-3">
         {/* Metal & Finish (only in cast mode, hidden on mobile) */}
         {viewMode === "cast" && !isMobile && (
-          <>
-            <Select value={metalPreset} onValueChange={(v) => onMetalChange(v as MetalPreset)}>
-              <SelectTrigger className="w-28 h-8 text-xs bg-secondary border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {METALS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-1">
+            {METALS.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => onMetalChange(m.value)}
+                title={m.label}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium transition-all border",
+                  metalPreset === m.value
+                    ? "border-primary/60 bg-primary/10 text-foreground ring-1 ring-primary/20"
+                    : "border-border/40 bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <span
+                  className="w-3 h-3 rounded-full flex-shrink-0 border border-border/20"
+                  style={{ background: m.gradient }}
+                />
+                {m.label}
+              </button>
+            ))}
+            <span className="w-px h-5 bg-border/40 mx-1" />
             <Select value={finishPreset} onValueChange={(v) => onFinishChange(v as FinishPreset)}>
-              <SelectTrigger className="w-28 h-8 text-xs bg-secondary border-border">
+              <SelectTrigger className="w-24 h-7 text-[10px] bg-secondary border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -136,7 +146,7 @@ export default function TopBar({
                 ))}
               </SelectContent>
             </Select>
-          </>
+          </div>
         )}
 
         {/* Desktop actions */}
@@ -196,8 +206,9 @@ export default function TopBar({
                       <DropdownMenuItem
                         key={m.value}
                         onClick={() => onMetalChange(m.value)}
-                        className={cn("text-xs", metalPreset === m.value && "text-primary font-medium")}
+                        className={cn("text-xs gap-2", metalPreset === m.value && "text-primary font-medium")}
                       >
+                        <span className="w-3 h-3 rounded-full flex-shrink-0 border border-border/20" style={{ background: m.gradient }} />
                         {m.label}
                       </DropdownMenuItem>
                     ))}

@@ -139,12 +139,12 @@ function MetalPicker({ metalPreset, onMetalChange, finishPreset, onFinishChange,
   finishPreset: FinishPreset; onFinishChange: (f: FinishPreset) => void;
   viewMode: ViewMode; onViewModeChange: (v: ViewMode) => void;
 }) {
-  const metals: { id: MetalPreset; label: string; color: string }[] = [
-    { id: "silver", label: "Silver", color: "bg-gray-300" },
-    { id: "gold", label: "Gold", color: "bg-yellow-500" },
-    { id: "rose-gold", label: "Rose Gold", color: "bg-pink-400" },
-    { id: "titanium", label: "Titanium", color: "bg-slate-400" },
-    { id: "tungsten", label: "Tungsten", color: "bg-zinc-600" },
+  const metals: { id: MetalPreset; label: string; gradient: string; highlight: string }[] = [
+    { id: "silver", label: "Silver", gradient: "linear-gradient(135deg, hsl(210,8%,82%), hsl(210,5%,65%), hsl(210,10%,88%))", highlight: "hsl(210,8%,90%)" },
+    { id: "gold", label: "Gold", gradient: "linear-gradient(135deg, hsl(43,75%,50%), hsl(38,80%,40%), hsl(48,85%,60%))", highlight: "hsl(43,80%,55%)" },
+    { id: "rose-gold", label: "Rose Gold", gradient: "linear-gradient(135deg, hsl(10,45%,70%), hsl(5,50%,55%), hsl(15,40%,75%))", highlight: "hsl(10,50%,65%)" },
+    { id: "titanium", label: "Titanium", gradient: "linear-gradient(135deg, hsl(215,8%,65%), hsl(220,5%,50%), hsl(210,10%,72%))", highlight: "hsl(210,5%,60%)" },
+    { id: "tungsten", label: "Tungsten", gradient: "linear-gradient(135deg, hsl(210,4%,50%), hsl(215,3%,35%), hsl(205,5%,55%))", highlight: "hsl(210,3%,45%)" },
   ];
 
   const finishes: FinishPreset[] = ["polished", "brushed", "hammered", "matte", "satin"];
@@ -175,20 +175,31 @@ function MetalPicker({ metalPreset, onMetalChange, finishPreset, onFinishChange,
       {/* Metal */}
       <div>
         <SubLabel>Metal</SubLabel>
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-3 gap-1.5">
           {metals.map((m) => (
             <button
               key={m.id}
               onClick={() => onMetalChange(m.id)}
               className={cn(
-                "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] font-medium transition-all border",
+                "flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all border",
                 metalPreset === m.id
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                  : "border-border/40 bg-secondary/30 hover:bg-secondary/60 hover:border-primary/20"
               )}
             >
-              <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", m.color)} />
-              {m.label}
+              <div
+                className="w-full h-5 rounded-md flex-shrink-0"
+                style={{
+                  background: m.gradient,
+                  boxShadow: metalPreset === m.id ? `0 2px 8px ${m.highlight}40` : "none",
+                }}
+              />
+              <span className={cn(
+                "text-[9px] font-medium leading-none",
+                metalPreset === m.id ? "text-primary" : "text-muted-foreground"
+              )}>
+                {m.label}
+              </span>
             </button>
           ))}
         </div>
