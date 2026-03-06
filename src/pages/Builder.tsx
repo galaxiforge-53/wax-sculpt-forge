@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer } from "lucide-react";
+import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import { Button } from "@/components/ui/button";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 
@@ -342,7 +343,7 @@ function BuilderInner() {
             showPrinterBed={showPrinterBed}
           />
 
-          {/* Camera preset buttons — top-left overlay */}
+          {/* Camera preset buttons + AI Generate — top-left overlay */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
             {CAMERA_BUTTONS.map((cam) => (
               <button
@@ -357,6 +358,18 @@ function BuilderInner() {
                 {cam.label}
               </button>
             ))}
+            <AIGenerateOverlay
+              params={params}
+              lunarTexture={lunarTexture}
+              viewMode={viewMode}
+              metalPreset={metalPreset}
+              finishPreset={finishPreset}
+              onUpdateParams={updateParams}
+              onLunarChange={setLunarTexture}
+              onViewModeChange={setViewMode}
+              onMetalChange={setMetalPreset}
+              onFinishChange={setFinishPreset}
+            />
           </div>
 
           {/* Measurement toggle + Cutaway toggle — top-right */}

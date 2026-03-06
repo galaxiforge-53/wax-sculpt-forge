@@ -29,12 +29,13 @@ interface AIAssistantPanelProps {
 }
 
 const SUGGESTIONS = [
+  "Create a dramatic lunar crater ring",
   "Make this ring more lunar",
   "Increase crater density",
   "Make the surface rougher",
   "Show me in gold",
-  "Add deep grooves",
-  "Make it look ancient and weathered",
+  "Design an ancient weathered band",
+  "Make it look bold and volcanic",
 ];
 
 export default function AIAssistantPanel({
