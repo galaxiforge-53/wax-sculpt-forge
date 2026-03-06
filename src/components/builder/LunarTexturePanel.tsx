@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
@@ -212,6 +212,7 @@ interface LunarTexturePanelProps {
 }
 
 export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRandomize }: LunarTexturePanelProps) {
+  const [seedLocked, setSeedLocked] = useState(false);
   const patch = (p: Partial<LunarTextureState>) => onChange({ ...state, ...p });
 
   const handlePreset = (name: string) => {
@@ -226,6 +227,12 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
   };
 
   const handleReseed = () => {
+    if (seedLocked) return;
+    onChange({ ...state, seed: newSeed() });
+  };
+
+  const handleResurface = () => {
+    if (seedLocked) return;
     onChange({ ...state, seed: newSeed() });
   };
 
@@ -302,12 +309,21 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
           </div>
           {/* Quick actions */}
           <div className="flex gap-1.5">
+            <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleResurface} disabled={seedLocked}>
+              <Shuffle className="w-3 h-3 mr-1" /> New Surface
+            </Button>
             <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleRandomize}>
               <Dices className="w-3 h-3 mr-1" /> Randomize
             </Button>
-            <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleReseed}>
-              <RotateCcw className="w-3 h-3 mr-1" /> Reseed
-            </Button>
+          </div>
+
+          {/* Seed lock */}
+          <div className="flex items-center justify-between bg-secondary/30 rounded px-2 py-1">
+            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+              {seedLocked ? <Lock className="w-3 h-3 text-primary" /> : <Unlock className="w-3 h-3" />}
+              Seed Lock
+            </Label>
+            <Switch checked={seedLocked} onCheckedChange={setSeedLocked} />
           </div>
 
           {/* ── Shape ── */}
@@ -393,10 +409,13 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Seed: {state.seed}</Label>
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                Seed: {state.seed}
+                {seedLocked && <Lock className="w-2.5 h-2.5 text-primary" />}
+              </Label>
               <div className="flex gap-1.5">
-                <Slider value={[state.seed]} onValueChange={([v]) => patch({ seed: v })} min={0} max={9999} step={1} className="flex-1" />
-                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={handleReseed}>
+                <Slider value={[state.seed]} onValueChange={([v]) => { if (!seedLocked) patch({ seed: v }); }} min={0} max={9999} step={1} className="flex-1" disabled={seedLocked} />
+                <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={handleReseed} disabled={seedLocked}>
                   <Shuffle className="w-3 h-3" />
                 </Button>
               </div>
