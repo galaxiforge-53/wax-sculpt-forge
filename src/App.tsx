@@ -19,6 +19,7 @@ const Help = lazy(() => import("./pages/Help"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AccessCode = lazy(() => import("./pages/AccessCode"));
 const Admin = lazy(() => import("./pages/Admin"));
+const DesignLibrary = lazy(() => import("./pages/DesignLibrary"));
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/access" element={<AccessCode />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/library" element={<DesignLibrary />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
