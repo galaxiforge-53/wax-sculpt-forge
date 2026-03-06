@@ -348,9 +348,9 @@ function BuilderInner() {
             showPrinterBed={showPrinterBed}
           />
 
-          {/* Camera presets — top-left */}
+          {/* Camera presets — top-left (hidden on mobile to save space) */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
-            {CAMERA_BUTTONS.map((cam) => (
+            {!isMobile && CAMERA_BUTTONS.map((cam) => (
               <button
                 key={cam.id}
                 onClick={() => setCameraPreset(cam.id)}
@@ -377,40 +377,44 @@ function BuilderInner() {
             />
           </div>
 
-          {/* View controls — top-right, grouped */}
+          {/* View controls — top-right, grouped (simplified on mobile) */}
           <div className="absolute top-2 right-2 z-10 flex flex-col gap-1.5 items-end">
-            {/* Cutaway row */}
+            {/* Cutaway row — desktop only */}
+            {!isMobile && (
+              <div className="flex gap-1">
+                {(["normal", "inside", "cross-section"] as CutawayMode[]).map((mode) => {
+                  const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section" };
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => setCutawayMode(mode)}
+                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                        ${cutawayMode === mode
+                          ? "bg-primary/30 text-primary border border-primary/40"
+                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                        }`}
+                    >
+                      {labels[mode]}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {/* Tools row — icon-only, compact */}
             <div className="flex gap-1">
-              {(["normal", "inside", "cross-section"] as CutawayMode[]).map((mode) => {
-                const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section" };
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => setCutawayMode(mode)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                      ${cutawayMode === mode
-                        ? "bg-primary/30 text-primary border border-primary/40"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
-                  >
-                    {labels[mode]}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Tools row */}
-            <div className="flex gap-1">
-              <button
-                onClick={() => setShowMeasurements((v) => !v)}
-                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                  ${showMeasurements || activeTool === "measure"
-                    ? "bg-primary/30 text-primary border border-primary/40"
-                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                  }`}
-                title="Toggle dimension guides"
-              >
-                📐
-              </button>
+              {!isMobile && (
+                <button
+                  onClick={() => setShowMeasurements((v) => !v)}
+                  className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                    ${showMeasurements || activeTool === "measure"
+                      ? "bg-primary/30 text-primary border border-primary/40"
+                      : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    }`}
+                  title="Toggle dimension guides"
+                >
+                  📐
+                </button>
+              )}
               <button
                 onClick={() => setShowcaseMode((v) => !v)}
                 className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
@@ -422,39 +426,43 @@ function BuilderInner() {
               >
                 <Sparkles className="w-3 h-3" />
               </button>
-              <button
-                onClick={() => setInspectionMode((v) => !v)}
-                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                  ${inspectionMode
-                    ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                  }`}
-                title="Inspection mode"
-              >
-                <Search className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => {
-                  setShowPrinterBed((v) => !v);
-                  if (!showPrinterBed) setRingRotation([Math.PI / 2, 0, 0]);
-                }}
-                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                  ${showPrinterBed
-                    ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                  }`}
-                title="Print bed"
-              >
-                <Printer className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setRenderGalleryOpen(true)}
-                className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                  bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                title="Generate beauty renders"
-              >
-                <Camera className="w-3 h-3" />
-              </button>
+              {!isMobile && (
+                <>
+                  <button
+                    onClick={() => setInspectionMode((v) => !v)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${inspectionMode
+                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title="Inspection mode"
+                  >
+                    <Search className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPrinterBed((v) => !v);
+                      if (!showPrinterBed) setRingRotation([Math.PI / 2, 0, 0]);
+                    }}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${showPrinterBed
+                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title="Print bed"
+                  >
+                    <Printer className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setRenderGalleryOpen(true)}
+                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    title="Generate beauty renders"
+                  >
+                    <Camera className="w-3 h-3" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
