@@ -15,6 +15,7 @@ import { WaxMark, WaxMarkType } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { slugFromUrl, findCodexMaterial } from "@/lib/codexMaterials";
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
+import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
@@ -47,6 +48,7 @@ export function useRingDesign() {
   const [waxMarks, setWaxMarks] = useState<WaxMark[]>([]);
   const [inlays, setInlays] = useState<InlayChannel[]>([]);
   const [lunarTexture, setLunarTextureRaw] = useState<LunarTextureState>(DEFAULT_LUNAR_TEXTURE);
+  const [engraving, setEngravingRaw] = useState<EngravingState>(DEFAULT_ENGRAVING);
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     type: "dent",
     radiusMm: 1.2,
@@ -226,6 +228,11 @@ export function useRingDesign() {
     logCraftAction("lunar_randomized", { seed: next.seed });
   }, [logCraftAction]);
 
+  const setEngraving = useCallback((next: EngravingState) => {
+    setEngravingRaw(next);
+    logCraftAction("engraving_updated", { text: next.text, font: next.font, sizeMm: next.sizeMm, depthMm: next.depthMm });
+  }, [logCraftAction]);
+
   // --- Inlay helpers ---
   const addInlayChannel = useCallback((input: Omit<InlayChannel, "id" | "createdAt">) => {
     const channel: InlayChannel = {
@@ -265,6 +272,7 @@ export function useRingDesign() {
       waxMarks,
       inlays: { channels: inlays },
       lunarTexture,
+      engraving,
       createdAt: craftStateRef.current.createdAt,
       updatedAt: craftStateRef.current.updatedAt,
     };
@@ -282,7 +290,7 @@ export function useRingDesign() {
       castabilityReport,
       pipelineState,
     };
-  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions, inlays, lunarTexture]);
+  }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions, inlays, lunarTexture, engraving]);
 
   const castabilityReport = useMemo(() => evaluateCastability(params), [params]);
 
@@ -315,6 +323,8 @@ export function useRingDesign() {
     // Backward-compat: merge saved lunar state with defaults so new fields get values
     const savedLunar = pkg.craftState?.lunarTexture;
     setLunarTextureRaw(savedLunar ? { ...DEFAULT_LUNAR_TEXTURE, ...savedLunar } : { ...DEFAULT_LUNAR_TEXTURE });
+    const savedEngraving = pkg.craftState?.engraving;
+    setEngravingRaw(savedEngraving ? { ...DEFAULT_ENGRAVING, ...savedEngraving } : { ...DEFAULT_ENGRAVING });
     craftStateRef.current = {
       baseRingParams: pkg.parameters,
       createdAt: pkg.craftState.createdAt,
@@ -362,5 +372,7 @@ export function useRingDesign() {
     setLunarTexture,
     applyLunarPreset,
     randomizeLunar,
+    engraving,
+    setEngraving,
   };
 }

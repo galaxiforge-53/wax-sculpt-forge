@@ -2,6 +2,7 @@ import { RingParameters, ViewMode } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
+import { EngravingState } from "@/types/engraving";
 import { CastabilityReport } from "@/types/castability";
 import { ForgePipelineState } from "@/types/pipeline";
 import { StampSettings } from "@/hooks/useRingDesign";
@@ -11,6 +12,7 @@ import CastabilityPanel from "./CastabilityPanel";
 import ForgePipelinePanel from "./ForgePipelinePanel";
 import InlaysPanel from "./InlaysPanel";
 import LunarTexturePanel from "./LunarTexturePanel";
+import EngravingPanel from "./EngravingPanel";
 import TemplatesPanel from "./TemplatesPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -44,6 +46,8 @@ interface BuilderSidebarProps {
   onApplyLunarPreset: (state: LunarTextureState, presetName: string) => void;
   onRandomizeLunar: (state: LunarTextureState) => void;
   onApplyTemplate: (params: Partial<RingParameters>) => void;
+  engraving: EngravingState;
+  onEngravingChange: (state: EngravingState) => void;
 }
 
 interface SectionProps {
@@ -82,6 +86,7 @@ export default function BuilderSidebar({
   inlays, onAddInlay, onRemoveInlay, onClearInlays,
   lunarTexture, onLunarChange, onApplyLunarPreset, onRandomizeLunar,
   onApplyTemplate,
+  engraving, onEngravingChange,
 }: BuilderSidebarProps) {
   return (
     <ScrollArea className="h-full">
@@ -113,6 +118,10 @@ export default function BuilderSidebar({
 
         <Section title="Lunar Texture">
           <LunarTexturePanel state={lunarTexture} onChange={onLunarChange} onApplyPreset={onApplyLunarPreset} onRandomize={onRandomizeLunar} />
+        </Section>
+
+        <Section title="Engraving">
+          <EngravingPanel state={engraving} onChange={onEngravingChange} />
         </Section>
 
         <Section title="Templates">
