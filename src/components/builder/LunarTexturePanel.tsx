@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
@@ -118,6 +118,71 @@ const LUNAR_PRESETS: LunarPreset[] = [
   },
 ];
 
+// ── Real Moon Surface Presets ─────────────────────────────────────
+
+interface MoonSurfacePreset {
+  name: string;
+  description: string;
+  build: () => LunarTextureState;
+}
+
+const MOON_SURFACE_PRESETS: MoonSurfacePreset[] = [
+  {
+    name: "Earth's Moon",
+    description: "Classic lunar highlands — mixed crater sizes, moderate erosion, fine regolith dust",
+    build: () => ({
+      enabled: true, intensity: 60, craterDensity: "med", craterSize: "med",
+      microDetail: 55, rimSharpness: 50, overlapIntensity: 40, smoothEdges: true, seed: newSeed(),
+      rimHeight: 55, bowlDepth: 60, erosion: 35, terrainRoughness: 40, craterVariation: 55,
+    }),
+  },
+  {
+    name: "Phobos",
+    description: "Mars' largest moon — dominated by Stickney crater, grooved terrain, low gravity stretching",
+    build: () => ({
+      enabled: true, intensity: 70, craterDensity: "low", craterSize: "large",
+      microDetail: 30, rimSharpness: 35, overlapIntensity: 20, smoothEdges: true, seed: newSeed(),
+      rimHeight: 30, bowlDepth: 85, erosion: 60, terrainRoughness: 75, craterVariation: 40,
+    }),
+  },
+  {
+    name: "Deimos",
+    description: "Mars' smaller moon — smooth, buried craters, thick regolith blanket softening all features",
+    build: () => ({
+      enabled: true, intensity: 35, craterDensity: "low", craterSize: "med",
+      microDetail: 70, rimSharpness: 15, overlapIntensity: 10, smoothEdges: true, seed: newSeed(),
+      rimHeight: 15, bowlDepth: 30, erosion: 90, terrainRoughness: 50, craterVariation: 25,
+    }),
+  },
+  {
+    name: "Mercury",
+    description: "Heavily cratered, no atmosphere — sharp rims preserved, dense overlapping basins",
+    build: () => ({
+      enabled: true, intensity: 85, craterDensity: "high", craterSize: "med",
+      microDetail: 40, rimSharpness: 80, overlapIntensity: 70, smoothEdges: false, seed: newSeed(),
+      rimHeight: 75, bowlDepth: 70, erosion: 10, terrainRoughness: 30, craterVariation: 65,
+    }),
+  },
+  {
+    name: "Europa",
+    description: "Jupiter's icy moon — very few craters, ultra-smooth ice plains with faint lineae ridges",
+    build: () => ({
+      enabled: true, intensity: 25, craterDensity: "low", craterSize: "small",
+      microDetail: 85, rimSharpness: 60, overlapIntensity: 5, smoothEdges: true, seed: newSeed(),
+      rimHeight: 45, bowlDepth: 25, erosion: 70, terrainRoughness: 80, craterVariation: 20,
+    }),
+  },
+  {
+    name: "Callisto",
+    description: "Jupiter's ancient moon — saturated craters, maximum bombardment, heavily weathered surface",
+    build: () => ({
+      enabled: true, intensity: 95, craterDensity: "high", craterSize: "large",
+      microDetail: 50, rimSharpness: 30, overlapIntensity: 90, smoothEdges: true, seed: newSeed(),
+      rimHeight: 35, bowlDepth: 55, erosion: 75, terrainRoughness: 60, craterVariation: 80,
+    }),
+  },
+];
+
 // ── Sub-section ───────────────────────────────────────────────────
 
 function SubSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
@@ -211,6 +276,30 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             </Select>
           </div>
 
+          {/* Moon Surface Presets */}
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Globe className="w-3 h-3" /> Moon Surface
+            </Label>
+            <Select value="" onValueChange={(name) => {
+              const preset = MOON_SURFACE_PRESETS.find((p) => p.name === name);
+              if (preset) onApplyPreset(preset.build(), name);
+            }}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue placeholder="Real moon terrain…" />
+              </SelectTrigger>
+              <SelectContent>
+                {MOON_SURFACE_PRESETS.map((p) => (
+                  <SelectItem key={p.name} value={p.name}>
+                    <div className="flex flex-col">
+                      <span>{p.name}</span>
+                      <span className="text-[9px] text-muted-foreground leading-tight">{p.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {/* Quick actions */}
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleRandomize}>
