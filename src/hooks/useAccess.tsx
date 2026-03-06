@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-export type AccessTier = "free" | "premium" | "export";
+export type AccessTier = "free" | "premium" | "export" | "pro" | "admin";
 
 interface AccessGrant {
   tier: AccessTier;
@@ -20,7 +20,7 @@ interface AccessContextType {
   refresh: () => Promise<void>;
 }
 
-const TIER_RANK: Record<AccessTier, number> = { free: 0, premium: 1, export: 2 };
+const TIER_RANK: Record<AccessTier, number> = { free: 0, premium: 1, export: 2, pro: 3, admin: 4 };
 
 const AccessContext = createContext<AccessContextType | undefined>(undefined);
 

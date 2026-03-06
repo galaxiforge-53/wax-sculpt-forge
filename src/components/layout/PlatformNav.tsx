@@ -1,10 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { isEmbedMode } from "@/config/galaxiforge";
-import { Flame, Menu, X, LogIn, LogOut, User } from "lucide-react";
+import { Flame, Menu, X, LogIn, LogOut, User, Shield } from "lucide-react";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
@@ -22,6 +23,12 @@ export default function PlatformNav() {
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
+
+  const navItems = [
+    ...NAV_ITEMS,
+    ...(isAdmin ? [{ label: "Admin", path: "/admin" }] : []),
+  ];
 
   if (embed || location.pathname === "/builder") return null;
 
@@ -41,7 +48,7 @@ export default function PlatformNav() {
         {/* Desktop nav */}
         {!isMobile && (
           <div className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = location.pathname === item.path;
               return (
                 <Link
@@ -98,7 +105,7 @@ export default function PlatformNav() {
       {/* Mobile dropdown */}
       {isMobile && menuOpen && (
         <div className="border-t border-border bg-card/95 backdrop-blur-md px-4 pb-4 pt-2 space-y-1 animate-in slide-in-from-top-2 duration-200">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = location.pathname === item.path;
             return (
               <Link

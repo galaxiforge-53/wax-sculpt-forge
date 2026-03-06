@@ -32,6 +32,20 @@ const TIER_INFO: Record<AccessTier, { label: string; icon: typeof Sparkles; desc
     features: ["Same as Premium"],
     color: "text-accent border-accent/30 bg-accent/10",
   },
+  pro: {
+    label: "Pro Member",
+    icon: Sparkles,
+    description: "Full pro access with all tools and AI assistant",
+    features: ["All builder tools", "Unlimited exports", "AI assistant", "All templates"],
+    color: "text-primary border-primary/30 bg-primary/10",
+  },
+  admin: {
+    label: "Admin",
+    icon: KeyRound,
+    description: "Full access plus admin dashboard",
+    features: ["All pro features", "Admin dashboard", "User management", "Code management"],
+    color: "text-red-400 border-red-500/30 bg-red-500/10",
+  },
 };
 
 export default function AccessCode() {
