@@ -18,6 +18,7 @@ const MyDesigns = lazy(() => import("./pages/MyDesigns"));
 const Help = lazy(() => import("./pages/Help"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AccessCode = lazy(() => import("./pages/AccessCode"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/export" element={<Export />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/access" element={<AccessCode />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

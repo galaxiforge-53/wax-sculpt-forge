@@ -1,0 +1,2 @@
+ALTER TABLE public.access_codes DROP CONSTRAINT access_codes_tier_check;
+ALTER TABLE public.access_codes ADD CONSTRAINT access_codes_tier_check CHECK (tier = ANY (ARRAY['free'::text, 'premium'::text, 'export'::text, 'pro'::text, 'admin'::text]));
