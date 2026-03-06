@@ -934,9 +934,9 @@ function ShowcaseRing({ design, metal }: { design: RingDesign; metal: MetalDef }
     if (groupRef.current) {
       const t = clock.getElapsedTime();
       groupRef.current.rotation.y += delta * 0.2;
-      // Gentle cinematic tilt — reveals top & bottom surfaces
-      groupRef.current.rotation.x = Math.sin(t * 0.3) * 0.12;
-      groupRef.current.rotation.z = Math.sin(t * 0.2 + 1.0) * 0.06;
+      // Cinematic tilt — deeper swing reveals interior engraving
+      groupRef.current.rotation.x = Math.sin(t * 0.25) * 0.35;
+      groupRef.current.rotation.z = Math.sin(t * 0.18 + 1.0) * 0.1;
     }
   });
 
