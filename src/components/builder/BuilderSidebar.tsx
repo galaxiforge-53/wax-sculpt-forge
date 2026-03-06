@@ -1,4 +1,4 @@
-import { RingParameters, ViewMode } from "@/types/ring";
+import { RingParameters, ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
@@ -14,6 +14,7 @@ import InlaysPanel from "./InlaysPanel";
 import LunarTexturePanel from "./LunarTexturePanel";
 import EngravingPanel from "./EngravingPanel";
 import TemplatesPanel from "./TemplatesPanel";
+import AIAssistantPanel from "./AIAssistantPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
@@ -48,6 +49,11 @@ interface BuilderSidebarProps {
   onApplyTemplate: (params: Partial<RingParameters>) => void;
   engraving: EngravingState;
   onEngravingChange: (state: EngravingState) => void;
+  metalPreset: MetalPreset;
+  finishPreset: FinishPreset;
+  onViewModeChange: (mode: ViewMode) => void;
+  onMetalChange: (metal: MetalPreset) => void;
+  onFinishChange: (finish: FinishPreset) => void;
 }
 
 interface SectionProps {
@@ -87,6 +93,8 @@ export default function BuilderSidebar({
   lunarTexture, onLunarChange, onApplyLunarPreset, onRandomizeLunar,
   onApplyTemplate,
   engraving, onEngravingChange,
+  metalPreset, finishPreset,
+  onViewModeChange, onMetalChange, onFinishChange,
 }: BuilderSidebarProps) {
   return (
     <ScrollArea className="h-full">
@@ -101,6 +109,21 @@ export default function BuilderSidebar({
             onClearWaxMarks={onClearWaxMarks}
             stampSettings={stampSettings}
             onStampSettingsChange={onStampSettingsChange}
+          />
+        </Section>
+
+        <Section title="AI Assistant" defaultOpen={true}>
+          <AIAssistantPanel
+            params={params}
+            lunarTexture={lunarTexture}
+            viewMode={viewMode}
+            metalPreset={metalPreset}
+            finishPreset={finishPreset}
+            onUpdateParams={onUpdate}
+            onLunarChange={onLunarChange}
+            onViewModeChange={onViewModeChange}
+            onMetalChange={onMetalChange}
+            onFinishChange={onFinishChange}
           />
         </Section>
 
