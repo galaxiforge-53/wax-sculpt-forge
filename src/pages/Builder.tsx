@@ -215,6 +215,7 @@ export default function Builder() {
             params={params}
             viewMode={viewMode}
             metalPreset={metalPreset}
+            finishPreset={finishPreset}
             activeTool={activeTool}
             onAddWaxMark={addWaxMark}
             waxMarks={waxMarks}
