@@ -348,7 +348,7 @@ function BuilderInner() {
             showPrinterBed={showPrinterBed}
           />
 
-          {/* Camera preset buttons + AI Generate — top-left overlay */}
+          {/* Camera presets — top-left */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
             {CAMERA_BUTTONS.map((cam) => (
               <button
@@ -377,84 +377,85 @@ function BuilderInner() {
             />
           </div>
 
-          {/* Measurement toggle + Cutaway toggle — top-right */}
-          <div className="absolute top-2 right-2 z-10 flex gap-1">
-            {/* Cutaway mode buttons */}
-            {(["normal", "inside", "cross-section"] as CutawayMode[]).map((mode) => {
-              const labels: Record<CutawayMode, string> = {
-                "normal": "Full",
-                "inside": "Inside",
-                "cross-section": "X-Section",
-              };
-              return (
-                <button
-                  key={mode}
-                  onClick={() => setCutawayMode(mode)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                    ${cutawayMode === mode
-                      ? "bg-primary/30 text-primary border border-primary/40"
-                      : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                    }`}
-                >
-                  {labels[mode]}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => setShowMeasurements((v) => !v)}
-              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                ${showMeasurements || activeTool === "measure"
-                  ? "bg-primary/30 text-primary border border-primary/40"
-                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                }`}
-              title="Toggle dimension guides"
-            >
-              📐 Dims
-            </button>
-            <button
-              onClick={() => setShowcaseMode((v) => !v)}
-              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                ${showcaseMode
-                  ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                }`}
-              title="High-quality showcase render mode — stronger reflections, sharper details"
-            >
-              <Sparkles className="w-3 h-3" /> Showcase
-            </button>
-            <button
-              onClick={() => setInspectionMode((v) => !v)}
-              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                ${inspectionMode
-                  ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                }`}
-              title="Inspection mode — slow rotation, strong raking light to reveal surface detail"
-            >
-              <Search className="w-3 h-3" /> Inspect
-            </button>
-            <button
-              onClick={() => {
-                setShowPrinterBed((v) => !v);
-                if (!showPrinterBed) setRingRotation([Math.PI / 2, 0, 0]); // Lay flat on bed
-              }}
-              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                ${showPrinterBed
-                  ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                }`}
-              title="3D printer bed simulation — verify print orientation and scale"
-            >
-              <Printer className="w-3 h-3" /> Print Bed
-            </button>
-            <button
-              onClick={() => setRenderGalleryOpen(true)}
-              className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-              title="Generate high-quality beauty renders for sharing and marketing"
-            >
-              <Camera className="w-3 h-3" /> Renders
-            </button>
+          {/* View controls — top-right, grouped */}
+          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1.5 items-end">
+            {/* Cutaway row */}
+            <div className="flex gap-1">
+              {(["normal", "inside", "cross-section"] as CutawayMode[]).map((mode) => {
+                const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section" };
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setCutawayMode(mode)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                      ${cutawayMode === mode
+                        ? "bg-primary/30 text-primary border border-primary/40"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                  >
+                    {labels[mode]}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Tools row */}
+            <div className="flex gap-1">
+              <button
+                onClick={() => setShowMeasurements((v) => !v)}
+                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                  ${showMeasurements || activeTool === "measure"
+                    ? "bg-primary/30 text-primary border border-primary/40"
+                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                  }`}
+                title="Toggle dimension guides"
+              >
+                📐
+              </button>
+              <button
+                onClick={() => setShowcaseMode((v) => !v)}
+                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                  ${showcaseMode
+                    ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                  }`}
+                title="High-quality showcase render"
+              >
+                <Sparkles className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setInspectionMode((v) => !v)}
+                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                  ${inspectionMode
+                    ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                  }`}
+                title="Inspection mode"
+              >
+                <Search className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowPrinterBed((v) => !v);
+                  if (!showPrinterBed) setRingRotation([Math.PI / 2, 0, 0]);
+                }}
+                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                  ${showPrinterBed
+                    ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                  }`}
+                title="Print bed"
+              >
+                <Printer className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setRenderGalleryOpen(true)}
+                className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                  bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                title="Generate beauty renders"
+              >
+                <Camera className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           {/* XYZ Position & Rotation controls — bottom-right overlay (desktop) */}
