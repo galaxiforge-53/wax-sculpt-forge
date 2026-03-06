@@ -1121,6 +1121,7 @@ interface RingViewportProps {
   cutawayMode?: CutawayMode;
   lighting?: LightingSettings;
   showcaseMode?: boolean;
+  inspectionMode?: boolean;
   ringPosition?: [number, number, number];
   ringRotation?: [number, number, number];
   showPrinterBed?: boolean;
@@ -1160,9 +1161,10 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false, ringPosition, ringRotation, showPrinterBed = false }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
+    const insp = inspectionMode;
     const rPos = ringPosition ?? [0, 0, 0];
     const rRot = ringRotation ?? [0, 0, 0];
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
@@ -1185,15 +1187,35 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     }), []);
 
     // Closer camera on mobile so ring fills screen — slightly angled for better initial view
-    const initialCamPos: [number, number, number] = isMobile ? [0.6, 1.0, 2.4] : [0, 2, 4];
+    // Inspection mode starts closer for detail viewing
+    const initialCamPos: [number, number, number] = insp
+      ? [0, 1.2, 2.2]
+      : isMobile ? [0.6, 1.0, 2.4] : [0, 2, 4];
 
     return (
-      <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none">
+      <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none relative">
+        {/* Inspection mode vignette overlay */}
+        {insp && (
+          <div
+            className="absolute inset-0 z-10 pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse at center, transparent 55%, hsl(var(--background) / 0.6) 100%)",
+            }}
+          />
+        )}
+        {/* Inspection mode label */}
+        {insp && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+            <span className="px-3 py-1 text-[10px] font-display uppercase tracking-[0.2em] text-primary bg-primary/10 border border-primary/25 rounded-full backdrop-blur-sm">
+              🔍 Inspection Mode
+            </span>
+          </div>
+        )}
         <Canvas
-          camera={{ position: initialCamPos, fov: isMobile ? 30 : 35 }}
-          shadows={sc ? "soft" : true}
-          gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: sc ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping, toneMappingExposure: sc ? 1.1 : 1.0 }}
-          dpr={sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2])}
+          camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
+          shadows={sc || insp ? "soft" : true}
+          gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: (sc || insp) ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping, toneMappingExposure: insp ? 1.25 : (sc ? 1.1 : 1.0) }}
+          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
         >
           <ClipPlaneManager mode={cutawayMode} />
 
@@ -1243,6 +1265,20 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                     <spotLight position={[-keyX * 1.2, keyY * 0.3, -keyZ * 1.2]} intensity={1.8} angle={0.35} penumbra={0.9} color="#e0e8ff" />
                     <pointLight position={[keyX * 0.5, -1, keyZ * 0.5]} intensity={0.8} color="#fff0d8" />
                     <rectAreaLight width={3} height={3} position={[0, 4, 0]} intensity={0.6} color="#ffffff" />
+                  </>
+                )}
+                {/* Inspection mode — strong multi-angle lighting to reveal surface detail */}
+                {insp && (
+                  <>
+                    {/* Raking light from low angle — reveals crater depth and engraving */}
+                    <spotLight position={[3, 0.5, 2]} intensity={3.5} angle={0.4} penumbra={0.6} color="#ffffff" castShadow />
+                    <spotLight position={[-3, 0.3, -1]} intensity={2.5} angle={0.5} penumbra={0.7} color="#f0f0ff" />
+                    {/* Overhead fill for even coverage */}
+                    <rectAreaLight width={4} height={4} position={[0, 5, 0]} intensity={1.2} color="#ffffff" />
+                    {/* Backlight rim for edge definition */}
+                    <pointLight position={[0, 0, -4]} intensity={1.5} color="#e8e0ff" />
+                    {/* Under-light to reveal bottom surface detail */}
+                    <pointLight position={[0, -3, 2]} intensity={0.8} color="#fff8e0" />
                   </>
                 )}
               </>
@@ -1301,17 +1337,17 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             );
           })()}
 
-          <Environment preset={lighting.envPreset} environmentIntensity={sc ? lighting.envIntensity * 1.8 : lighting.envIntensity} />
+          <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
           <OrbitControls
             enablePan={false}
-            minDistance={isMobile ? 1.0 : 1.5}
-            maxDistance={isMobile ? 7 : 8}
-            autoRotate={!isMobile}
-            autoRotateSpeed={0.4}
+            minDistance={insp ? 0.8 : (isMobile ? 1.0 : 1.5)}
+            maxDistance={insp ? 5 : (isMobile ? 7 : 8)}
+            autoRotate={insp || (!isMobile)}
+            autoRotateSpeed={insp ? 0.15 : 0.4}
             enableDamping
-            dampingFactor={isMobile ? 0.12 : 0.08}
-            rotateSpeed={isMobile ? 0.5 : 1}
-            zoomSpeed={isMobile ? 0.8 : 1}
+            dampingFactor={insp ? 0.06 : (isMobile ? 0.12 : 0.08)}
+            rotateSpeed={insp ? 0.35 : (isMobile ? 0.5 : 1)}
+            zoomSpeed={insp ? 0.6 : (isMobile ? 0.8 : 1)}
             touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             /* Polar limits prevent flipping upside down on touch */
             minPolarAngle={isMobile ? Math.PI * 0.1 : 0}

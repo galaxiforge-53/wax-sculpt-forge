@@ -17,7 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search } from "lucide-react";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ function BuilderInner() {
   const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showcaseMode, setShowcaseMode] = useState(false);
+  const [inspectionMode, setInspectionMode] = useState(false);
   const [ringPosition, setRingPosition] = useState<[number, number, number]>([0, 0, 0]);
   const [ringRotation, setRingRotation] = useState<[number, number, number]>([0, 0, 0]);
   const [showPrinterBed, setShowPrinterBed] = useState(false);
@@ -339,6 +340,7 @@ function BuilderInner() {
             cutawayMode={cutawayMode}
             lighting={lighting}
             showcaseMode={showcaseMode}
+            inspectionMode={inspectionMode}
             ringPosition={ringPosition}
             ringRotation={ringRotation}
             showPrinterBed={showPrinterBed}
@@ -417,6 +419,17 @@ function BuilderInner() {
               title="High-quality showcase render mode — stronger reflections, sharper details"
             >
               <Sparkles className="w-3 h-3" /> Showcase
+            </button>
+            <button
+              onClick={() => setInspectionMode((v) => !v)}
+              className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                ${inspectionMode
+                  ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                  : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                }`}
+              title="Inspection mode — slow rotation, strong raking light to reveal surface detail"
+            >
+              <Search className="w-3 h-3" /> Inspect
             </button>
             <button
               onClick={() => {
