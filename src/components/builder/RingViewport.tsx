@@ -1163,8 +1163,8 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       },
     }), []);
 
-    // Closer camera on mobile so ring fills screen
-    const initialCamPos: [number, number, number] = isMobile ? [0, 1.4, 2.8] : [0, 2, 4];
+    // Closer camera on mobile so ring fills screen — slightly angled for better initial view
+    const initialCamPos: [number, number, number] = isMobile ? [0.6, 1.0, 2.4] : [0, 2, 4];
 
     return (
       <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none">
@@ -1283,14 +1283,18 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <Environment preset={lighting.envPreset} environmentIntensity={sc ? lighting.envIntensity * 1.8 : lighting.envIntensity} />
           <OrbitControls
             enablePan={false}
-            minDistance={isMobile ? 1.2 : 1.5}
-            maxDistance={isMobile ? 6 : 8}
+            minDistance={isMobile ? 1.0 : 1.5}
+            maxDistance={isMobile ? 7 : 8}
             autoRotate={!isMobile}
             autoRotateSpeed={0.4}
             enableDamping
-            dampingFactor={0.08}
-            rotateSpeed={isMobile ? 0.6 : 1}
-            touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+            dampingFactor={isMobile ? 0.12 : 0.08}
+            rotateSpeed={isMobile ? 0.5 : 1}
+            zoomSpeed={isMobile ? 0.8 : 1}
+            touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+            /* Polar limits prevent flipping upside down on touch */
+            minPolarAngle={isMobile ? Math.PI * 0.1 : 0}
+            maxPolarAngle={isMobile ? Math.PI * 0.9 : Math.PI}
           />
 
           {/* Camera preset animator */}
