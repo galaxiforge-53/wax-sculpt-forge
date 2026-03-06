@@ -6,6 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useCallback } from "react";
 
 interface PropertiesPanelProps {
   params: RingParameters;
@@ -18,12 +20,12 @@ interface PropertiesPanelProps {
   onStampSettingsChange?: (s: StampSettings) => void;
 }
 
-const PROFILES: { value: RingProfile; label: string }[] = [
-  { value: "flat", label: "Flat" },
-  { value: "dome", label: "Dome" },
-  { value: "comfort", label: "Comfort Fit" },
-  { value: "square", label: "Square" },
-  { value: "knife-edge", label: "Knife Edge" },
+const PROFILES: { value: RingProfile; label: string; desc: string }[] = [
+  { value: "flat", label: "Flat", desc: "Sharp parallel walls" },
+  { value: "dome", label: "Dome", desc: "Classic rounded exterior" },
+  { value: "comfort", label: "Comfort Fit", desc: "Rounded inner surface" },
+  { value: "square", label: "Square", desc: "Angular box profile" },
+  { value: "knife-edge", label: "Knife Edge", desc: "Pointed peak" },
 ];
 
 const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
@@ -36,12 +38,25 @@ const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
 export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
 
+  const handleDirectInput = useCallback((field: keyof RingParameters, value: string, min: number, max: number, step: number) => {
+    let num = parseFloat(value);
+    if (isNaN(num)) return;
+    num = Math.round(num / step) * step;
+    num = Math.max(min, Math.min(max, num));
+    onUpdate({ [field]: num });
+  }, [onUpdate]);
+
+  const outerDiameter = params.innerDiameter + 2 * params.thickness;
+
   return (
     <div className="flex flex-col gap-4">
 
-      {/* Ring Size */}
+      {/* ── Ring Size ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Ring Size (US): {params.size}</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-secondary-foreground">Ring Size (US)</Label>
+          <span className="text-xs font-mono text-primary">{params.size}</span>
+        </div>
         <Slider
           value={[params.size]}
           onValueChange={([v]) => onUpdate({ size: v })}
@@ -50,11 +65,28 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
           step={1}
           className="w-full"
         />
+        <p className="text-[10px] text-muted-foreground">
+          Inner Ø {params.innerDiameter.toFixed(1)}mm · Circumference {(params.innerDiameter * Math.PI).toFixed(1)}mm
+        </p>
       </div>
 
-      {/* Width */}
+      {/* ── Width ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Width: {params.width}mm</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-secondary-foreground">Width</Label>
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              value={params.width}
+              onChange={(e) => handleDirectInput("width", e.target.value, 2, 14, 0.5)}
+              className="w-16 h-6 text-xs text-right font-mono bg-secondary border-border px-1"
+              step={0.5}
+              min={2}
+              max={14}
+            />
+            <span className="text-[10px] text-muted-foreground">mm</span>
+          </div>
+        </div>
         <Slider
           value={[params.width]}
           onValueChange={([v]) => onUpdate({ width: v })}
@@ -64,9 +96,23 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         />
       </div>
 
-      {/* Thickness */}
+      {/* ── Thickness ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Thickness: {params.thickness}mm</Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-secondary-foreground">Thickness</Label>
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              value={params.thickness}
+              onChange={(e) => handleDirectInput("thickness", e.target.value, 1, 4, 0.1)}
+              className="w-16 h-6 text-xs text-right font-mono bg-secondary border-border px-1"
+              step={0.1}
+              min={1}
+              max={4}
+            />
+            <span className="text-[10px] text-muted-foreground">mm</span>
+          </div>
+        </div>
         <Slider
           value={[params.thickness]}
           onValueChange={([v]) => onUpdate({ thickness: v })}
@@ -74,9 +120,12 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
           max={4}
           step={0.1}
         />
+        {params.thickness < 1.2 && (
+          <p className="text-[10px] text-amber-400">⚠ Below 1.2mm may be too thin for casting</p>
+        )}
       </div>
 
-      {/* Profile */}
+      {/* ── Profile ── */}
       <div className="space-y-2">
         <Label className="text-xs text-secondary-foreground">Profile</Label>
         <Select
@@ -89,23 +138,33 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
           <SelectContent>
             {PROFILES.map((p) => (
               <SelectItem key={p.value} value={p.value}>
-                {p.label}
+                <div className="flex flex-col">
+                  <span>{p.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{p.desc}</span>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Comfort Fit */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-secondary-foreground">Comfort Fit</Label>
-        <Switch
-          checked={params.comfortFit}
-          onCheckedChange={(v) => onUpdate({ comfortFit: v })}
-        />
+      {/* ── Comfort Fit ── */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-secondary-foreground">Comfort Fit</Label>
+          <Switch
+            checked={params.comfortFit}
+            onCheckedChange={(v) => onUpdate({ comfortFit: v })}
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          {params.comfortFit
+            ? "Inner surface is gently curved for all-day wear"
+            : "Flat inner surface — standard fit"}
+        </p>
       </div>
 
-      {/* Grooves */}
+      {/* ── Grooves ── */}
       <div className="space-y-2">
         <Label className="text-xs text-secondary-foreground">Grooves: {params.grooveCount}</Label>
         <Slider
@@ -117,7 +176,7 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         />
       </div>
 
-      {/* Bevel */}
+      {/* ── Bevel ── */}
       <div className="space-y-2">
         <Label className="text-xs text-secondary-foreground">Bevel: {params.bevelSize.toFixed(1)}mm</Label>
         <Slider
@@ -129,14 +188,29 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         />
       </div>
 
-      {/* Measurements */}
+      {/* ── Dimension Summary ── */}
       {showMeasure && (
-        <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-1">
-          <h4 className="text-xs font-display text-primary uppercase tracking-wider">Measurements</h4>
-          <p className="text-xs text-muted-foreground">Inner Ø: {params.innerDiameter.toFixed(1)}mm</p>
-          <p className="text-xs text-muted-foreground">Width: {params.width}mm</p>
-          <p className="text-xs text-muted-foreground">Thickness: {params.thickness}mm</p>
-          <p className="text-xs text-muted-foreground">Profile: {params.profile}</p>
+        <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-2">
+          <h4 className="text-xs font-display text-primary uppercase tracking-wider">Dimensions</h4>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <span className="text-[10px] text-muted-foreground">Inner Ø</span>
+            <span className="text-[10px] font-mono text-foreground text-right">{params.innerDiameter.toFixed(1)} mm</span>
+            <span className="text-[10px] text-muted-foreground">Outer Ø</span>
+            <span className="text-[10px] font-mono text-foreground text-right">{outerDiameter.toFixed(1)} mm</span>
+            <span className="text-[10px] text-muted-foreground">Width</span>
+            <span className="text-[10px] font-mono text-foreground text-right">{params.width.toFixed(1)} mm</span>
+            <span className="text-[10px] text-muted-foreground">Thickness</span>
+            <span className="text-[10px] font-mono text-foreground text-right">{params.thickness.toFixed(1)} mm</span>
+            <span className="text-[10px] text-muted-foreground">Profile</span>
+            <span className="text-[10px] font-mono text-foreground text-right">{params.profile}</span>
+            <span className="text-[10px] text-muted-foreground">Comfort Fit</span>
+            <span className="text-[10px] font-mono text-foreground text-right">{params.comfortFit ? "Yes" : "No"}</span>
+          </div>
+          <div className="pt-2 border-t border-border/50">
+            <p className="text-[10px] text-muted-foreground italic">
+              All dimensions are manufacturing-ready for wax printing & investment casting.
+            </p>
+          </div>
         </div>
       )}
 
