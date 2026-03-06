@@ -20,6 +20,7 @@ import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
 import { computeEnhancements, EnhancementResult } from "@/lib/designEnhancer";
+import { analyzeSurfaceBalance, computeAutoBalance, BalanceAnalysis } from "@/lib/surfaceBalancer";
 
 export interface StampSettings {
   type: WaxMarkType;
@@ -295,6 +296,36 @@ export function useRingDesign() {
 
   const castabilityReport = useMemo(() => evaluateCastability(params, lunarTexture, engraving), [params, lunarTexture, engraving]);
 
+  const balanceAnalysis = useMemo(() => analyzeSurfaceBalance(params, lunarTexture, engraving, waxMarks, inlays), [params, lunarTexture, engraving, waxMarks, inlays]);
+
+  const autoBalance = useCallback(() => {
+    const result = computeAutoBalance(params, lunarTexture, engraving, waxMarks, inlays);
+
+    if (Object.keys(result.paramsPatch).length > 0) {
+      const newParams = { ...params, ...result.paramsPatch };
+      if (result.paramsPatch.size !== undefined) {
+        newParams.innerDiameter = RING_SIZE_MAP[result.paramsPatch.size] || params.innerDiameter;
+      }
+      setParams(newParams);
+      pushHistory(newParams);
+      craftStateRef.current.baseRingParams = newParams;
+    }
+    if (result.lunarPatch) {
+      setLunarTextureRaw((prev) => ({ ...prev, ...result.lunarPatch! }));
+    }
+    if (result.engravingPatch) {
+      setEngravingRaw((prev) => ({ ...prev, ...result.engravingPatch! }));
+    }
+
+    logCraftAction("surface_auto_balanced", {
+      score: result.analysis.score,
+      fixCount: result.analysis.fixes.length,
+      issues: result.analysis.issues.map((i) => i.id),
+    });
+
+    return result.analysis;
+  }, [params, lunarTexture, engraving, waxMarks, inlays, pushHistory, logCraftAction]);
+
   const restoreDesign = useCallback((pkg: DesignPackage) => {
     setParams(pkg.parameters);
     setHistory([pkg.parameters]);
@@ -408,5 +439,7 @@ export function useRingDesign() {
     engraving,
     setEngraving,
     enhanceDesign,
+    balanceAnalysis,
+    autoBalance,
   };
 }

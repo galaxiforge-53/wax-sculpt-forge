@@ -72,6 +72,8 @@ function BuilderInner() {
     lunarTexture, setLunarTexture, applyLunarPreset, randomizeLunar,
     engraving, setEngraving,
     enhanceDesign,
+    balanceAnalysis,
+    autoBalance,
   } = useRingDesign();
 
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -278,6 +280,8 @@ function BuilderInner() {
       onFinishChange={setFinishPreset}
       lighting={lighting}
       onLightingChange={setLighting}
+      balanceAnalysis={balanceAnalysis}
+      onAutoBalance={autoBalance}
     />
   );
 
