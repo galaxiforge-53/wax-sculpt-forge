@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
@@ -338,7 +338,78 @@ const METEORITE_PRESETS: MeteoritePreset[] = [
   },
 ];
 
-// ── Sub-section ───────────────────────────────────────────────────
+// ── Hammered Metal Presets ─────────────────────────────────────────
+
+interface HammeredPreset {
+  name: string;
+  description: string;
+  color: string;
+  build: () => LunarTextureState;
+}
+
+const HAMMERED_PRESETS: HammeredPreset[] = [
+  {
+    name: "Light Planished",
+    color: "text-zinc-300",
+    description: "Gentle, uniform dents — classic hand-finished jewellery look with subtle surface movement",
+    build: () => ({
+      enabled: true, intensity: 35, craterDensity: "med", craterSize: "med",
+      microDetail: 20, rimSharpness: 15, overlapIntensity: 40, smoothEdges: true, seed: newSeed(),
+      rimHeight: 10, bowlDepth: 40, erosion: 60, terrainRoughness: 25, craterVariation: 65,
+    }),
+  },
+  {
+    name: "Artisan Hammered",
+    color: "text-amber-300",
+    description: "Varied irregular dents with moderate depth — each strike unique, warm handcrafted character",
+    build: () => ({
+      enabled: true, intensity: 55, craterDensity: "high", craterSize: "med",
+      microDetail: 30, rimSharpness: 25, overlapIntensity: 60, smoothEdges: true, seed: newSeed(),
+      rimHeight: 15, bowlDepth: 60, erosion: 40, terrainRoughness: 30, craterVariation: 85,
+    }),
+  },
+  {
+    name: "Deep Forge Strike",
+    color: "text-orange-400",
+    description: "Bold, pronounced hammer marks — heavy blacksmith-style strikes with visible facets and sharp edges",
+    build: () => ({
+      enabled: true, intensity: 80, craterDensity: "med", craterSize: "large",
+      microDetail: 15, rimSharpness: 50, overlapIntensity: 35, smoothEdges: false, seed: newSeed(),
+      rimHeight: 30, bowlDepth: 85, erosion: 10, terrainRoughness: 20, craterVariation: 70,
+    }),
+  },
+  {
+    name: "Pin Hammer Fine",
+    color: "text-sky-300",
+    description: "Tiny dense dimples — delicate pin hammer texture giving a shimmering, light-catching surface",
+    build: () => ({
+      enabled: true, intensity: 45, craterDensity: "high", craterSize: "small",
+      microDetail: 40, rimSharpness: 20, overlapIntensity: 70, smoothEdges: true, seed: newSeed(),
+      rimHeight: 8, bowlDepth: 35, erosion: 50, terrainRoughness: 15, craterVariation: 55,
+    }),
+  },
+  {
+    name: "Rustic Beaten",
+    color: "text-stone-400",
+    description: "Rough, uneven strikes with weathered edges — organic, ancient-looking forged metal finish",
+    build: () => ({
+      enabled: true, intensity: 70, craterDensity: "high", craterSize: "large",
+      microDetail: 55, rimSharpness: 35, overlapIntensity: 80, smoothEdges: false, seed: newSeed(),
+      rimHeight: 25, bowlDepth: 75, erosion: 55, terrainRoughness: 45, craterVariation: 95,
+    }),
+  },
+  {
+    name: "Satin Peen",
+    color: "text-violet-300",
+    description: "Uniform ball-peen finish — consistent overlapping dimples creating a soft satin-like reflective surface",
+    build: () => ({
+      enabled: true, intensity: 40, craterDensity: "high", craterSize: "small",
+      microDetail: 25, rimSharpness: 10, overlapIntensity: 90, smoothEdges: true, seed: newSeed(),
+      rimHeight: 5, bowlDepth: 30, erosion: 70, terrainRoughness: 10, craterVariation: 20,
+    }),
+  },
+];
+
 
 function SubSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -483,6 +554,65 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               ))}
             </div>
           </SubSection>
+
+          {/* Hammered Metal Styles */}
+          <SubSection title="Hammered Metal">
+            <p className="text-[8px] text-muted-foreground/60 leading-tight -mt-1 mb-1">
+              Hand-hammered jewellery textures. After applying, fine-tune with the controls below.
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {HAMMERED_PRESETS.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => onApplyPreset(p.build(), p.name)}
+                  className={cn(
+                    "flex flex-col items-start gap-0.5 p-2 rounded-lg border text-left transition-all",
+                    "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 w-full">
+                    <Hammer className={cn("w-3 h-3", p.color)} />
+                    <span className={cn("text-[10px] font-medium", p.color)}>{p.name}</span>
+                  </div>
+                  <span className="text-[8px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">{p.description}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Dedicated hammered controls */}
+            <div className="space-y-2 mt-2 p-2 rounded-lg bg-secondary/20 border border-border/30">
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground/70 font-display flex items-center gap-1">
+                <Hammer className="w-3 h-3" /> Hammer Controls
+              </span>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Hammer Density</Label>
+                <Select value={state.craterDensity} onValueChange={(v) => patch({ craterDensity: v as CraterDensity })}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Light tapping</SelectItem>
+                    <SelectItem value="med">Medium coverage</SelectItem>
+                    <SelectItem value="high">Dense hammering</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Hammer Depth: {state.bowlDepth}%</Label>
+                <Slider value={[state.bowlDepth]} onValueChange={([v]) => patch({ bowlDepth: v })} min={0} max={100} step={1} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Hammer Size</Label>
+                <Select value={state.craterSize} onValueChange={(v) => patch({ craterSize: v as CraterSize })}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="small">Pin hammer</SelectItem>
+                    <SelectItem value="med">Ball peen</SelectItem>
+                    <SelectItem value="large">Planishing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </SubSection>
+
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleResurface} disabled={seedLocked}>
               <Shuffle className="w-3 h-3 mr-1" /> New Surface
