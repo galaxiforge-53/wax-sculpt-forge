@@ -3,7 +3,7 @@ export type MetalPreset = "silver" | "gold" | "rose-gold" | "titanium" | "tungst
 export type FinishPreset = "polished" | "brushed" | "hammered" | "matte" | "satin";
 export type ViewMode = "wax" | "cast" | "wax-print";
 
-export type ToolType = "carve" | "smooth" | "bevel" | "groove" | "measure" | "flatten" | "stamp";
+export type ToolType = "carve" | "smooth" | "bevel" | "groove" | "measure" | "flatten" | "stamp" | "push" | "sculpt-carve" | "sculpt-smooth";
 
 export interface RingParameters {
   size: number; // US ring size 3-16

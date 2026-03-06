@@ -462,15 +462,25 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10);
   }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness]);
 
+  // Map active tool to wax mark type for sculpting tools
+  const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
+    stamp: stampSettings?.type ?? "dent",
+    push: "push",
+    "sculpt-carve": "carve-sculpt",
+    "sculpt-smooth": "smooth-sculpt",
+  };
+
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
-    if (viewMode !== "wax" || activeTool !== "stamp" || !onAddWaxMark) return;
+    if (viewMode !== "wax" || !onAddWaxMark) return;
+    const markType = SCULPT_TOOL_MAP[activeTool ?? ""];
+    if (!markType) return;
     e.stopPropagation();
     const point = e.point;
     const normal = e.face?.normal ?? new THREE.Vector3(0, 1, 0);
     const worldNormal = normal.clone();
     if (e.object) worldNormal.transformDirection(e.object.matrixWorld);
     onAddWaxMark({
-      type: stampSettings?.type ?? "dent",
+      type: markType,
       position: { x: point.x, y: point.y, z: point.z },
       normal: { x: worldNormal.x, y: worldNormal.y, z: worldNormal.z },
       radiusMm: stampSettings?.radiusMm ?? 1.2,
@@ -616,34 +626,60 @@ function RingMesh(props: RingMeshProps) {
   return <ProceduralRingMesh {...props} />;
 }
 
-// Render wax marks as small decal-like circles
+// ── Visual config per wax mark type ──
+const WAX_MARK_VISUALS: Record<string, { color: string; opacity: number; scale: number; shape: "circle" | "sphere" | "box" }> = {
+  dent:           { color: "#2a4a22", opacity: 0.45, scale: 1.0, shape: "circle" },
+  scratch:        { color: "#3a3a1f", opacity: 0.35, scale: 0.6, shape: "box" },
+  chisel:         { color: "#1f2f1f", opacity: 0.5,  scale: 1.1, shape: "box" },
+  "heat-soften":  { color: "#5a4a22", opacity: 0.3,  scale: 1.4, shape: "sphere" },
+  push:           { color: "#1a3a3a", opacity: 0.55, scale: 1.0, shape: "sphere" },
+  "carve-sculpt": { color: "#3a1a1a", opacity: 0.6,  scale: 0.8, shape: "box" },
+  "smooth-sculpt":{ color: "#2a3a4a", opacity: 0.25, scale: 1.5, shape: "sphere" },
+};
+
+// Render wax marks as 3D sculpting indicators
 function WaxMarkOverlays({ marks }: { marks: WaxMark[] }) {
-  const visible = marks.slice(-80);
+  const visible = marks.slice(-120);
 
   return (
     <>
       {visible.map((mark) => {
         const pos = new THREE.Vector3(mark.position.x, mark.position.y, mark.position.z);
         const norm = new THREE.Vector3(mark.normal.x, mark.normal.y, mark.normal.z).normalize();
-        const offset = pos.clone().add(norm.clone().multiplyScalar(0.002));
+        const vis = WAX_MARK_VISUALS[mark.type] ?? WAX_MARK_VISUALS.dent;
+        const radius = mark.radiusMm / 10;
+
+        // Push/carve displace inward, smooth stays on surface
+        const displaceDir = mark.type === "push" || mark.type === "carve-sculpt" ? -1 : 1;
+        const displaceAmount = mark.type === "smooth-sculpt" ? 0.001 : radius * 0.3 * mark.intensity * displaceDir;
+        const offset = pos.clone().add(norm.clone().multiplyScalar(mark.type === "push" || mark.type === "carve-sculpt" ? -displaceAmount : 0.002));
+
         const quat = new THREE.Quaternion();
         quat.setFromUnitVectors(new THREE.Vector3(0, 0, 1), norm);
         const euler = new THREE.Euler().setFromQuaternion(quat);
-        const radius = mark.radiusMm / 10;
+        const s = radius * vis.scale;
 
         return (
           <mesh
             key={mark.id}
             position={[offset.x, offset.y, offset.z]}
             rotation={euler}
+            scale={mark.type === "carve-sculpt" ? [s * 0.4, s * 1.8, s] : undefined}
           >
-            <circleGeometry args={[radius, 16]} />
-            <meshBasicMaterial
-              color="#2a4a22"
+            {vis.shape === "sphere" ? (
+              <sphereGeometry args={[s, 12, 12]} />
+            ) : vis.shape === "box" ? (
+              <boxGeometry args={[s * 1.5, s * 0.3, s]} />
+            ) : (
+              <circleGeometry args={[s, 16]} />
+            )}
+            <meshStandardMaterial
+              color={vis.color}
               transparent
-              opacity={mark.intensity * 0.45}
+              opacity={mark.intensity * vis.opacity}
               depthWrite={false}
               side={THREE.DoubleSide}
+              roughness={0.9}
             />
           </mesh>
         );

@@ -1,4 +1,4 @@
-export type WaxMarkType = "dent" | "scratch" | "chisel" | "heat-soften";
+export type WaxMarkType = "dent" | "scratch" | "chisel" | "heat-soften" | "push" | "carve-sculpt" | "smooth-sculpt";
 
 export interface WaxMark {
   id: string;

@@ -33,6 +33,9 @@ const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
   { value: "scratch", label: "Scratch" },
   { value: "chisel", label: "Chisel" },
   { value: "heat-soften", label: "Heat Soften" },
+  { value: "push", label: "Push" },
+  { value: "carve-sculpt", label: "Carve" },
+  { value: "smooth-sculpt", label: "Smooth" },
 ];
 
 export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange }: PropertiesPanelProps) {
