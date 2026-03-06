@@ -24,7 +24,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Lock, Sparkles } from "lucide-react";
+import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useAccess } from "@/hooks/useAccess";
@@ -65,36 +65,52 @@ interface BuilderSidebarProps {
   onAutoBalance?: () => void;
 }
 
+/* ── Section wrapper with icon ─────────────────────────────────── */
+
 interface SectionProps {
   title: string;
+  icon?: React.ElementType;
   defaultOpen?: boolean;
   children: React.ReactNode;
   premium?: boolean;
 }
 
-function Section({ title, defaultOpen = false, children, premium }: SectionProps) {
+function Section({ title, icon: Icon, defaultOpen = false, children, premium }: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-border last:border-b-0">
-      <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2.5 hover:bg-secondary/50 transition-colors group">
-        <span className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground font-display group-hover:text-foreground transition-colors flex items-center gap-1.5">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-border/60 last:border-b-0">
+      <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary/40 transition-colors group">
+        <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground font-display group-hover:text-foreground transition-colors flex items-center gap-2">
+          {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground/70 group-hover:text-foreground/70 transition-colors" />}
           {title}
           {premium && <Sparkles className="w-3 h-3 text-primary/60" />}
         </span>
         <ChevronDown
           className={cn(
-            "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200",
+            "h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200",
             open && "rotate-180"
           )}
         />
       </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3 animate-in slide-in-from-top-1 duration-200">
+      <CollapsibleContent className="px-4 pb-4 animate-in slide-in-from-top-1 duration-200">
         {children}
       </CollapsibleContent>
     </Collapsible>
   );
 }
+
+/* ── Subsection label ──────────────────────────────────────────── */
+
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground/50 mb-2 mt-3 first:mt-0 font-display">
+      {children}
+    </p>
+  );
+}
+
+/* ── Premium gate ──────────────────────────────────────────────── */
 
 function PremiumLock() {
   const navigate = useNavigate();
@@ -104,7 +120,7 @@ function PremiumLock() {
         <Lock className="w-5 h-5 text-primary/70" />
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Premium feature — enter a premium access code to unlock
+        Premium feature — enter an access code to unlock
       </p>
       <button
         onClick={() => navigate("/access")}
@@ -115,6 +131,94 @@ function PremiumLock() {
     </div>
   );
 }
+
+/* ── Metal picker (inline) ─────────────────────────────────────── */
+
+function MetalPicker({ metalPreset, onMetalChange, finishPreset, onFinishChange, viewMode, onViewModeChange }: {
+  metalPreset: MetalPreset; onMetalChange: (m: MetalPreset) => void;
+  finishPreset: FinishPreset; onFinishChange: (f: FinishPreset) => void;
+  viewMode: ViewMode; onViewModeChange: (v: ViewMode) => void;
+}) {
+  const metals: { id: MetalPreset; label: string; color: string }[] = [
+    { id: "silver", label: "Silver", color: "bg-gray-300" },
+    { id: "gold", label: "Gold", color: "bg-yellow-500" },
+    { id: "rose-gold", label: "Rose Gold", color: "bg-pink-400" },
+    { id: "titanium", label: "Titanium", color: "bg-slate-400" },
+    { id: "tungsten", label: "Tungsten", color: "bg-zinc-600" },
+  ];
+
+  const finishes: FinishPreset[] = ["polished", "brushed", "hammered", "matte", "satin"];
+
+  return (
+    <div className="space-y-3">
+      {/* View mode */}
+      <div>
+        <SubLabel>View Mode</SubLabel>
+        <div className="flex gap-1">
+          {(["wax", "cast", "wax-print"] as ViewMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => onViewModeChange(mode)}
+              className={cn(
+                "flex-1 py-1.5 text-[10px] font-medium rounded-md transition-all",
+                viewMode === mode
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              )}
+            >
+              {mode === "wax-print" ? "Print" : mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Metal */}
+      <div>
+        <SubLabel>Metal</SubLabel>
+        <div className="grid grid-cols-3 gap-1">
+          {metals.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => onMetalChange(m.id)}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] font-medium transition-all border",
+                metalPreset === m.id
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+              )}
+            >
+              <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0", m.color)} />
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Finish */}
+      <div>
+        <SubLabel>Finish</SubLabel>
+        <div className="grid grid-cols-3 gap-1">
+          {finishes.map((f) => (
+            <button
+              key={f}
+              onClick={() => onFinishChange(f)}
+              className={cn(
+                "px-2 py-1.5 rounded-md text-[10px] font-medium transition-all border",
+                finishPreset === f
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+              )}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Main sidebar ──────────────────────────────────────────────── */
 
 export default function BuilderSidebar({
   params, onUpdate, activeTool, viewMode,
@@ -134,7 +238,9 @@ export default function BuilderSidebar({
   return (
     <ScrollArea className="h-full">
       <div className="flex flex-col">
-        <Section title="Properties" defaultOpen={true}>
+
+        {/* ═══ 1. RING SHAPE ═══ */}
+        <Section title="Ring Shape" icon={Layers} defaultOpen={true}>
           <PropertiesPanel
             params={params}
             onUpdate={onUpdate}
@@ -146,9 +252,75 @@ export default function BuilderSidebar({
             onStampSettingsChange={onStampSettingsChange}
             metalPreset={metalPreset}
           />
+          <div className="border-t border-border/40 mt-3 pt-3">
+            <SubLabel>Templates</SubLabel>
+            <TemplatesPanel
+              onApply={onApplyTemplate}
+              currentParams={params}
+              onLunarChange={onLunarChange}
+              onEngravingChange={onEngravingChange}
+              onMetalChange={onMetalChange}
+              onFinishChange={onFinishChange}
+            />
+          </div>
         </Section>
 
-        <Section title="AI Assistant" defaultOpen={true} premium={!isPremium}>
+        {/* ═══ 2. SURFACE & TEXTURE ═══ */}
+        <Section title="Surface & Texture" icon={Moon} premium={!isPremium}>
+          {isPremium ? (
+            <>
+              <LunarTexturePanel
+                state={lunarTexture}
+                onChange={onLunarChange}
+                onApplyPreset={onApplyLunarPreset}
+                onRandomize={onRandomizeLunar}
+              />
+              <div className="border-t border-border/40 mt-3 pt-3">
+                <SubLabel>Inlays</SubLabel>
+                <InlaysPanel inlays={inlays} onAdd={onAddInlay} onRemove={onRemoveInlay} onClear={onClearInlays} />
+              </div>
+            </>
+          ) : (
+            <PremiumLock />
+          )}
+        </Section>
+
+        {/* ═══ 3. ENGRAVING ═══ */}
+        <Section title="Engraving" icon={PenTool} premium={!isPremium}>
+          {isPremium ? (
+            <EngravingPanel state={engraving} onChange={onEngravingChange} />
+          ) : (
+            <PremiumLock />
+          )}
+        </Section>
+
+        {/* ═══ 4. MATERIALS & LIGHTING ═══ */}
+        <Section title="Materials" icon={Palette} defaultOpen={false}>
+          <MetalPicker
+            metalPreset={metalPreset}
+            onMetalChange={onMetalChange}
+            finishPreset={finishPreset}
+            onFinishChange={onFinishChange}
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+          />
+          <div className="border-t border-border/40 mt-3 pt-3">
+            <SubLabel>Lighting Studio</SubLabel>
+            <LightingStudioPanel settings={lighting} onChange={onLightingChange} />
+          </div>
+        </Section>
+
+        {/* ═══ 5. PRODUCTION ═══ */}
+        <Section title="Production" icon={Flame} defaultOpen={false}>
+          <CastabilityPanel report={castabilityReport} balanceAnalysis={balanceAnalysis} onAutoBalance={onAutoBalance} />
+          <div className="border-t border-border/40 mt-3 pt-3">
+            <SubLabel>Forge Pipeline</SubLabel>
+            <ForgePipelinePanel pipelineState={pipelineState} onNext={onNext} onPrev={onPrev} />
+          </div>
+        </Section>
+
+        {/* ═══ 6. AI ASSISTANT ═══ */}
+        <Section title="AI Assistant" icon={Sparkles} defaultOpen={false} premium={!isPremium}>
           {isPremium ? (
             <AIAssistantPanel
               params={params}
@@ -165,49 +337,6 @@ export default function BuilderSidebar({
           ) : (
             <PremiumLock />
           )}
-        </Section>
-
-        <Section title="Castability" defaultOpen={true}>
-          <CastabilityPanel report={castabilityReport} balanceAnalysis={balanceAnalysis} onAutoBalance={onAutoBalance} />
-        </Section>
-
-        <Section title="Forge Pipeline">
-          <ForgePipelinePanel pipelineState={pipelineState} onNext={onNext} onPrev={onPrev} />
-        </Section>
-
-        <Section title="Inlays">
-          <InlaysPanel inlays={inlays} onAdd={onAddInlay} onRemove={onRemoveInlay} onClear={onClearInlays} />
-        </Section>
-
-        <Section title="Lunar Texture" premium={!isPremium}>
-          {isPremium ? (
-            <LunarTexturePanel state={lunarTexture} onChange={onLunarChange} onApplyPreset={onApplyLunarPreset} onRandomize={onRandomizeLunar} />
-          ) : (
-            <PremiumLock />
-          )}
-        </Section>
-
-        <Section title="Engraving" premium={!isPremium}>
-          {isPremium ? (
-            <EngravingPanel state={engraving} onChange={onEngravingChange} />
-          ) : (
-            <PremiumLock />
-          )}
-        </Section>
-
-        <Section title="Templates">
-          <TemplatesPanel
-            onApply={onApplyTemplate}
-            currentParams={params}
-            onLunarChange={onLunarChange}
-            onEngravingChange={onEngravingChange}
-            onMetalChange={onMetalChange}
-            onFinishChange={onFinishChange}
-          />
-        </Section>
-
-        <Section title="Lighting Studio" defaultOpen={false}>
-          <LightingStudioPanel settings={lighting} onChange={onLightingChange} />
         </Section>
       </div>
     </ScrollArea>
