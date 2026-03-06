@@ -96,7 +96,7 @@ const BAND_DESIGNS: RingDesign[] = [
     bevel: 0.1,
     width: 7,
     thickness: 2.0,
-    engraving: "GALAXIFORGE · EHAND3D",
+    engraving: "YOUR TEXT HERE",
     inlays: [
       { material: "crystal", name: "Tanzanite", placement: -0.22, widthMm: 0.9, color: "#7c3aed", emissive: "#5b21b6", emissiveIntensity: 0.7, roughness: 0.06, metalness: 0.04, opacity: 0.8, depthMm: 0.3 },
       { material: "opal", name: "Fire Opal", placement: 0.0, widthMm: 1.6, color: "#ff6b2b", emissive: "#ff4500", emissiveIntensity: 1.1, roughness: 0.04, metalness: 0.02, opacity: 0.85, depthMm: 0.5 },
@@ -839,12 +839,12 @@ function InteriorEngraving({
   const glyphMeshes = useMemo(() => {
     if (!text) return [];
     const chars = text.split("");
-    const charHeight = ringWidth * 0.32; // larger for readability
-    const charWidth = charHeight * 0.55;
-    const spacing = charHeight * 0.18;
+    const charHeight = ringWidth * 0.38; // larger for cosmic boldness
+    const charWidth = charHeight * 0.6;
+    const spacing = charHeight * 0.22;
     const totalWidth = chars.length * (charWidth + spacing);
-    const engravingR = innerR - 0.012; // deeper inset into bore
-    const depth = 0.018; // significantly deeper for visible shadow
+    const engravingR = innerR - 0.018; // deeper inset for dramatic shadow
+    const depth = 0.025; // much deeper for clearly visible engraving
 
     const circumference = 2 * Math.PI * engravingR;
     const totalAngle = (totalWidth / circumference) * 2 * Math.PI;
@@ -860,9 +860,9 @@ function InteriorEngraving({
 
   // Darker shade of the metal for engraving depth effect
   const engravingColor = useMemo(() => {
-    if (isWax) return "#3d5228";
+    if (isWax) return "#2d3d1e";
     const c = new THREE.Color(metalColor);
-    c.multiplyScalar(0.35); // darken significantly for depth illusion
+    c.multiplyScalar(0.25); // much darker for deep shadow contrast
     return `#${c.getHexString()}`;
   }, [metalColor, isWax]);
 
@@ -887,14 +887,14 @@ function InteriorEngraving({
                   rotation={[0, -angle + Math.PI, 0]}
                   castShadow
                 >
-                  <boxGeometry args={[stroke.width * 1.1, stroke.height * 1.1, depth]} />
+                  <boxGeometry args={[stroke.width * 1.15, stroke.height * 1.15, depth]} />
                   <meshPhysicalMaterial
                     color={engravingColor}
-                    roughness={isWax ? 0.85 : 0.5}
-                    metalness={isWax ? 0.02 : 0.9}
-                    envMapIntensity={0.3}
-                    clearcoat={isWax ? 0 : 0.2}
-                    clearcoatRoughness={0.4}
+                    roughness={isWax ? 0.85 : 0.65}
+                    metalness={isWax ? 0.02 : 0.85}
+                    envMapIntensity={0.15}
+                    clearcoat={isWax ? 0 : 0.15}
+                    clearcoatRoughness={0.6}
                   />
                 </mesh>
               );
@@ -906,7 +906,7 @@ function InteriorEngraving({
   );
 }
 
-// Simple stroke-based character rendering (sans-serif block letters)
+// Cosmic-style stroke-based character rendering — wider, bolder, with decorative elements
 interface CharStroke {
   offsetX: number;
   offsetY: number;
@@ -915,49 +915,52 @@ interface CharStroke {
 }
 
 function getCharStrokes(char: string, w: number, h: number): CharStroke[] {
-  const t = w * 0.18; // stroke thickness
+  const t = w * 0.22; // thicker stroke for cosmic boldness
   const strokes: CharStroke[] = [];
+  // Cosmic serifs — small caps at stroke ends
+  const serif = t * 0.4;
 
   const patterns: Record<string, () => void> = {
-    "A": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); },
-    "B": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "C": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "A": () => { strokes.push({ offsetX: 0, offsetY: h, width: w * 1.1, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.48, width: w*0.75, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.4, height: serif }); },
+    "B": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.9, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "C": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: w/2, offsetY: h-serif/2, width: serif, height: serif }); strokes.push({ offsetX: w/2, offsetY: serif/2, width: serif, height: serif }); },
     "D": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
-    "E": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.7, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "F": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.7, height: t }); },
-    "G": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.5, width: w*0.7, height: t }); },
-    "H": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); },
-    "I": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.6, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.6, height: t }); },
-    "K": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w*0.1, offsetY: h*0.5, width: w*0.5, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "L": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "M": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.7, width: t, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.7, width: t, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); },
-    "N": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "O": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "P": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); },
-    "R": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "S": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "T": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); },
-    "U": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "V": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.5, height: t }); },
-    "W": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.3, width: t, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.3, width: t, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "X": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.5, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
-    "Y": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.5, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.25, width: t, height: h/2 }); },
-    "Z": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.5, height: h*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
+    "E": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: -w*0.05, offsetY: h*0.5, width: w*0.8, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
+    "F": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: -w*0.05, offsetY: h*0.5, width: w*0.75, height: t*0.8 }); strokes.push({ offsetX: -w/2+t/2, offsetY: 0, width: w*0.4, height: serif }); },
+    "G": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w*0.1, offsetY: h*0.5, width: w*0.65, height: t*0.8 }); },
+    "H": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.3, height: serif }); },
+    "I": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.7, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.7, height: t }); },
+    "K": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w*0.05, offsetY: h*0.5, width: w*0.45, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "L": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); },
+    "M": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.65, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.65, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.1, height: t }); },
+    "N": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
+    "O": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
+    "P": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: -w/2+t/2, offsetY: 0, width: w*0.35, height: serif }); },
+    "R": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w/2, offsetY: 0, width: serif, height: serif }); },
+    "S": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.9, height: t*0.8 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
+    "T": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.15, height: t }); strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.35, height: serif }); },
+    "U": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.3, height: serif }); },
+    "V": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.45, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h, width: w*0.3, height: serif }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.3, height: serif }); },
+    "W": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: -w*0.15, offsetY: h*0.3, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: w*0.15, offsetY: h*0.3, width: t*0.9, height: h*0.55 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.1, height: t }); },
+    "X": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.55, height: t*0.8 }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.25, width: t, height: h/2 }); },
+    "Y": () => { strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.5, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.8, height: serif }); },
+    "Z": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.6, height: h*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
     "0": () => { patterns["O"]!(); },
-    "1": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); },
-    "2": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); },
-    "3": () => { strokes.push({ offsetX: 0, offsetY: h, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
-    "·": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.2, height: t*1.2 }); },
-    "-": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.7, height: t }); },
-    "J": () => { strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.2, width: t, height: h*0.35 }); },
+    "1": () => { strokes.push({ offsetX: 0, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: h, width: w*0.5, height: serif }); strokes.push({ offsetX: 0, offsetY: 0, width: w*0.5, height: serif }); },
+    "2": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h*0.75, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w, height: t*0.8 }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.25, width: t, height: h/2 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); },
+    "3": () => { strokes.push({ offsetX: 0, offsetY: h, width: w*1.05, height: t }); strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.85, height: t*0.8 }); strokes.push({ offsetX: 0, offsetY: 0, width: w*1.05, height: t }); strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); },
+    "·": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: t*1.4, height: t*1.4 }); },
+    "-": () => { strokes.push({ offsetX: 0, offsetY: h*0.5, width: w*0.75, height: t*0.8 }); },
+    "J": () => { strokes.push({ offsetX: w/2-t/2, offsetY: h/2, width: t, height: h }); strokes.push({ offsetX: 0, offsetY: 0, width: w, height: t }); strokes.push({ offsetX: -w/2+t/2, offsetY: h*0.2, width: t, height: h*0.35 }); strokes.push({ offsetX: w/2-t/2, offsetY: h, width: w*0.5, height: serif }); },
+    "Q": () => { patterns["O"]!(); strokes.push({ offsetX: w*0.25, offsetY: -t*0.3, width: t*1.2, height: t*2 }); },
   };
 
   const upperChar = char.toUpperCase();
   if (patterns[upperChar]) {
     patterns[upperChar]();
   } else {
-    // Fallback: small square dot
-    strokes.push({ offsetX: 0, offsetY: h * 0.5, width: t, height: t });
+    // Fallback: cosmic dot
+    strokes.push({ offsetX: 0, offsetY: h * 0.5, width: t * 1.2, height: t * 1.2 });
   }
 
   return strokes;

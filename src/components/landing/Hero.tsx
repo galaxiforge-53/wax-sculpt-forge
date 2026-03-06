@@ -55,11 +55,13 @@ function HeroRingMesh() {
     return geo;
   }, [geometry]);
 
-  // Slow auto-rotation with gentle wobble
+  // Slow auto-rotation, tilted 45° with top of ring upward
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
     groupRef.current.rotation.y = t * 0.15;
+    groupRef.current.rotation.x = Math.PI * 0.25; // 45° tilt — top of ring faces viewer
+    groupRef.current.rotation.z = 0.1; // slight lean for drama
   });
 
   return (
@@ -156,16 +158,16 @@ export default function Hero() {
         ))}
       </div>
 
-      {/* 3D Hero Ring — interactive, touch-sensitive */}
-      <div className="absolute inset-0 z-[3]">
+      {/* 3D Hero Ring — centered, full-width, interactive */}
+      <div className="absolute inset-0 z-[3] flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.5, delay: 0.3, ease: "easeOut" }}
-          className="absolute inset-0"
+          className="w-full h-full max-w-[600px] sm:max-w-none mx-auto"
         >
-          <Canvas
-            camera={{ position: [0, 1.0, 3.5], fov: 32 }}
+      <Canvas
+            camera={{ position: [0, 1.5, 3.0], fov: 36 }}
             gl={{ antialias: true, alpha: true }}
             dpr={[1, 2]}
           >
@@ -182,9 +184,8 @@ export default function Hero() {
             />
           </Canvas>
         </motion.div>
-        {/* Subtle vignette — keep ring visible */}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/40 via-transparent to-background/40 pointer-events-none" />
+        {/* Subtle vignette — minimal so ring stays visible and centered */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/20 pointer-events-none" />
       </div>
 
       <div className="relative z-10 text-center px-5 sm:px-6 max-w-3xl">
