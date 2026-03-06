@@ -56,7 +56,7 @@ export default function TopBar({
   const isMobile = useIsMobile();
 
   return (
-    <div className="flex items-center justify-between px-2 sm:px-4 py-2 bg-card border-b border-border gap-1">
+    <div className="flex items-center justify-between px-2 sm:px-4 py-2 builder-topbar gap-1">
       <div className="flex items-center gap-1 sm:gap-2 min-w-0">
         {!embed && !isMobile && (
           <h1 className="font-display text-sm text-primary mr-2 tracking-[0.15em] whitespace-nowrap">

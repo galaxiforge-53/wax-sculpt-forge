@@ -79,8 +79,8 @@ function Section({ title, icon: Icon, defaultOpen = false, children, premium }: 
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-border/60 last:border-b-0">
-      <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary/40 transition-colors group">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-builder-divider last:border-b-0">
+      <CollapsibleTrigger className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary/30 transition-colors group">
         <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground font-display group-hover:text-foreground transition-colors flex items-center gap-2">
           {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground/70 group-hover:text-foreground/70 transition-colors" />}
           {title}

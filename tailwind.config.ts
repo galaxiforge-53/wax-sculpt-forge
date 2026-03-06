@@ -61,6 +61,10 @@ export default {
         "wax-muted": "hsl(var(--wax-muted))",
         "metal-silver": "hsl(var(--metal-silver))",
         "metal-gold": "hsl(var(--metal-gold))",
+        "builder-viewport": "hsl(var(--builder-viewport))",
+        "builder-rail": "hsl(var(--builder-rail))",
+        "builder-topbar": "hsl(var(--builder-topbar))",
+        "builder-divider": "hsl(var(--builder-divider))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
