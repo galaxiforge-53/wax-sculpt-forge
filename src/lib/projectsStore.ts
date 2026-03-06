@@ -41,3 +41,30 @@ export function saveProject(project: DesignProject): void {
 export function deleteProject(id: string): void {
   writeAll(readAll().filter((p) => p.id !== id));
 }
+
+export function renameProject(id: string, newName: string): void {
+  const all = readAll();
+  const project = all.find((p) => p.id === id);
+  if (project) {
+    project.name = newName;
+    project.updatedAt = new Date().toISOString();
+    writeAll(all);
+  }
+}
+
+export function duplicateProject(id: string): DesignProject | null {
+  const all = readAll();
+  const source = all.find((p) => p.id === id);
+  if (!source) return null;
+  const now = new Date().toISOString();
+  const copy: DesignProject = {
+    ...structuredClone(source),
+    id: `PRJ-${Date.now().toString(36).toUpperCase()}`,
+    name: `${source.name} (Copy)`,
+    createdAt: now,
+    updatedAt: now,
+  };
+  all.push(copy);
+  writeAll(all);
+  return copy;
+}
