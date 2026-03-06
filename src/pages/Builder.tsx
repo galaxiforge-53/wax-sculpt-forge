@@ -65,7 +65,23 @@ function BuilderInner() {
     inlays, addInlayChannel, removeInlayChannel, clearInlays,
     lunarTexture, setLunarTexture, applyLunarPreset, randomizeLunar,
     engraving, setEngraving,
+    enhanceDesign,
   } = useRingDesign();
+
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  const handleEnhance = () => {
+    setIsEnhancing(true);
+    // Small delay so UI shows "Enhancing…" state
+    setTimeout(() => {
+      const result = enhanceDesign();
+      setIsEnhancing(false);
+      toast({
+        title: "✨ Design Enhanced",
+        description: result.summary.slice(0, 3).join(" · "),
+      });
+    }, 400);
+  };
 
   const embed = isEmbedMode();
 
@@ -276,6 +292,8 @@ function BuilderInner() {
         onSave={handleSave}
         isSaving={isSaving}
         onForgeNow={handleForgeNow}
+        onEnhance={handleEnhance}
+        isEnhancing={isEnhancing}
       />
 
       <div className="flex flex-1 min-h-0 relative">

@@ -19,6 +19,7 @@ import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
+import { computeEnhancements, EnhancementResult } from "@/lib/designEnhancer";
 
 export interface StampSettings {
   type: WaxMarkType;
@@ -332,6 +333,38 @@ export function useRingDesign() {
     };
   }, []);
 
+  const enhanceDesign = useCallback((): EnhancementResult => {
+    const result = computeEnhancements(params, lunarTexture, engraving);
+
+    // Apply parameter changes
+    if (Object.keys(result.params).length > 0) {
+      const newParams = { ...params, ...result.params };
+      if (result.params.size !== undefined) {
+        newParams.innerDiameter = RING_SIZE_MAP[result.params.size] || params.innerDiameter;
+      }
+      setParams(newParams);
+      pushHistory(newParams);
+      craftStateRef.current.baseRingParams = newParams;
+    }
+
+    // Apply lunar changes
+    if (result.lunar) {
+      setLunarTextureRaw((prev) => ({ ...prev, ...result.lunar! }));
+    }
+
+    // Apply engraving changes
+    if (result.engraving) {
+      setEngravingRaw((prev) => ({ ...prev, ...result.engraving! }));
+    }
+
+    logCraftAction("design_enhanced", {
+      changes: result.summary,
+      paramKeys: Object.keys(result.params),
+    });
+
+    return result;
+  }, [params, lunarTexture, engraving, pushHistory, logCraftAction]);
+
   return {
     craftActions,
     castabilityReport,
@@ -374,5 +407,6 @@ export function useRingDesign() {
     randomizeLunar,
     engraving,
     setEngraving,
+    enhanceDesign,
   };
 }
