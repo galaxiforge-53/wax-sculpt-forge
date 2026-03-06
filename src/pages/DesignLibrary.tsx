@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Flame, Sparkles, Eye, ArrowRight, Upload, Search, X } from "lucide-react";
+import SEOHead from "@/components/SEOHead";
 
 // ── Design type — supports both STL and procedural ───────────────
 
@@ -908,6 +909,7 @@ export default function DesignLibrary() {
 
   return (
     <div className="min-h-screen bg-background pt-20 pb-16">
+      <SEOHead title="Design Library" description="Browse curated ring designs — bands, signets, wedding rings and more. Preview in 3D and customize in the builder." />
       {/* Hero header */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 mb-10 sm:mb-14">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center">

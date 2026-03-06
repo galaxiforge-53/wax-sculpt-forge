@@ -22,6 +22,7 @@ import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
 import { Button } from "@/components/ui/button";
+import SEOHead from "@/components/SEOHead";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 
 function BuilderInner() {
@@ -294,6 +295,7 @@ function BuilderInner() {
 
   return (
     <div className="h-screen flex flex-col bg-forge-dark overflow-hidden">
+      <SEOHead title="Ring Builder" description="Design your custom ring in 3D. Sculpt, preview metals, and export for casting." />
       <TopBar
         viewMode={viewMode}
         onViewModeChange={setViewMode}
