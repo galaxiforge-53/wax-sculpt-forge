@@ -96,101 +96,118 @@ function buildLunarHeightmap(w: number, h: number, seed: number): Float32Array {
   const rng = seededRng(seed);
   const noise = makeNoise2D(seed + 7);
 
+  // CRITICAL: aspect ratio so craters are ROUND in UV space
+  // The heightmap is w×h but maps to a ring where X=circumference, Y=width.
+  // To make craters circular, we must scale pixel distances by this ratio.
+  const aspect = w / h; // e.g. 4.0 for 1024×256
+
   // Base terrain: multi-octave fractal noise (highland/mare topography)
+  // Use aspect-corrected coordinates so terrain features are also round
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const u = x / w;
       const v = y / h;
       let val = 0;
-      val += noise(u * 6, v * 4) * 0.3;
-      val += noise(u * 12 + 3.7, v * 8 + 1.2) * 0.15;
-      val += noise(u * 24 + 7.1, v * 16 + 4.5) * 0.08;
-      val += noise(u * 48 + 13.3, v * 32 + 9.8) * 0.04;
-      val += noise(u * 96 + 21.0, v * 64 + 15.0) * 0.02;
+      val += noise(u * 8, v * 8) * 0.15;
+      val += noise(u * 16 + 3.7, v * 16 + 1.2) * 0.08;
+      val += noise(u * 32 + 7.1, v * 32 + 4.5) * 0.05;
+      val += noise(u * 64 + 13.3, v * 64 + 9.8) * 0.03;
+      val += noise(u * 128 + 21.0, v * 128 + 15.0) * 0.015;
+      // Rougher base terrain — volcanic regolith
+      val += noise(u * 200 + 50, v * 200 + 30) * 0.01;
       hmap[y * w + x] = val * 0.5;
     }
   }
 
-  // 5-tier crater distribution (Mega → Micro)
+  // 5-tier crater distribution — all radii in Y-pixels (height-space)
+  // so a radius of 20 means 20 pixels in Y, and 20*aspect pixels in X → round crater
   const tiers: CraterTier[] = [
-    { count: 2,   minR: 40, maxR: 70, depth: 0.45, rimHeight: 0.18, hasCentralPeak: true,  hasEjecta: true,  hasTerraces: true },
-    { count: 5,   minR: 20, maxR: 40, depth: 0.35, rimHeight: 0.14, hasCentralPeak: true,  hasEjecta: true,  hasTerraces: true },
-    { count: 15,  minR: 10, maxR: 22, depth: 0.28, rimHeight: 0.10, hasCentralPeak: false, hasEjecta: true,  hasTerraces: false },
-    { count: 40,  minR: 4,  maxR: 12, depth: 0.20, rimHeight: 0.06, hasCentralPeak: false, hasEjecta: false, hasTerraces: false },
-    { count: 120, minR: 1,  maxR: 5,  depth: 0.12, rimHeight: 0.03, hasCentralPeak: false, hasEjecta: false, hasTerraces: false },
+    { count: 2,   minR: 30, maxR: 55, depth: 0.55, rimHeight: 0.22, hasCentralPeak: true,  hasEjecta: true,  hasTerraces: true },
+    { count: 6,   minR: 15, maxR: 32, depth: 0.42, rimHeight: 0.18, hasCentralPeak: true,  hasEjecta: true,  hasTerraces: true },
+    { count: 20,  minR: 7,  maxR: 18, depth: 0.32, rimHeight: 0.12, hasCentralPeak: false, hasEjecta: true,  hasTerraces: false },
+    { count: 50,  minR: 3,  maxR: 9,  depth: 0.24, rimHeight: 0.08, hasCentralPeak: false, hasEjecta: false, hasTerraces: false },
+    { count: 150, minR: 1,  maxR: 4,  depth: 0.15, rimHeight: 0.04, hasCentralPeak: false, hasEjecta: false, hasTerraces: false },
   ];
 
   for (const tier of tiers) {
     for (let c = 0; c < tier.count; c++) {
       const cx = Math.floor(rng() * w);
       const cy = Math.floor(rng() * h);
-      const radius = tier.minR + rng() * (tier.maxR - tier.minR);
+      // Radius in Y-pixel space (height pixels)
+      const radiusY = tier.minR + rng() * (tier.maxR - tier.minR);
+      // Corresponding X-pixel radius to make a ROUND crater
+      const radiusX = radiusY * aspect;
       const depth = tier.depth * (0.7 + rng() * 0.6);
       const rimH = tier.rimHeight * (0.6 + rng() * 0.8);
-      const ellipticity = 0.85 + rng() * 0.3;
-      const rotAngle = rng() * Math.PI;
-      const cosA = Math.cos(rotAngle);
-      const sinA = Math.sin(rotAngle);
 
       // Central peak params
-      const peakHeight = tier.hasCentralPeak ? depth * (0.25 + rng() * 0.2) : 0;
-      const peakRadius = radius * (0.12 + rng() * 0.08);
+      const peakHeight = tier.hasCentralPeak ? depth * (0.3 + rng() * 0.2) : 0;
+      const peakRadius = 0.15 + rng() * 0.08;
 
       // Terraced walls
-      const terraceCount = tier.hasTerraces ? 2 + Math.floor(rng() * 2) : 0;
+      const terraceCount = tier.hasTerraces ? 2 + Math.floor(rng() * 3) : 0;
 
-      const rr = Math.ceil(radius * 1.8);
+      // Scan area in pixels
+      const scanX = Math.ceil(radiusX * 1.8);
+      const scanY = Math.ceil(radiusY * 1.8);
 
-      for (let dy = -rr; dy <= rr; dy++) {
-        for (let dx = -rr; dx <= rr; dx++) {
-          // Rotate for ellipticity
-          const lx = cosA * dx + sinA * dy;
-          const ly = -sinA * dx + cosA * dy;
-          const dist = Math.sqrt((lx * lx) + (ly * ly) / (ellipticity * ellipticity));
+      for (let dy = -scanY; dy <= scanY; dy++) {
+        for (let dx = -scanX; dx <= scanX; dx++) {
+          // Normalize to unit circle: divide by respective radii
+          const nx = dx / radiusX;
+          const ny = dy / radiusY;
+          const normDist = Math.sqrt(nx * nx + ny * ny);
 
-          if (dist > radius * 1.8) continue;
+          if (normDist > 1.8) continue;
 
           const px = ((cx + dx) % w + w) % w;
           const py = Math.max(0, Math.min(h - 1, cy + dy));
           const idx = py * w + px;
 
-          const normDist = dist / radius;
-
           if (normDist <= 1.0) {
             // Inside crater bowl
             let bowlProfile: number;
-            if (normDist < 0.15 && tier.hasCentralPeak) {
-              // Central peak
-              const peakDist = normDist / 0.15;
-              bowlProfile = -depth * 0.4 + peakHeight * (1 - peakDist * peakDist);
+            if (normDist < peakRadius && tier.hasCentralPeak) {
+              // Central peak — volcanic mound
+              const peakDist = normDist / peakRadius;
+              bowlProfile = -depth * 0.35 + peakHeight * Math.exp(-peakDist * peakDist * 3);
             } else {
-              // Parabolic bowl with optional terraces
-              bowlProfile = -depth * normDist * normDist;
+              // Parabolic bowl — deeper and more realistic
+              const bowlShape = normDist * normDist;
+              bowlProfile = -depth * (1 - bowlShape * 0.5);
 
-              // Add terraces
-              if (terraceCount > 0 && normDist > 0.3 && normDist < 0.9) {
+              // Add terraces (stepped inner walls)
+              if (terraceCount > 0 && normDist > 0.3 && normDist < 0.92) {
                 const terracePhase = normDist * terraceCount * Math.PI;
-                const terrace = Math.sin(terracePhase) * depth * 0.06;
+                const terrace = Math.sin(terracePhase) * depth * 0.08;
                 bowlProfile += terrace;
               }
             }
 
-            // Crater rim (raised lip near edge)
-            const rimFactor = Math.pow(normDist, 8);
-            bowlProfile += rimH * rimFactor;
+            // Sharp raised rim near the edge
+            const rimStart = 0.75;
+            if (normDist > rimStart) {
+              const rimT = (normDist - rimStart) / (1 - rimStart);
+              const rimBump = rimH * Math.sin(rimT * Math.PI);
+              bowlProfile += rimBump;
+            }
 
             hmap[idx] += bowlProfile;
           } else if (normDist <= 1.8) {
-            // Rim and ejecta blanket
+            // Rim falloff and ejecta blanket
             const rimDist = (normDist - 1.0) / 0.8;
-            const rimProfile = rimH * Math.exp(-rimDist * 3);
+            const rimProfile = rimH * Math.exp(-rimDist * 4);
 
-            // Ejecta rays
+            // Ejecta rays — radial debris streaks
             let ejecta = 0;
-            if (tier.hasEjecta && rimDist < 0.6) {
-              const angle = Math.atan2(ly, lx);
-              const rayCount = 5 + Math.floor(rng() * 4);
-              ejecta = Math.pow(Math.abs(Math.sin(angle * rayCount * 0.5)), 3) * rimH * 0.3 * (1 - rimDist);
+            if (tier.hasEjecta && rimDist < 0.7) {
+              const angle = Math.atan2(ny, nx);
+              const rayCount = 5 + Math.floor(rng() * 5);
+              const rayPattern = Math.pow(Math.abs(Math.sin(angle * rayCount * 0.5)), 4);
+              ejecta = rayPattern * rimH * 0.4 * (1 - rimDist);
+              // Rough ejecta texture
+              const ejectaNoise = noise(px * 0.15, py * 0.15) * 0.02;
+              ejecta += ejectaNoise * (1 - rimDist);
             }
 
             hmap[idx] += rimProfile + ejecta;
@@ -198,29 +215,40 @@ function buildLunarHeightmap(w: number, h: number, seed: number): Float32Array {
         }
       }
 
-      // Secondary impacts around large craters
-      if (tier.hasEjecta && radius > 15) {
-        const secondaryCount = 3 + Math.floor(rng() * 5);
+      // Secondary impacts along ejecta rays
+      if (tier.hasEjecta && radiusY > 12) {
+        const secondaryCount = 4 + Math.floor(rng() * 6);
         for (let s = 0; s < secondaryCount; s++) {
           const sAngle = rng() * Math.PI * 2;
-          const sDist = radius * (1.3 + rng() * 0.8);
-          const sx = Math.round(cx + Math.cos(sAngle) * sDist);
+          const sDist = radiusY * (1.4 + rng() * 1.0);
+          const sx = Math.round(cx + Math.cos(sAngle) * sDist * aspect);
           const sy = Math.round(cy + Math.sin(sAngle) * sDist);
-          const sRadius = 1 + rng() * 3;
-          const sDepth = depth * 0.08;
+          const sRadY = 1 + rng() * 3;
+          const sRadX = sRadY * aspect;
+          const sDepth = depth * 0.1;
 
-          for (let dy2 = -Math.ceil(sRadius); dy2 <= Math.ceil(sRadius); dy2++) {
-            for (let dx2 = -Math.ceil(sRadius); dx2 <= Math.ceil(sRadius); dx2++) {
-              const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-              if (d2 > sRadius) continue;
+          for (let dy2 = -Math.ceil(sRadY); dy2 <= Math.ceil(sRadY); dy2++) {
+            for (let dx2 = -Math.ceil(sRadX); dx2 <= Math.ceil(sRadX); dx2++) {
+              const snx = dx2 / sRadX;
+              const sny = dy2 / sRadY;
+              const d2 = Math.sqrt(snx * snx + sny * sny);
+              if (d2 > 1) continue;
               const spx = ((sx + dx2) % w + w) % w;
               const spy = Math.max(0, Math.min(h - 1, sy + dy2));
-              const norm2 = d2 / sRadius;
-              hmap[spy * w + spx] -= sDepth * (1 - norm2 * norm2);
+              hmap[spy * w + spx] -= sDepth * (1 - d2 * d2);
             }
           }
         }
       }
+    }
+  }
+
+  // Micro-roughness pass: volcanic regolith grain
+  const grainNoise = makeNoise2D(seed + 99);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const grain = grainNoise(x * 0.5, y * 0.5) * 0.008;
+      hmap[y * w + x] += grain;
     }
   }
 
@@ -246,9 +274,11 @@ function useLunarTextures() {
     const H = 256;
     const hmap = buildLunarHeightmap(W, H, 4207);
 
-    // Normal map from heightmap
+    // Normal map from heightmap — stronger for deeper crater shading
     const normalData = new Uint8Array(W * H * 4);
-    const strength = 3.0;
+    // Aspect-correct the normal derivatives so shading matches round craters
+    const aspectRatio = W / H;
+    const strength = 5.0;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const idx = y * W + x;
@@ -257,7 +287,7 @@ function useLunarTextures() {
         const yn = Math.max(0, y - 1);
         const yp = Math.min(H - 1, y + 1);
         const dhdx = (hmap[y * W + xp] - hmap[y * W + xn]) * strength;
-        const dhdy = (hmap[yp * W + x] - hmap[yn * W + x]) * strength;
+        const dhdy = (hmap[yp * W + x] - hmap[yn * W + x]) * strength * aspectRatio;
         const len = Math.sqrt(dhdx * dhdx + dhdy * dhdy + 1);
         normalData[idx * 4]     = Math.round(((-dhdx / len) * 0.5 + 0.5) * 255);
         normalData[idx * 4 + 1] = Math.round(((dhdy / len) * 0.5 + 0.5) * 255);
@@ -333,7 +363,7 @@ function HeroRingMesh() {
     const uvAttr = lathe.attributes.uv;
 
     // Bake lunar heightmap displacement into outer surface vertices
-    const displacementScale = 0.018;
+    const displacementScale = 0.032;
     for (let i = 0; i < posAttr.count; i++) {
       const x = posAttr.getX(i);
       const y = posAttr.getY(i);
@@ -389,16 +419,16 @@ function HeroRingMesh() {
     <group ref={groupRef}>
       <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <meshPhysicalMaterial
-          color="#D4A520"
-          roughness={0.12}
+          color="#C4A030"
+          roughness={0.18}
           metalness={1.0}
-          envMapIntensity={3.5}
-          clearcoat={0.3}
-          clearcoatRoughness={0.15}
+          envMapIntensity={3.0}
+          clearcoat={0.15}
+          clearcoatRoughness={0.25}
           reflectivity={1.0}
           ior={2.5}
           normalMap={normalTex}
-          normalScale={new THREE.Vector2(1.5, 1.5)}
+          normalScale={new THREE.Vector2(2.5, 2.5)}
           roughnessMap={roughTex}
         />
       </mesh>
