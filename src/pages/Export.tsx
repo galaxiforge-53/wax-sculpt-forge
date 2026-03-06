@@ -6,8 +6,8 @@ import { DesignPackage, ViewMode, MetalPreset, FinishPreset, RING_SIZE_MAP } fro
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
 import { getReturnUrl, getHandoffUrl, isEmbedMode } from "@/config/galaxiforge";
-import { generateExportSTL, downloadBlob, STLExportResult } from "@/lib/stlExporter";
-import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles } from "lucide-react";
+import { generateExportSTL, downloadBlob, STLExportResult, SHRINKAGE_PROFILES, ShrinkageMetal } from "@/lib/stlExporter";
+import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale } from "lucide-react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
@@ -97,6 +97,7 @@ export default function Export() {
   const [sent, setSent] = useState(false);
   const [stlResult, setStlResult] = useState<STLExportResult | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [shrinkage, setShrinkage] = useState<ShrinkageMetal>("none");
 
   // Submission form state
   const [submitStep, setSubmitStep] = useState<SubmitStep>("review");
@@ -111,14 +112,19 @@ export default function Export() {
     if (raw) {
       const parsed = JSON.parse(raw) as DesignPackage;
       setPkg(parsed);
-      // Initialize confirmation fields from design
       setConfirmSize(parsed.parameters.size);
       setConfirmMetal(parsed.metalPreset);
       setConfirmFinish(parsed.finishPreset);
+      // Auto-select shrinkage based on metal
+      if (parsed.metalPreset === "gold" || parsed.metalPreset === "rose-gold") {
+        setShrinkage("gold");
+      } else if (parsed.metalPreset === "silver") {
+        setShrinkage("silver");
+      }
     }
   }, []);
 
-  // Generate STL when package loads
+  // Generate STL when package loads or shrinkage changes
   useEffect(() => {
     if (!pkg) return;
     setGenerating(true);
@@ -132,6 +138,7 @@ export default function Export() {
           pkg.parameters,
           lunar.enabled ? lunar : null,
           engraving.enabled ? engraving : null,
+          shrinkage,
         );
         setStlResult(result);
       } catch (e) {
@@ -141,7 +148,7 @@ export default function Export() {
         setGenerating(false);
       }
     });
-  }, [pkg]);
+  }, [pkg, shrinkage]);
 
   const handleDownloadSTL = () => {
     if (!stlResult || !pkg) return;
@@ -281,6 +288,50 @@ export default function Export() {
             warn={pkg.parameters.thickness < 1.2}
           />
           <SpecBadge icon={Box} label="Ring Size" value={`${pkg.parameters.size} US`} />
+        </div>
+
+        {/* ── Casting Shrinkage Compensation ── */}
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Scale className="w-4 h-4 text-primary" />
+            <h3 className="text-xs font-display uppercase tracking-wider text-foreground">Casting Shrinkage Compensation</h3>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            Metals shrink during the investment casting process. Select a shrinkage profile to automatically scale the STL model so the final cast ring matches your intended dimensions.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(Object.entries(SHRINKAGE_PROFILES) as [ShrinkageMetal, typeof SHRINKAGE_PROFILES["none"]][]).map(
+              ([key, profile]) => (
+                <button
+                  key={key}
+                  onClick={() => setShrinkage(key)}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    shrinkage === key
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                  }`}
+                >
+                  <p className={`text-[11px] font-medium ${shrinkage === key ? "text-primary" : "text-foreground"}`}>
+                    {profile.label}
+                  </p>
+                  <p className={`text-[10px] font-mono mt-0.5 ${shrinkage === key ? "text-primary/80" : "text-muted-foreground"}`}>
+                    {key === "none" ? "×1.000" : `×${profile.factor.toFixed(3)}`}
+                    {key !== "none" && ` (+${((profile.factor - 1) * 100).toFixed(1)}%)`}
+                  </p>
+                </button>
+              )
+            )}
+          </div>
+          {shrinkage !== "none" && (
+            <div className="flex items-start gap-2 text-[10px] text-primary bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
+              <Scale className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>
+                STL is scaled ×{SHRINKAGE_PROFILES[shrinkage].factor.toFixed(3)} — 
+                inner Ø becomes {(pkg.parameters.innerDiameter * SHRINKAGE_PROFILES[shrinkage].factor).toFixed(2)}mm 
+                (was {pkg.parameters.innerDiameter.toFixed(1)}mm)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Warnings */}
