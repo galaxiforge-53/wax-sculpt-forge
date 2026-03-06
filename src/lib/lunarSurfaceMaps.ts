@@ -395,12 +395,39 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
 
 // ── Build heightmap ───────────────────────────────────────────────
 
+// Reference ring for surface-area scaling (US size 8, 6mm wide, 2mm thick)
+const REF_INNER_DIAM = 18.1; // mm
+const REF_WIDTH = 6;         // mm
+const REF_THICKNESS = 2;     // mm
+
+function computeSurfaceAreaFactor(innerDiameterMm: number, widthMm: number, thicknessMm: number): number {
+  const refOuterR = REF_INNER_DIAM / 2 + REF_THICKNESS;
+  const refArea = 2 * Math.PI * refOuterR * REF_WIDTH;
+  const outerR = innerDiameterMm / 2 + thicknessMm;
+  const area = 2 * Math.PI * outerR * widthMm;
+  // Clamp so very small rings don't drop to zero craters
+  return Math.max(0.35, Math.min(3.0, area / refArea));
+}
+
 export interface HeightmapResult {
   hmap: Float32Array;
   craterCount: number;
 }
 
-export function buildHeightmap(lunar: LunarTextureState, physicalAspect: number = 1): HeightmapResult {
+/**
+ * Build the lunar heightmap. When ring dimensions are provided, crater counts
+ * scale proportionally to the physical surface area so a narrow size-3 ring
+ * isn't overcrowded and a wide size-16 ring isn't sparse.
+ */
+export function buildHeightmap(
+  lunar: LunarTextureState,
+  physicalAspect: number = 1,
+  ringDims?: { innerDiameterMm: number; widthMm: number; thicknessMm: number },
+): HeightmapResult {
+  const surfaceAreaFactor = ringDims
+    ? computeSurfaceAreaFactor(ringDims.innerDiameterMm, ringDims.widthMm, ringDims.thicknessMm)
+    : 1;
+
   const hmap = new Float32Array(MAP_W * MAP_H).fill(0.5);
   const rand = seededRng(lunar.seed);
   const rimSharp = lunar.rimSharpness / 100;
@@ -432,28 +459,29 @@ export function buildHeightmap(lunar: LunarTextureState, physicalAspect: number 
   const warpNoise = makeNoise2D(lunar.seed + 1234);
   const warpAmp = 0.15 + rimSharp * 0.12;
 
-  // ─── 3) 5-tier crater distribution ─────────────────────
+  // ─── 3) 5-tier crater distribution (scaled by surface area) ─────
   const densityMul = lunar.craterDensity === "low" ? 0.5 : lunar.craterDensity === "med" ? 1.0 : 1.8;
   const sizeMul = lunar.craterSize === "small" ? 0.6 : lunar.craterSize === "med" ? 1.0 : 1.5;
+  const saf = surfaceAreaFactor; // shorthand
 
-  // Tier 0: MEGA craters (1-3, massive basin impacts)
-  const megaCount = Math.round(1 + densityMul * 1.5);
+  // Tier 0: MEGA craters (1-3, massive basin impacts) — count barely scales
+  const megaCount = Math.round((1 + densityMul * 1.5) * Math.max(0.6, Math.min(1.5, saf)));
   const megaRadMin = 0.12 * sizeMul, megaRadMax = 0.22 * sizeMul;
 
-  // Tier 1: HERO craters (3-8)
-  const heroCount = Math.round(3 + densityMul * 5);
+  // Tier 1: HERO craters (3-8) — moderate scaling
+  const heroCount = Math.round((3 + densityMul * 5) * Math.sqrt(saf));
   const heroRadMin = 0.06 * sizeMul, heroRadMax = 0.12 * sizeMul;
 
-  // Tier 2: MEDIUM craters (15-50)
-  const medCount = Math.round(15 + densityMul * 35 * sizeMul);
+  // Tier 2: MEDIUM craters (15-50) — full scaling
+  const medCount = Math.round((15 + densityMul * 35 * sizeMul) * saf);
   const medRadMin = 0.025 * sizeMul, medRadMax = 0.06 * sizeMul;
 
-  // Tier 3: SMALL craters (40-200)
-  const smallCount = Math.round(40 + densityMul * 160);
+  // Tier 3: SMALL craters (40-200) — full scaling
+  const smallCount = Math.round((40 + densityMul * 160) * saf);
   const smallRadMin = 0.008, smallRadMax = 0.025 * sizeMul;
 
-  // Tier 4: MICRO-PITS (hundreds, handled separately)
-  const microPitCount = Math.round(200 + densityMul * 600);
+  // Tier 4: MICRO-PITS (hundreds) — full scaling
+  const microPitCount = Math.round((200 + densityMul * 600) * saf);
 
   const stamps: CraterStamp[] = [];
 
@@ -806,13 +834,24 @@ function setupDataTexture(tex: THREE.CanvasTexture) {
 
 // ── Public API ────────────────────────────────────────────────────
 
-export function generateLunarSurfaceMaps(lunar: LunarTextureState, physicalAspect?: number): LunarSurfaceMapSet {
+export interface RingDimensions {
+  innerDiameterMm: number;
+  widthMm: number;
+  thicknessMm: number;
+}
+
+export function generateLunarSurfaceMaps(
+  lunar: LunarTextureState,
+  physicalAspect?: number,
+  ringDims?: RingDimensions,
+): LunarSurfaceMapSet {
   // physicalAspect = circumference / width; defaults to 1 (square) for backward compat
   const aspect = physicalAspect ?? 1;
-  const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}`;
+  const dimsKey = ringDims ? `-d${ringDims.innerDiameterMm.toFixed(1)}_${ringDims.widthMm.toFixed(1)}_${ringDims.thicknessMm.toFixed(1)}` : "";
+  const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}` + dimsKey;
   if (cache.has(key)) return cache.get(key)!;
 
-  const { hmap, craterCount } = buildHeightmap(lunar, aspect);
+  const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
 
   // Scale normal map Y gradient by aspect ratio so lighting responds to circular craters correctly
   const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
