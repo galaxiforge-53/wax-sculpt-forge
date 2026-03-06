@@ -74,6 +74,56 @@ export type Database = {
         }
         Relationships: []
       }
+      production_orders: {
+        Row: {
+          created_at: string
+          design_id: string | null
+          design_package: Json
+          finish: string
+          id: string
+          metal: string
+          notes: string | null
+          ring_size: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          design_id?: string | null
+          design_package: Json
+          finish: string
+          id?: string
+          metal: string
+          notes?: string | null
+          ring_size: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          design_id?: string | null
+          design_package?: Json
+          finish?: string
+          id?: string
+          metal?: string
+          notes?: string | null
+          ring_size?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_orders_design_id_fkey"
+            columns: ["design_id"]
+            isOneToOne: false
+            referencedRelation: "ring_designs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
