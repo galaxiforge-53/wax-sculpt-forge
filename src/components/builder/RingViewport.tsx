@@ -311,67 +311,116 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
   );
 }
 
-// ── Procedural ring mesh — high-poly with displacement when lunar enabled ──────
+// ── Build solid ring geometry with separate outer, inner, and cap surfaces ──
+function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
+  const innerR = params.innerDiameter / 2 / 10;
+  const outerR = innerR + params.thickness / 10;
+  const halfW = params.width / 2 / 10;
+  const bevel = params.bevelSize / 10;
+
+  const radSegs = hasLunar ? 512 : 128;
+  const profileSteps = hasLunar ? 128 : 32;
+
+  // Build outer profile curve (only outer surface, from one edge to other)
+  const outerPoints: THREE.Vector2[] = [];
+  if (params.profile === "dome" || params.profile === "comfort") {
+    for (let i = 0; i <= profileSteps; i++) {
+      const t = i / profileSteps;
+      const angle = t * Math.PI;
+      const r = innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
+      const y = (t - 0.5) * halfW * 2;
+      outerPoints.push(new THREE.Vector2(r, y));
+    }
+  } else if (params.profile === "flat") {
+    if (hasLunar) {
+      for (let i = 0; i <= profileSteps; i++) {
+        const t = i / profileSteps;
+        const y = (t - 0.5) * halfW * 2;
+        const edgeDist = Math.min(t, 1 - t);
+        const bevelT = Math.min(1, edgeDist / (bevel / (halfW * 2) + 0.01));
+        const r = innerR + (outerR - innerR) * Math.min(1, bevelT);
+        outerPoints.push(new THREE.Vector2(r, y));
+      }
+    } else {
+      const b = Math.min(bevel, halfW * 0.4);
+      outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
+      for (let i = 0; i <= 8; i++) {
+        const t = i / 8;
+        outerPoints.push(new THREE.Vector2(
+          outerR - b + b * Math.sin(t * Math.PI / 2),
+          -halfW + b * (1 - Math.cos(t * Math.PI / 2))
+        ));
+      }
+      outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
+      outerPoints.push(new THREE.Vector2(outerR, halfW - b));
+      for (let i = 0; i <= 8; i++) {
+        const t = i / 8;
+        outerPoints.push(new THREE.Vector2(
+          outerR - b * Math.sin(t * Math.PI / 2),
+          halfW - b + b * Math.sin(t * Math.PI / 2) // fixed: was incorrect
+        ));
+      }
+    }
+  } else if (params.profile === "knife-edge") {
+    for (let i = 0; i <= profileSteps; i++) {
+      const t = i / profileSteps;
+      const angle = t * Math.PI;
+      const bulge = Math.pow(Math.sin(angle), 0.5);
+      const r = innerR + (outerR - innerR) * bulge;
+      const y = (t - 0.5) * halfW * 2;
+      outerPoints.push(new THREE.Vector2(r, y));
+    }
+  } else { // square
+    for (let i = 0; i <= profileSteps; i++) {
+      const t = i / profileSteps;
+      const y = (t - 0.5) * halfW * 2;
+      outerPoints.push(new THREE.Vector2(outerR, y));
+    }
+  }
+
+  // 1. Outer surface — LatheGeometry (this gets lunar textures)
+  const outerGeo = new THREE.LatheGeometry(outerPoints, radSegs);
+  outerGeo.computeVertexNormals();
+
+  // 2. Inner bore — smooth cylinder (NO lunar texture, just polished inner surface)
+  const innerGeo = new THREE.CylinderGeometry(innerR, innerR, halfW * 2, radSegs, 1, true);
+  // Flip normals inward for inner bore
+  const innerPos = innerGeo.attributes.position;
+  const innerNorm = innerGeo.attributes.normal;
+  for (let i = 0; i < innerNorm.count; i++) {
+    innerNorm.setXYZ(i, -innerNorm.getX(i), -innerNorm.getY(i), -innerNorm.getZ(i));
+  }
+  // Flip face winding
+  const innerIdx = innerGeo.index;
+  if (innerIdx) {
+    const arr = innerIdx.array as Uint16Array | Uint32Array;
+    for (let i = 0; i < arr.length; i += 3) {
+      const tmp = arr[i];
+      arr[i] = arr[i + 2];
+      arr[i + 2] = tmp;
+    }
+  }
+
+  // 3. End caps — ring-shaped annular discs connecting outer edge to inner bore
+  const capGeoTop = new THREE.RingGeometry(innerR, outerPoints[outerPoints.length - 1].x, radSegs, 1);
+  capGeoTop.rotateX(-Math.PI / 2);
+  capGeoTop.translate(0, halfW, 0);
+
+  const capGeoBot = new THREE.RingGeometry(innerR, outerPoints[0].x, radSegs, 1);
+  capGeoBot.rotateX(Math.PI / 2);
+  capGeoBot.translate(0, -halfW, 0);
+
+  return { outerGeo, innerGeo, capGeoTop, capGeoBot };
+}
+
+// ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
 function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
   const hasLunar = !!lunarTexture?.enabled;
 
-  const geometry = useMemo(() => {
-    const innerRadius = params.innerDiameter / 2 / 10;
-    const outerRadius = innerRadius + params.thickness / 10;
-    const width = params.width / 10;
-    const bevel = params.bevelSize / 10;
-
-    // When lunar is enabled, use much higher subdivision for displacement to work
-    const steps = hasLunar ? 128 : 24;
-    const segments = hasLunar ? 512 : 128;
-    const points: THREE.Vector2[] = [];
-
-    if (params.profile === "dome" || params.profile === "comfort") {
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const angle = t * Math.PI;
-        const r = innerRadius + (outerRadius - innerRadius) * (0.5 + 0.5 * Math.sin(angle));
-        const y = (t - 0.5) * width;
-        points.push(new THREE.Vector2(r, y));
-      }
-    } else if (params.profile === "flat") {
-      // For flat profile with lunar, interpolate more points for smooth displacement
-      if (hasLunar) {
-        for (let i = 0; i <= steps; i++) {
-          const t = i / steps;
-          const y = (t - 0.5) * width;
-          let r: number;
-          // Create flat profile with beveled edges using more points
-          const edgeDist = Math.min(t, 1 - t);
-          const bevelT = Math.min(1, edgeDist / (bevel / width + 0.01));
-          r = innerRadius + (outerRadius - innerRadius) * Math.min(1, bevelT);
-          points.push(new THREE.Vector2(r, y));
-        }
-      } else {
-        points.push(new THREE.Vector2(innerRadius, -width / 2));
-        points.push(new THREE.Vector2(outerRadius - bevel, -width / 2));
-        points.push(new THREE.Vector2(outerRadius, -width / 2 + bevel));
-        points.push(new THREE.Vector2(outerRadius, width / 2 - bevel));
-        points.push(new THREE.Vector2(outerRadius - bevel, width / 2));
-        points.push(new THREE.Vector2(innerRadius, width / 2));
-      }
-    } else if (params.profile === "knife-edge") {
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const angle = t * Math.PI;
-        const bulge = Math.pow(Math.sin(angle), 0.5);
-        const r = innerRadius + (outerRadius - innerRadius) * bulge;
-        const y = (t - 0.5) * width;
-        points.push(new THREE.Vector2(r, y));
-      }
-    } else {
-      points.push(new THREE.Vector2(innerRadius, -width / 2));
-    }
-
-    const lathe = new THREE.LatheGeometry(points, segments);
-    lathe.computeVertexNormals();
-    return lathe;
-  }, [params, hasLunar]);
+  const { outerGeo, innerGeo, capGeoTop, capGeoBot } = useMemo(
+    () => buildSolidRingGeometry(params, hasLunar),
+    [params, hasLunar]
+  );
 
   const isWax = viewMode === "wax";
   const isWaxPrint = viewMode === "wax-print";
@@ -386,7 +435,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return width > 0 ? circumference / width : 1;
   }, [params.innerDiameter, params.thickness, params.width]);
 
-  // Generate lunar procedural maps for ANY ring shape
+  // Generate lunar procedural maps for outer surface only
   const lunarMaps = useMemo(() => {
     if (!lunarTexture?.enabled) return null;
     return generateLunarSurfaceMaps(lunarTexture, physicalAspect);
@@ -403,16 +452,13 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
-    // Strong normal mapping for visible crater relief
     const strength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
     return new THREE.Vector2(strength, -strength);
   }, [lunarTexture?.enabled, lunarTexture?.intensity]);
 
-  // Displacement scale — aggressive for real 3D crater depth
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = params.innerDiameter / 2 / 10 + params.thickness / 10;
-    // 4-12% of outer radius creates dramatic, visible craters
     return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10);
   }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness]);
 
@@ -432,14 +478,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
-  return (
-    <mesh
-      geometry={geometry}
-      rotation={[Math.PI / 2, 0, 0]}
-      castShadow
-      onPointerDown={handlePointerDown}
-    >
-      {isWaxPrint ? (
+  // Outer material — has lunar textures
+  const outerMaterial = useMemo(() => {
+    if (isWaxPrint) {
+      return (
         <meshStandardMaterial
           color="#C8B896"
           roughness={0.6}
@@ -452,8 +494,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
           displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
+          side={THREE.FrontSide}
         />
-      ) : isWax ? (
+      );
+    }
+    if (isWax) {
+      return (
         <meshStandardMaterial
           color="#78A85B"
           roughness={hasLunar ? 0.82 : 0.85}
@@ -466,31 +512,102 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
           displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
+          side={THREE.FrontSide}
         />
-      ) : (
-        <meshPhysicalMaterial
-          color={mc.color}
-          roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod)}
-          metalness={mc.metalness}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 2.0 : 0}
-          normalScale={normalScale}
-          envMapIntensity={mc.envMapIntensity}
-          clearcoat={hasLunar ? mc.clearcoat : mc.clearcoat * 1.5}
-          clearcoatRoughness={mc.clearcoatRoughness}
-          reflectivity={mc.reflectivity}
-          sheen={mc.sheen}
-          sheenColor={mc.sheenColor}
-          sheenRoughness={mc.sheenRoughness}
-          ior={mc.ior}
-          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
-          displacementScale={dispScale}
-          displacementBias={-dispScale * 0.5}
-        />
-      )}
-    </mesh>
+      );
+    }
+    return (
+      <meshPhysicalMaterial
+        color={mc.color}
+        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod)}
+        metalness={mc.metalness}
+        normalMap={lunarMaps?.normalMap ?? null}
+        roughnessMap={lunarMaps?.roughnessMap ?? null}
+        aoMap={lunarMaps?.aoMap ?? null}
+        aoMapIntensity={hasLunar ? 2.0 : 0}
+        normalScale={normalScale}
+        envMapIntensity={mc.envMapIntensity}
+        clearcoat={hasLunar ? mc.clearcoat : mc.clearcoat * 1.5}
+        clearcoatRoughness={mc.clearcoatRoughness}
+        reflectivity={mc.reflectivity}
+        sheen={mc.sheen}
+        sheenColor={mc.sheenColor}
+        sheenRoughness={mc.sheenRoughness}
+        ior={mc.ior}
+        displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+        displacementScale={dispScale}
+        displacementBias={-dispScale * 0.5}
+        side={THREE.FrontSide}
+      />
+    );
+  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale]);
+
+  // Inner bore material — always smooth, polished, NO lunar texture
+  const innerMaterial = useMemo(() => {
+    if (isWaxPrint) {
+      return <meshStandardMaterial color="#D4CFC0" roughness={0.35} metalness={0.0} side={THREE.FrontSide} />;
+    }
+    if (isWax) {
+      return <meshStandardMaterial color="#6B9650" roughness={0.5} metalness={0.05} side={THREE.FrontSide} />;
+    }
+    return (
+      <meshPhysicalMaterial
+        color={mc.color}
+        roughness={Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3)}
+        metalness={mc.metalness}
+        envMapIntensity={mc.envMapIntensity * 0.8}
+        clearcoat={0.4}
+        clearcoatRoughness={0.03}
+        reflectivity={mc.reflectivity}
+        ior={mc.ior}
+        side={THREE.FrontSide}
+      />
+    );
+  }, [isWax, isWaxPrint, mc, finishRoughMod]);
+
+  // Cap material — matches inner but matte
+  const capMaterial = useMemo(() => {
+    if (isWaxPrint) {
+      return <meshStandardMaterial color="#C8B896" roughness={0.55} metalness={0.0} side={THREE.DoubleSide} />;
+    }
+    if (isWax) {
+      return <meshStandardMaterial color="#6E9A55" roughness={0.7} metalness={0.05} side={THREE.DoubleSide} />;
+    }
+    return (
+      <meshPhysicalMaterial
+        color={mc.color}
+        roughness={Math.min(1, mc.roughness + 0.05 + finishRoughMod)}
+        metalness={mc.metalness}
+        envMapIntensity={mc.envMapIntensity * 0.7}
+        clearcoat={mc.clearcoat * 0.5}
+        clearcoatRoughness={mc.clearcoatRoughness}
+        reflectivity={mc.reflectivity * 0.9}
+        ior={mc.ior}
+        side={THREE.DoubleSide}
+      />
+    );
+  }, [isWax, isWaxPrint, mc, finishRoughMod]);
+
+  return (
+    <group rotation={[Math.PI / 2, 0, 0]}>
+      {/* Outer surface — textured with lunar/displacement */}
+      <mesh geometry={outerGeo} castShadow onPointerDown={handlePointerDown}>
+        {outerMaterial}
+      </mesh>
+
+      {/* Inner bore — smooth polished surface */}
+      <mesh geometry={innerGeo} castShadow>
+        {innerMaterial}
+      </mesh>
+
+      {/* End caps */}
+      <mesh geometry={capGeoTop} castShadow>
+        {capMaterial}
+      </mesh>
+      <mesh geometry={capGeoBot} castShadow>
+        {capMaterial}
+      </mesh>
+    </group>
   );
 }
 
@@ -688,6 +805,8 @@ function SnapshotHelper({ onReady }: { onReady: (api: { capture: (pos: [number, 
 
 // ── Forge Workbench Environment ────────────────────────────────────
 function WorkbenchGrid({ params }: { params: RingParameters }) {
+  const outerR = (params.innerDiameter / 2 + params.thickness) / 10;
+  const gridY = -(outerR + 0.12); // Position grid just below the ring's outer radius
   const outerDiam = (params.innerDiameter + 2 * params.thickness) / 10;
   const gridSize = Math.max(3, Math.ceil(outerDiam * 3));
   const majorDivisions = gridSize; // every 10mm
@@ -696,7 +815,7 @@ function WorkbenchGrid({ params }: { params: RingParameters }) {
   const scaleLen = 1; // 10mm
 
   return (
-    <group position={[0, -0.85, 0]}>
+    <group position={[0, gridY, 0]}>
       {/* Measurement bed plane — very subtle */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[gridSize, gridSize]} />
@@ -803,6 +922,8 @@ interface RingViewportProps {
   cutawayMode?: CutawayMode;
   lighting?: LightingSettings;
   showcaseMode?: boolean;
+  ringPosition?: [number, number, number];
+  ringRotation?: [number, number, number];
 }
 
 // ── Clipping plane manager ─────────────────────────────────────────
@@ -839,9 +960,11 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp, showcaseMode = false, ringPosition, ringRotation }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
-    const sc = showcaseMode; // shorthand
+    const sc = showcaseMode;
+    const rPos = ringPosition ?? [0, 0, 0];
+    const rRot = ringRotation ?? [0, 0, 0];
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -926,45 +1049,53 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             );
           })()}
 
-          <RingMesh
-            params={params}
-            viewMode={viewMode}
-            metalPreset={metalPreset}
-            finishPreset={finishPreset}
-            activeTool={activeTool ?? null}
-            onAddWaxMark={onAddWaxMark}
-            stampSettings={stampSettings}
-            lunarTexture={lunarTexture}
-          />
+          {/* Ring group — positioned and rotated */}
+          <group position={rPos} rotation={rRot}>
+            <RingMesh
+              params={params}
+              viewMode={viewMode}
+              metalPreset={metalPreset}
+              finishPreset={finishPreset}
+              activeTool={activeTool ?? null}
+              onAddWaxMark={onAddWaxMark}
+              stampSettings={stampSettings}
+              lunarTexture={lunarTexture}
+            />
 
-          {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (
-            <WaxMarkOverlays marks={waxMarks} />
-          )}
+            {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (
+              <WaxMarkOverlays marks={waxMarks} />
+            )}
 
-          {viewMode === "wax" && inlays && inlays.length > 0 && (
-            <InlayBandMarkers inlays={inlays} params={params} />
-          )}
+            {viewMode === "wax" && inlays && inlays.length > 0 && (
+              <InlayBandMarkers inlays={inlays} params={params} />
+            )}
 
-          {/* Interior engraving */}
-          {engraving?.enabled && engraving.text && (
-            <EngravingText3D params={params} engraving={engraving} />
-          )}
+            {/* Interior engraving */}
+            {engraving?.enabled && engraving.text && (
+              <EngravingText3D params={params} engraving={engraving} />
+            )}
 
-          {/* Workbench measurement bed */}
+            {/* Measurement dimension guides */}
+            <MeasurementOverlay params={params} visible={viewMode === "wax-print" || !!showMeasurements} />
+          </group>
+
+          {/* Workbench measurement bed — always at world origin */}
           <WorkbenchGrid params={params} />
 
-          {/* Measurement dimension guides */}
-          {/* Measurement dimension guides — always visible in wax-print mode */}
-          <MeasurementOverlay params={params} visible={viewMode === "wax-print" || !!showMeasurements} />
-
-          <ContactShadows
-            position={[0, -0.84, 0]}
-            opacity={sc ? 0.65 : 0.5}
-            scale={sc ? 8 : 6}
-            blur={sc ? 3 : 2}
-            far={sc ? 5 : 4}
-            resolution={sc ? 512 : 256}
-          />
+          {(() => {
+            const outerR = (params.innerDiameter / 2 + params.thickness) / 10;
+            const shadowY = -(outerR + 0.11);
+            return (
+              <ContactShadows
+                position={[0, shadowY, 0]}
+                opacity={sc ? 0.65 : 0.5}
+                scale={sc ? 8 : 6}
+                blur={sc ? 3 : 2}
+                far={sc ? 5 : 4}
+                resolution={sc ? 512 : 256}
+              />
+            );
+          })()}
 
           <Environment preset={lighting.envPreset} environmentIntensity={sc ? lighting.envIntensity * 1.8 : lighting.envIntensity} />
           <OrbitControls
