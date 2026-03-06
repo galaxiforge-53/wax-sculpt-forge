@@ -1,6 +1,7 @@
 import Hero from "@/components/landing/Hero";
 import HowItWorks from "@/components/landing/HowItWorks";
 import RingShowcase from "@/components/landing/RingShowcase";
+import SEOHead from "@/components/SEOHead";
 import { isEmbedMode } from "@/config/galaxiforge";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +15,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="Custom Ring Builder — Carve, Cast, Create" description="Design custom rings in 3D with ForgeLab. Sculpt in digital wax, preview in precious metals, and send to GalaxiForge for precision casting." />
       <Hero />
       <HowItWorks />
       <RingShowcase />

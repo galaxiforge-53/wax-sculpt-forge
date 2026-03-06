@@ -10,6 +10,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { useRef } from "react";
+import SEOHead from "@/components/SEOHead";
 
 // ── Tiny 3D ring preview for each card ──────────────────────
 
@@ -316,6 +317,7 @@ export default function Templates() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead title="Ring Templates" description="Start from a proven template — classic bands, cosmic textures, minimalist designs and more. One-click customization." />
       {/* Hero header */}
       <div className="relative overflow-hidden border-b border-border">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] via-transparent to-transparent" />

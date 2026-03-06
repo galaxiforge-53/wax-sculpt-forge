@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import SEOHead from "@/components/SEOHead";
 
 const FAQ = [
   { q: "How do I start a new ring?", a: "Go to Builders → Wax Ring Builder and use the tools on the left to sculpt." },
@@ -10,6 +11,7 @@ const FAQ = [
 export default function Help() {
   return (
     <div className="min-h-screen bg-background px-4 sm:px-6 py-10 sm:py-16">
+      <SEOHead title="Help & FAQ" description="Learn how to use ForgeLab — design rings, preview metals, export for casting, and more." />
       <div className="max-w-2xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mb-2">Help</h1>
