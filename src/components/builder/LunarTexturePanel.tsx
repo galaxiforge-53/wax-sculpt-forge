@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
@@ -228,6 +228,116 @@ const PLANETARY_PRESETS: PlanetaryPreset[] = [
   },
 ];
 
+// ── Meteorite Surface Library ─────────────────────────────────────
+
+interface MeteoritePreset {
+  name: string;
+  emoji: string;
+  description: string;
+  type: string; // classification
+  color: string;
+  build: () => LunarTextureState;
+}
+
+const METEORITE_PRESETS: MeteoritePreset[] = [
+  {
+    name: "Iron Widmanstätten",
+    emoji: "⚔",
+    type: "Iron (IIIAB)",
+    color: "text-zinc-300",
+    description: "Classic cross-hatched crystal pattern from slow cooling over millions of years — deep angular fractures with sharp metallic ridges",
+    build: () => ({
+      enabled: true, intensity: 70, craterDensity: "low", craterSize: "small",
+      microDetail: 85, rimSharpness: 95, overlapIntensity: 15, smoothEdges: false, seed: newSeed(),
+      rimHeight: 80, bowlDepth: 20, erosion: 5, terrainRoughness: 90, craterVariation: 30,
+    }),
+  },
+  {
+    name: "Pallasite Crystal",
+    emoji: "💎",
+    type: "Stony-Iron",
+    color: "text-amber-300",
+    description: "Olivine crystals embedded in nickel-iron matrix — smooth gem pockets surrounded by rough metallic ridges",
+    build: () => ({
+      enabled: true, intensity: 55, craterDensity: "med", craterSize: "large",
+      microDetail: 40, rimSharpness: 30, overlapIntensity: 60, smoothEdges: true, seed: newSeed(),
+      rimHeight: 25, bowlDepth: 75, erosion: 40, terrainRoughness: 45, craterVariation: 90,
+    }),
+  },
+  {
+    name: "Chondrite Regmaglypts",
+    emoji: "🪨",
+    type: "Stony (L5)",
+    color: "text-stone-400",
+    description: "Thumbprint-like ablation cavities from atmospheric entry — rounded pits with smooth interiors and rough ridges between",
+    build: () => ({
+      enabled: true, intensity: 65, craterDensity: "high", craterSize: "med",
+      microDetail: 50, rimSharpness: 25, overlapIntensity: 55, smoothEdges: true, seed: newSeed(),
+      rimHeight: 20, bowlDepth: 70, erosion: 50, terrainRoughness: 55, craterVariation: 75,
+    }),
+  },
+  {
+    name: "Gibeon Iron",
+    emoji: "🔩",
+    type: "Iron (IVA)",
+    color: "text-slate-300",
+    description: "Fine octahedrite — tight geometric etching with subtle pitting and highly polished fracture faces",
+    build: () => ({
+      enabled: true, intensity: 60, craterDensity: "low", craterSize: "small",
+      microDetail: 95, rimSharpness: 85, overlapIntensity: 10, smoothEdges: false, seed: newSeed(),
+      rimHeight: 70, bowlDepth: 15, erosion: 8, terrainRoughness: 95, craterVariation: 20,
+    }),
+  },
+  {
+    name: "Campo del Cielo",
+    emoji: "🌋",
+    type: "Iron (IAB)",
+    color: "text-orange-400",
+    description: "Coarse rust-pitted iron with deep irregular cavities — heavy weathering exposes rugged internal structure",
+    build: () => ({
+      enabled: true, intensity: 80, craterDensity: "med", craterSize: "large",
+      microDetail: 60, rimSharpness: 55, overlapIntensity: 45, smoothEdges: false, seed: newSeed(),
+      rimHeight: 50, bowlDepth: 85, erosion: 65, terrainRoughness: 80, craterVariation: 70,
+    }),
+  },
+  {
+    name: "Muonionalusta",
+    emoji: "❄",
+    type: "Iron (IVA)",
+    color: "text-sky-300",
+    description: "Ancient Swedish meteorite — ultra-fine Widmanstätten with frost-like crystalline micro-texture and subtle impact dimples",
+    build: () => ({
+      enabled: true, intensity: 50, craterDensity: "low", craterSize: "small",
+      microDetail: 100, rimSharpness: 75, overlapIntensity: 5, smoothEdges: false, seed: newSeed(),
+      rimHeight: 60, bowlDepth: 10, erosion: 15, terrainRoughness: 100, craterVariation: 15,
+    }),
+  },
+  {
+    name: "Sikhote-Alin Shrapnel",
+    emoji: "💥",
+    type: "Iron (IIAB)",
+    color: "text-red-400",
+    description: "Violent fragmentation — jagged torn edges, deep impact pits, and explosive shrapnel surface from 1947 fall",
+    build: () => ({
+      enabled: true, intensity: 95, craterDensity: "high", craterSize: "med",
+      microDetail: 70, rimSharpness: 100, overlapIntensity: 80, smoothEdges: false, seed: newSeed(),
+      rimHeight: 95, bowlDepth: 65, erosion: 3, terrainRoughness: 75, craterVariation: 85,
+    }),
+  },
+  {
+    name: "Lunar Meteorite",
+    emoji: "🌙",
+    type: "Achondrite",
+    color: "text-neutral-300",
+    description: "Ejected lunar rock — fused regolith breccia with vesicular glass pockets and micro-crater surface",
+    build: () => ({
+      enabled: true, intensity: 55, craterDensity: "med", craterSize: "small",
+      microDetail: 75, rimSharpness: 45, overlapIntensity: 35, smoothEdges: true, seed: newSeed(),
+      rimHeight: 40, bowlDepth: 50, erosion: 45, terrainRoughness: 65, craterVariation: 60,
+    }),
+  },
+];
+
 // ── Sub-section ───────────────────────────────────────────────────
 
 function SubSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
@@ -350,7 +460,29 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               ))}
             </div>
           </SubSection>
-          {/* Quick actions */}
+
+          {/* Meteorite Surface Library */}
+          <SubSection title="Meteorite Surfaces">
+            <div className="grid grid-cols-2 gap-1.5">
+              {METEORITE_PRESETS.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => onApplyPreset(p.build(), p.name)}
+                  className={cn(
+                    "flex flex-col items-start gap-0.5 p-2 rounded-lg border text-left transition-all",
+                    "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 w-full">
+                    <span className="text-sm">{p.emoji}</span>
+                    <span className={cn("text-[10px] font-medium", p.color)}>{p.name}</span>
+                  </div>
+                  <span className="text-[8px] text-muted-foreground/70 leading-tight">{p.type}</span>
+                  <span className="text-[8px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">{p.description}</span>
+                </button>
+              ))}
+            </div>
+          </SubSection>
           <div className="flex gap-1.5">
             <Button variant="outline" size="sm" className="flex-1 text-[10px] h-6" onClick={handleResurface} disabled={seedLocked}>
               <Shuffle className="w-3 h-3 mr-1" /> New Surface
