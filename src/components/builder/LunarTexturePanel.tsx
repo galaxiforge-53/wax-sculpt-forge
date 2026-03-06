@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer } from "lucide-react";
 import { useState, useMemo } from "react";
+import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
 
@@ -428,6 +429,12 @@ function SubSection({ title, defaultOpen = true, children }: { title: string; de
   );
 }
 
+// ── Pre-computed thumbnail states (stable refs, no hooks needed) ──
+const LUNAR_THUMB_STATES = LUNAR_PRESETS.filter(p => p.name !== "Random Chaos").map(p => ({ name: p.name, state: p.build() }));
+const PLANETARY_THUMB_STATES = PLANETARY_PRESETS.map(p => ({ name: p.name, state: p.build() }));
+const METEORITE_THUMB_STATES = METEORITE_PRESETS.map(p => ({ name: p.name, state: p.build() }));
+const HAMMERED_THUMB_STATES = HAMMERED_PRESETS.map(p => ({ name: p.name, state: p.build() }));
+
 // ── Panel ─────────────────────────────────────────────────────────
 
 interface LunarTexturePanelProps {
@@ -494,64 +501,81 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             <span>{craterCount.toLocaleString()} craters generated</span>
           </div>
 
-          {/* Presets */}
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground">Preset</Label>
-            <Select value="" onValueChange={handlePreset}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Apply preset…" />
-              </SelectTrigger>
-              <SelectContent>
-                {LUNAR_PRESETS.map((p) => (
-                  <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Presets — visual grid with thumbnails */}
+          <div className="space-y-1.5">
+            <Label className="text-[10px] text-muted-foreground">Quick Presets</Label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {LUNAR_THUMB_STATES.map((t) => (
+                  <button
+                    key={t.name}
+                    onClick={() => handlePreset(t.name)}
+                    className={cn(
+                      "flex items-center gap-2 p-1.5 rounded-lg border text-left transition-all",
+                      "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                    )}
+                  >
+                    <SurfaceThumbnail preset={t.state} size={36} className="border border-border/30" />
+                    <span className="text-[9px] font-medium text-muted-foreground leading-tight">{t.name}</span>
+                  </button>
+              ))}
+            </div>
           </div>
 
           {/* Planetary Surface Library */}
           <SubSection title="Planetary Surfaces">
             <div className="grid grid-cols-2 gap-1.5">
-              {PLANETARY_PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => onApplyPreset(p.build(), p.name)}
-                  className={cn(
-                    "flex flex-col items-start gap-0.5 p-2 rounded-lg border text-left transition-all",
-                    "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 w-full">
-                    <span className="text-sm">{p.emoji}</span>
-                    <span className={cn("text-[10px] font-medium", p.color)}>{p.name}</span>
-                  </div>
-                  <span className="text-[8px] text-muted-foreground/70 leading-tight">{p.parent}</span>
-                  <span className="text-[8px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">{p.description}</span>
-                </button>
-              ))}
+              {PLANETARY_PRESETS.map((p) => {
+                const thumbState = PLANETARY_THUMB_STATES.find(t => t.name === p.name)?.state;
+                return (
+                  <button
+                    key={p.name}
+                    onClick={() => onApplyPreset(p.build(), p.name)}
+                    className={cn(
+                      "flex items-start gap-2 p-1.5 rounded-lg border text-left transition-all",
+                      "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                    )}
+                  >
+                    {thumbState && <SurfaceThumbnail preset={thumbState} size={40} className="border border-border/30 mt-0.5" />}
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs">{p.emoji}</span>
+                        <span className={cn("text-[9px] font-medium truncate", p.color)}>{p.name}</span>
+                      </div>
+                      <span className="text-[7px] text-muted-foreground/70 leading-tight">{p.parent}</span>
+                      <span className="text-[7px] text-muted-foreground leading-tight line-clamp-2">{p.description}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </SubSection>
 
           {/* Meteorite Surface Library */}
           <SubSection title="Meteorite Surfaces">
             <div className="grid grid-cols-2 gap-1.5">
-              {METEORITE_PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => onApplyPreset(p.build(), p.name)}
-                  className={cn(
-                    "flex flex-col items-start gap-0.5 p-2 rounded-lg border text-left transition-all",
-                    "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 w-full">
-                    <span className="text-sm">{p.emoji}</span>
-                    <span className={cn("text-[10px] font-medium", p.color)}>{p.name}</span>
-                  </div>
-                  <span className="text-[8px] text-muted-foreground/70 leading-tight">{p.type}</span>
-                  <span className="text-[8px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">{p.description}</span>
-                </button>
-              ))}
+              {METEORITE_PRESETS.map((p) => {
+                const thumbState = METEORITE_THUMB_STATES.find(t => t.name === p.name)?.state;
+                return (
+                  <button
+                    key={p.name}
+                    onClick={() => onApplyPreset(p.build(), p.name)}
+                    className={cn(
+                      "flex items-start gap-2 p-1.5 rounded-lg border text-left transition-all",
+                      "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                    )}
+                  >
+                    {thumbState && <SurfaceThumbnail preset={thumbState} size={40} className="border border-border/30 mt-0.5" />}
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs">{p.emoji}</span>
+                        <span className={cn("text-[9px] font-medium truncate", p.color)}>{p.name}</span>
+                      </div>
+                      <span className="text-[7px] text-muted-foreground/70 leading-tight">{p.type}</span>
+                      <span className="text-[7px] text-muted-foreground leading-tight line-clamp-2">{p.description}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </SubSection>
 
@@ -561,22 +585,25 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               Hand-hammered jewellery textures. After applying, fine-tune with the controls below.
             </p>
             <div className="grid grid-cols-2 gap-1.5">
-              {HAMMERED_PRESETS.map((p) => (
-                <button
-                  key={p.name}
-                  onClick={() => onApplyPreset(p.build(), p.name)}
-                  className={cn(
-                    "flex flex-col items-start gap-0.5 p-2 rounded-lg border text-left transition-all",
-                    "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 w-full">
-                    <Hammer className={cn("w-3 h-3", p.color)} />
-                    <span className={cn("text-[10px] font-medium", p.color)}>{p.name}</span>
-                  </div>
-                  <span className="text-[8px] text-muted-foreground leading-tight line-clamp-2 mt-0.5">{p.description}</span>
-                </button>
-              ))}
+              {HAMMERED_PRESETS.map((p) => {
+                const thumbState = HAMMERED_THUMB_STATES.find(t => t.name === p.name)?.state;
+                return (
+                  <button
+                    key={p.name}
+                    onClick={() => onApplyPreset(p.build(), p.name)}
+                    className={cn(
+                      "flex items-start gap-2 p-1.5 rounded-lg border text-left transition-all",
+                      "border-border bg-card/50 hover:bg-secondary/50 hover:border-primary/30"
+                    )}
+                  >
+                    {thumbState && <SurfaceThumbnail preset={thumbState} size={36} className="border border-border/30 mt-0.5" />}
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className={cn("text-[9px] font-medium truncate", p.color)}>{p.name}</span>
+                      <span className="text-[7px] text-muted-foreground leading-tight line-clamp-2">{p.description}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Dedicated hammered controls */}
