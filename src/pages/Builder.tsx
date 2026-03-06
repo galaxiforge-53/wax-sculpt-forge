@@ -7,6 +7,7 @@ import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import TopBar from "@/components/builder/TopBar";
 import ForgeCinematicModal from "@/components/forge/ForgeCinematicModal";
 import GuidedWorkflow from "@/components/builder/GuidedWorkflow";
+import AccessGate from "@/components/access/AccessGate";
 import { isEmbedMode } from "@/config/galaxiforge";
 import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
@@ -19,7 +20,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Settings2, Eye, RotateCcw, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function Builder() {
+function BuilderInner() {
   const navigate = useNavigate();
   const viewportRef = useRef<RingViewportHandle>(null);
   const { toast } = useToast();
@@ -457,5 +458,13 @@ export default function Builder() {
         onSendToGalaxiForge={() => { setForgeModalOpen(false); handleExport(); }}
       />
     </div>
+  );
+}
+
+export default function Builder() {
+  return (
+    <AccessGate minTier="free" featureLabel="the ring builder">
+      <BuilderInner />
+    </AccessGate>
   );
 }

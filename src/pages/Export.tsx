@@ -1,16 +1,18 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DesignPackage, ViewMode } from "@/types/ring";
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
 import { getReturnUrl, getHandoffUrl, isEmbedMode } from "@/config/galaxiforge";
 import { generateExportSTL, downloadBlob, STLExportResult } from "@/lib/stlExporter";
-import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2 } from "lucide-react";
+import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock } from "lucide-react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import { useToast } from "@/hooks/use-toast";
+import { useAccess } from "@/hooks/useAccess";
 
 // ── 3D Preview of export geometry ────────────────────────────────
 
@@ -61,6 +63,7 @@ function SpecBadge({ icon: Icon, label, value, warn }: { icon: React.ElementType
 export default function Export() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { canExport } = useAccess();
   const [pkg, setPkg] = useState<DesignPackage | null>(null);
   const [sent, setSent] = useState(false);
   const [stlResult, setStlResult] = useState<STLExportResult | null>(null);
@@ -249,11 +252,12 @@ export default function Export() {
             </Button>
             <Button
               onClick={handleDownloadSTL}
-              disabled={!stlResult || generating}
+              disabled={!stlResult || generating || !canExport}
               className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              title={!canExport ? "Requires Export Pro access code" : ""}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Download STL {stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}
+              {!canExport ? <Lock className="h-4 w-4 mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+              {!canExport ? "Export Pro Required" : `Download STL ${stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}`}
             </Button>
             <Button onClick={handleSend} className="flex-1 bg-primary text-primary-foreground hover:bg-ember-glow">
               <Send className="h-4 w-4 mr-2" /> Send to GalaxiForge
