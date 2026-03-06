@@ -1,43 +1,153 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  listCloudDesigns, deleteCloudDesign, duplicateCloudDesign,
+  renameCloudDesign, updateDesignStatus, CloudDesign,
+} from "@/lib/cloudDesignsStore";
 import { listProjects, deleteProject, duplicateProject, renameProject } from "@/lib/projectsStore";
 import { DesignProject } from "@/types/projects";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Trash2, ExternalLink, Copy, Pencil, Check, X, Plus } from "lucide-react";
+import {
+  Trash2, ExternalLink, Copy, Pencil, Check, X, Plus,
+  Send, Cloud, HardDrive, LogIn, Loader2,
+} from "lucide-react";
 import { STAGES } from "@/config/pipeline";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+type UnifiedDesign = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  createdAt: string;
+  thumbnail?: string | null;
+  source: "cloud" | "local";
+  status?: CloudDesign["status"];
+  designPackage: any;
+};
 
 export default function MyDesigns() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [projects, setProjects] = useState<DesignProject[]>([]);
+  const { user, loading: authLoading } = useAuth();
+  const [designs, setDesigns] = useState<UnifiedDesign[]>([]);
+  const [loading, setLoading] = useState(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const refresh = useCallback(() => setProjects(listProjects()), []);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const unified: UnifiedDesign[] = [];
 
-  useEffect(() => { refresh(); }, [refresh]);
+      // Cloud designs (if authenticated)
+      if (user) {
+        const cloud = await listCloudDesigns();
+        cloud.forEach((d) => unified.push({
+          id: d.id,
+          name: d.name,
+          updatedAt: d.updated_at,
+          createdAt: d.created_at,
+          thumbnail: d.thumbnail,
+          source: "cloud",
+          status: d.status,
+          designPackage: d.design_package,
+        }));
+      }
 
-  const handleOpen = (id: string) => {
-    sessionStorage.setItem("openProjectId", id);
+      // Local designs
+      const local: DesignProject[] = listProjects();
+      local.forEach((p) => {
+        // Skip if already exists in cloud (by name match)
+        if (!unified.some((u) => u.name === p.name && u.source === "cloud")) {
+          unified.push({
+            id: p.id,
+            name: p.name,
+            updatedAt: p.updatedAt,
+            createdAt: p.createdAt,
+            thumbnail: p.thumbnail,
+            source: "local",
+            designPackage: p.designPackage,
+          });
+        }
+      });
+
+      unified.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setDesigns(unified);
+    } catch (err: any) {
+      toast({ title: "Error loading designs", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    if (!authLoading) refresh();
+  }, [authLoading, refresh]);
+
+  const handleOpen = (design: UnifiedDesign) => {
+    if (design.source === "cloud") {
+      sessionStorage.setItem("openCloudDesignId", design.id);
+    } else {
+      sessionStorage.setItem("openProjectId", design.id);
+    }
     navigate("/builder");
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    deleteProject(id);
-    refresh();
-    toast({ title: "Deleted", description: `"${name}" has been removed.` });
+  const handleDelete = async (design: UnifiedDesign) => {
+    if (!window.confirm(`Delete "${design.name}"? This cannot be undone.`)) return;
+    setActionLoading(design.id);
+    try {
+      if (design.source === "cloud") {
+        await deleteCloudDesign(design.id);
+      } else {
+        deleteProject(design.id);
+      }
+      toast({ title: "Deleted", description: `"${design.name}" removed.` });
+      refresh();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleDuplicate = (id: string) => {
-    const copy = duplicateProject(id);
-    if (copy) {
+  const handleDuplicate = async (design: UnifiedDesign) => {
+    setActionLoading(design.id);
+    try {
+      if (design.source === "cloud") {
+        await duplicateCloudDesign(design.id);
+      } else {
+        duplicateProject(design.id);
+      }
+      toast({ title: "Duplicated", description: `Copy of "${design.name}" created.` });
       refresh();
-      toast({ title: "Duplicated", description: `Created "${copy.name}".` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSendToProduction = async (design: UnifiedDesign) => {
+    if (design.source !== "cloud") {
+      toast({ title: "Sign in required", description: "Save to cloud first to submit for production.", variant: "destructive" });
+      return;
+    }
+    setActionLoading(design.id);
+    try {
+      await updateDesignStatus(design.id, "submitted");
+      toast({ title: "Submitted!", description: `"${design.name}" has been sent for production review.` });
+      refresh();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -46,12 +156,22 @@ export default function MyDesigns() {
     setRenameValue(currentName);
   };
 
-  const confirmRename = () => {
+  const confirmRename = async () => {
     if (!renamingId || !renameValue.trim()) return;
-    renameProject(renamingId, renameValue.trim());
-    setRenamingId(null);
-    refresh();
-    toast({ title: "Renamed", description: `Design renamed to "${renameValue.trim()}".` });
+    const design = designs.find((d) => d.id === renamingId);
+    if (!design) return;
+    try {
+      if (design.source === "cloud") {
+        await renameCloudDesign(renamingId, renameValue.trim());
+      } else {
+        renameProject(renamingId, renameValue.trim());
+      }
+      setRenamingId(null);
+      toast({ title: "Renamed" });
+      refresh();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const cancelRename = () => {
@@ -63,18 +183,26 @@ export default function MyDesigns() {
     STAGES.find((s) => s.id === stageId)?.label ?? stageId;
 
   const scoreColor = (score: number) => {
-    if (score >= 80) return "bg-green-900/30 text-green-400 border-green-800";
-    if (score >= 50) return "bg-yellow-900/30 text-yellow-400 border-yellow-800";
+    if (score >= 80) return "bg-emerald-900/30 text-emerald-400 border-emerald-800";
+    if (score >= 50) return "bg-amber-900/30 text-amber-400 border-amber-800";
     return "bg-red-900/30 text-red-400 border-red-800";
   };
 
-  const designSummary = (project: DesignProject) => {
-    const p = project.designPackage.parameters;
-    const cs = project.designPackage.craftState;
+  const statusConfig: Record<string, { label: string; className: string }> = {
+    draft: { label: "Draft", className: "border-border text-muted-foreground" },
+    submitted: { label: "Submitted", className: "border-primary/40 text-primary bg-primary/10" },
+    in_production: { label: "In Production", className: "border-amber-500/40 text-amber-400 bg-amber-500/10" },
+    completed: { label: "Completed", className: "border-emerald-500/40 text-emerald-400 bg-emerald-500/10" },
+  };
+
+  const designSummary = (pkg: any) => {
+    const p = pkg?.parameters;
+    if (!p) return "";
     const parts: string[] = [];
     parts.push(`Size ${p.size}`);
     parts.push(`${p.width}×${p.thickness}mm`);
     parts.push(p.profile);
+    const cs = pkg?.craftState;
     if (cs?.engraving?.enabled && cs.engraving.text) parts.push("engraved");
     if (cs?.lunarTexture?.enabled) parts.push("lunar");
     if (cs?.inlays?.channels?.length) parts.push(`${cs.inlays.channels.length} inlay(s)`);
@@ -84,19 +212,35 @@ export default function MyDesigns() {
   return (
     <div className="min-h-screen bg-background px-4 sm:px-6 py-10 sm:py-16">
       <div className="max-w-5xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-8 sm:mb-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-8 sm:mb-12 flex-wrap gap-3">
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mb-2">My Designs</h1>
-            <p className="text-muted-foreground text-sm">
-              {projects.length} saved design{projects.length !== 1 ? "s" : ""}
+            <h1 className="font-display text-2xl sm:text-3xl md:text-4xl mb-1">My Designs</h1>
+            <p className="text-muted-foreground text-sm flex items-center gap-2">
+              {loading ? "Loading..." : `${designs.length} design${designs.length !== 1 ? "s" : ""}`}
+              {user && (
+                <Badge variant="outline" className="text-[9px] gap-1 border-primary/30 text-primary/70">
+                  <Cloud className="w-3 h-3" /> Cloud synced
+                </Badge>
+              )}
             </p>
           </div>
-          <Button onClick={() => navigate("/builder")} className="gap-1.5">
-            <Plus className="h-4 w-4" /> New Design
-          </Button>
+          <div className="flex items-center gap-2">
+            {!user && (
+              <Button variant="outline" onClick={() => navigate("/auth")} className="gap-1.5 text-xs">
+                <LogIn className="h-3.5 w-3.5" /> Sign in to sync
+              </Button>
+            )}
+            <Button onClick={() => navigate("/builder")} className="gap-1.5">
+              <Plus className="h-4 w-4" /> New Design
+            </Button>
+          </div>
         </motion.div>
 
-        {projects.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : designs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center">
             <span className="text-4xl mb-4 opacity-30">📂</span>
             <p className="text-sm text-muted-foreground">No saved designs yet.</p>
@@ -109,35 +253,39 @@ export default function MyDesigns() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {projects.map((project, i) => (
+            {designs.map((design, i) => (
               <motion.div
-                key={project.id}
+                key={`${design.source}-${design.id}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
+                transition={{ delay: i * 0.04 }}
                 className="group rounded-xl border border-border bg-card overflow-hidden hover:border-primary/30 transition-colors"
               >
                 {/* Thumbnail */}
                 <div
-                  className="aspect-video bg-secondary/50 flex items-center justify-center overflow-hidden cursor-pointer"
-                  onClick={() => handleOpen(project.id)}
+                  className="aspect-video bg-secondary/50 flex items-center justify-center overflow-hidden cursor-pointer relative"
+                  onClick={() => handleOpen(design)}
                 >
-                  {project.thumbnail ? (
-                    <img
-                      src={project.thumbnail}
-                      alt={project.name}
-                      className="w-full h-full object-contain"
-                    />
+                  {design.thumbnail ? (
+                    <img src={design.thumbnail} alt={design.name} className="w-full h-full object-contain" />
                   ) : (
                     <span className="text-3xl opacity-20">💍</span>
                   )}
+                  {/* Source indicator */}
+                  <div className="absolute top-2 right-2">
+                    {design.source === "cloud" ? (
+                      <Cloud className="w-3.5 h-3.5 text-primary/50" />
+                    ) : (
+                      <HardDrive className="w-3.5 h-3.5 text-muted-foreground/40" />
+                    )}
+                  </div>
                 </div>
 
                 {/* Info */}
                 <div className="p-3 sm:p-4 space-y-3">
-                  {/* Name — inline rename */}
+                  {/* Name */}
                   <div>
-                    {renamingId === project.id ? (
+                    {renamingId === design.id ? (
                       <div className="flex items-center gap-1">
                         <Input
                           value={renameValue}
@@ -151,80 +299,75 @@ export default function MyDesigns() {
                           maxLength={80}
                         />
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={confirmRename}>
-                          <Check className="h-3 w-3 text-green-400" />
+                          <Check className="h-3 w-3 text-emerald-400" />
                         </Button>
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={cancelRename}>
                           <X className="h-3 w-3 text-muted-foreground" />
                         </Button>
                       </div>
                     ) : (
-                      <h3 className="font-medium text-sm text-foreground truncate">{project.name}</h3>
+                      <h3 className="font-medium text-sm text-foreground truncate">{design.name}</h3>
                     )}
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {new Date(project.updatedAt).toLocaleDateString(undefined, {
+                      {new Date(design.updatedAt).toLocaleDateString(undefined, {
                         month: "short", day: "numeric", year: "numeric",
                         hour: "2-digit", minute: "2-digit",
                       })}
                     </p>
                   </div>
 
-                  {/* Design summary */}
                   <p className="text-[10px] text-muted-foreground/80 truncate">
-                    {designSummary(project)}
+                    {designSummary(design.designPackage)}
                   </p>
 
                   {/* Badges */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge
                       variant="outline"
-                      className={`text-[10px] px-1.5 py-0 ${scoreColor(
-                        project.designPackage.castabilityReport?.score ?? 0
-                      )}`}
+                      className={cn("text-[10px] px-1.5 py-0", scoreColor(
+                        design.designPackage?.castabilityReport?.score ?? 0
+                      ))}
                     >
-                      Score {project.designPackage.castabilityReport?.score ?? "–"}
+                      Score {design.designPackage?.castabilityReport?.score ?? "–"}
                     </Badge>
+                    {design.status && (
+                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", statusConfig[design.status]?.className)}>
+                        {statusConfig[design.status]?.label}
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-border text-muted-foreground">
-                      {stageLabel(project.designPackage.pipelineState?.currentStage ?? "WAX_SCULPT")}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-border text-muted-foreground">
-                      {project.designPackage.metalPreset}
+                      {design.designPackage?.metalPreset ?? "—"}
                     </Badge>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <Button
-                      size="sm"
-                      className="flex-1 text-xs h-8"
-                      onClick={() => handleOpen(project.id)}
-                    >
+                  <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                    <Button size="sm" className="flex-1 text-xs h-8" onClick={() => handleOpen(design)}>
                       <ExternalLink className="h-3 w-3 mr-1" /> Open
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs h-8 px-2"
-                      onClick={() => handleDuplicate(project.id)}
-                      title="Duplicate"
-                    >
+                    {design.source === "cloud" && design.status === "draft" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-8 px-2 border-primary/30 text-primary hover:bg-primary/10"
+                        onClick={() => handleSendToProduction(design)}
+                        disabled={actionLoading === design.id}
+                        title="Send to production"
+                      >
+                        <Send className="h-3 w-3" />
+                      </Button>
+                    )}
+                    <Button size="sm" variant="outline" className="text-xs h-8 px-2"
+                      onClick={() => handleDuplicate(design)} disabled={actionLoading === design.id} title="Duplicate">
                       <Copy className="h-3 w-3" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs h-8 px-2"
-                      onClick={() => startRename(project.id, project.name)}
-                      title="Rename"
-                    >
+                    <Button size="sm" variant="outline" className="text-xs h-8 px-2"
+                      onClick={() => startRename(design.id, design.name)} title="Rename">
                       <Pencil className="h-3 w-3" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <Button size="sm" variant="ghost"
                       className="text-xs h-8 px-2 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(project.id, project.name)}
-                      title="Delete"
-                    >
+                      onClick={() => handleDelete(design)} disabled={actionLoading === design.id} title="Delete">
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>

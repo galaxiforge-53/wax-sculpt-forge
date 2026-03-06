@@ -1,9 +1,11 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { isEmbedMode } from "@/config/galaxiforge";
-import { Flame, Menu, X } from "lucide-react";
+import { Flame, Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
   { label: "Home", path: "/" },
@@ -18,6 +20,7 @@ export default function PlatformNav() {
   const embed = isEmbedMode();
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   if (embed || location.pathname === "/builder") return null;
 
@@ -54,6 +57,29 @@ export default function PlatformNav() {
                 </Link>
               );
             })}
+            {/* Auth button */}
+            {user ? (
+              <div className="flex items-center gap-2 ml-3 pl-3 border-l border-border">
+                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                  {user.email}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => signOut()}
+                >
+                  <LogOut className="w-3 h-3" />
+                </Button>
+              </div>
+            ) : (
+              <Link
+                to="/auth"
+                className="ml-3 pl-3 border-l border-border flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
+              >
+                <LogIn className="w-3.5 h-3.5" /> Sign In
+              </Link>
+            )}
           </div>
         )}
 
@@ -89,6 +115,25 @@ export default function PlatformNav() {
               </Link>
             );
           })}
+          {/* Mobile auth */}
+          <div className="pt-2 border-t border-border mt-2">
+            {user ? (
+              <div className="flex items-center justify-between px-4 py-2">
+                <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                <Button size="sm" variant="ghost" className="text-xs" onClick={() => { signOut(); setMenuOpen(false); }}>
+                  <LogOut className="w-3.5 h-3.5 mr-1" /> Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Link
+                to="/auth"
+                onClick={() => setMenuOpen(false)}
+                className="block px-4 py-3 rounded-lg text-sm font-medium text-primary hover:bg-primary/10 transition-all"
+              >
+                <LogIn className="w-4 h-4 inline mr-2" /> Sign In
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </nav>
