@@ -348,9 +348,9 @@ function BuilderInner() {
             showPrinterBed={showPrinterBed}
           />
 
-          {/* Camera presets — top-left (hidden on mobile to save space) */}
+          {/* Camera presets — top-left */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
-            {!isMobile && CAMERA_BUTTONS.map((cam) => (
+            {CAMERA_BUTTONS.map((cam) => (
               <button
                 key={cam.id}
                 onClick={() => setCameraPreset(cam.id)}
@@ -363,18 +363,20 @@ function BuilderInner() {
                 {cam.label}
               </button>
             ))}
-            <AIGenerateOverlay
-              params={params}
-              lunarTexture={lunarTexture}
-              viewMode={viewMode}
-              metalPreset={metalPreset}
-              finishPreset={finishPreset}
-              onUpdateParams={updateParams}
-              onLunarChange={setLunarTexture}
-              onViewModeChange={setViewMode}
-              onMetalChange={setMetalPreset}
-              onFinishChange={setFinishPreset}
-            />
+            {!isMobile && (
+              <AIGenerateOverlay
+                params={params}
+                lunarTexture={lunarTexture}
+                viewMode={viewMode}
+                metalPreset={metalPreset}
+                finishPreset={finishPreset}
+                onUpdateParams={updateParams}
+                onLunarChange={setLunarTexture}
+                onViewModeChange={setViewMode}
+                onMetalChange={setMetalPreset}
+                onFinishChange={setFinishPreset}
+              />
+            )}
           </div>
 
           {/* View controls — top-right, grouped (simplified on mobile) */}
