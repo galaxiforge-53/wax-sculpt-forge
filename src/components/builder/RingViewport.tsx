@@ -4,6 +4,7 @@ import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback, useState
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { RingParameters, ViewMode, MetalPreset, FinishPreset, ToolType } from "@/types/ring";
+import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
@@ -800,6 +801,7 @@ interface RingViewportProps {
   showMeasurements?: boolean;
   engraving?: EngravingState;
   cutawayMode?: CutawayMode;
+  lighting?: LightingSettings;
 }
 
 // ── Clipping plane manager ─────────────────────────────────────────
@@ -836,7 +838,8 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal" }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", lighting: lightingProp }, ref) {
+    const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
 
@@ -869,25 +872,49 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         >
           <ClipPlaneManager mode={cutawayMode} />
 
-          {/* Wax-print mode: clean, even, simplified lighting for surface inspection */}
-          {viewMode === "wax-print" ? (
-            <>
-              <ambientLight intensity={0.55} color="#f5f0e8" />
-              <directionalLight position={[3, 5, 3]} intensity={1.2} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color="#ffffff" />
-              <directionalLight position={[-3, 3, -2]} intensity={0.7} color="#f0f0f0" />
-              <pointLight position={[0, -2, 3]} intensity={0.4} color="#ffffff" />
-            </>
-          ) : (
-            <>
-              <ambientLight intensity={viewMode === "cast" ? 0.15 : 0.3} />
-              <directionalLight position={[4, 6, 3]} intensity={viewMode === "cast" ? 2.2 : 1.8} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color={viewMode === "wax" ? "#fff5e0" : "#fff8f0"} />
-              <directionalLight position={[-4, 2, -3]} intensity={viewMode === "cast" ? 0.8 : 0.6} color={viewMode === "wax" ? "#ffe8c0" : "#d8e0f8"} />
-              <pointLight position={[0, -3, 4]} intensity={viewMode === "cast" ? 1.0 : 0.7} color="#ffffff" />
-              <pointLight position={[0, 5, 0]} intensity={viewMode === "cast" ? 0.6 : 0.4} color="#f8f4ff" />
-              <pointLight position={[-5, 1, -2]} intensity={viewMode === "cast" ? 0.5 : 0.3} color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"} />
-              <pointLight position={[2, -1, -4]} intensity={viewMode === "cast" ? 0.4 : 0} color="#e8e8ff" />
-            </>
-          )}
+          {/* Dynamic lighting from Lighting Studio */}
+          {(() => {
+            // Compute key light position from azimuth/elevation
+            const azRad = (lighting.azimuth * Math.PI) / 180;
+            const elRad = (lighting.elevation * Math.PI) / 180;
+            const dist = 6;
+            const keyX = Math.sin(azRad) * Math.cos(elRad) * dist;
+            const keyY = Math.sin(elRad) * dist;
+            const keyZ = Math.cos(azRad) * Math.cos(elRad) * dist;
+            // Fill from opposite
+            const fillX = -keyX * 0.7;
+            const fillY = keyY * 0.4;
+            const fillZ = -keyZ * 0.7;
+            // Warmth → color
+            const w = lighting.warmth / 100;
+            const keyR = Math.round(255 * (0.85 + 0.15 * w));
+            const keyG = Math.round(255 * (0.9 + 0.1 * w - 0.05 * (1 - w)));
+            const keyB = Math.round(255 * (0.75 + 0.25 * (1 - w)));
+            const keyColor = `rgb(${keyR},${keyG},${keyB})`;
+            const fillColor = viewMode === "wax" ? "#ffe8c0" : "#d8e0f8";
+
+            if (viewMode === "wax-print") {
+              return (
+                <>
+                  <ambientLight intensity={lighting.ambientIntensity + 0.3} color="#f5f0e8" />
+                  <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity * 0.6} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color="#ffffff" />
+                  <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity + 0.2} color="#f0f0f0" />
+                  <pointLight position={[0, -2, 3]} intensity={0.4} color="#ffffff" />
+                </>
+              );
+            }
+
+            return (
+              <>
+                <ambientLight intensity={lighting.ambientIntensity} />
+                <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color={keyColor} />
+                <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity} color={fillColor} />
+                <pointLight position={[0, -3, 4]} intensity={viewMode === "cast" ? 1.0 : 0.7} color="#ffffff" />
+                <pointLight position={[0, 5, 0]} intensity={viewMode === "cast" ? 0.6 : 0.4} color="#f8f4ff" />
+                <pointLight position={[-5, 1, -2]} intensity={viewMode === "cast" ? 0.5 : 0.3} color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"} />
+              </>
+            );
+          })()}
 
           <RingMesh
             params={params}
@@ -928,7 +955,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             far={4}
           />
 
-          <Environment preset={viewMode === "wax-print" ? "warehouse" : viewMode === "wax" ? "warehouse" : "city"} />
+          <Environment preset={lighting.envPreset} environmentIntensity={lighting.envIntensity} />
           <OrbitControls
             enablePan={false}
             minDistance={isMobile ? 1.2 : 1.5}

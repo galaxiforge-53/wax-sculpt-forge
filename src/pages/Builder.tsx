@@ -19,6 +19,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Settings2, Eye, RotateCcw, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 
 function BuilderInner() {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ function BuilderInner() {
   const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
+  const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [guidedMode, setGuidedMode] = useState(() => {
     // Show guided mode for new users (no prior project or template)
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
@@ -270,6 +272,8 @@ function BuilderInner() {
       onViewModeChange={setViewMode}
       onMetalChange={setMetalPreset}
       onFinishChange={setFinishPreset}
+      lighting={lighting}
+      onLightingChange={setLighting}
     />
   );
 
@@ -323,6 +327,7 @@ function BuilderInner() {
             onPresetApplied={() => setCameraPreset(null)}
             showMeasurements={showMeasurements || activeTool === "measure"}
             cutawayMode={cutawayMode}
+            lighting={lighting}
           />
 
           {/* Camera preset buttons — top-left overlay */}
