@@ -1,7 +1,7 @@
 export type RingProfile = "flat" | "dome" | "comfort" | "square" | "knife-edge";
 export type MetalPreset = "silver" | "gold" | "rose-gold" | "titanium" | "tungsten";
 export type FinishPreset = "polished" | "brushed" | "hammered" | "matte" | "satin";
-export type ViewMode = "wax" | "cast";
+export type ViewMode = "wax" | "cast" | "wax-print";
 
 export type ToolType = "carve" | "smooth" | "bevel" | "groove" | "measure" | "flatten" | "stamp";
 

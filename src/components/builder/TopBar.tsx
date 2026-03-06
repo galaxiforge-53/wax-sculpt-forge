@@ -70,7 +70,7 @@ export default function TopBar({
           <Redo2 className="h-4 w-4" />
         </Button>
 
-        {/* Wax / Cast Toggle */}
+        {/* Wax / Cast / Print Toggle */}
         <div className="flex items-center bg-secondary rounded-md ml-1">
           <button
             onClick={() => onViewModeChange("wax")}
@@ -93,6 +93,18 @@ export default function TopBar({
             )}
           >
             Cast
+          </button>
+          <button
+            onClick={() => onViewModeChange("wax-print")}
+            className={cn(
+              "px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+              viewMode === "wax-print"
+                ? "bg-amber-700 text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            title="Wax printing preparation view"
+          >
+            Print
           </button>
         </div>
       </div>

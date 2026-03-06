@@ -207,6 +207,7 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
   }, [stlGeometry, targetOuterR, targetWidth]);
 
   const isWax = viewMode === "wax";
+  const isWaxPrint = viewMode === "wax-print";
   const mc = METAL_CONFIGS[metalPreset] ?? METAL_CONFIGS.silver;
   const finishRoughMod = FINISH_ROUGHNESS_MOD[finishPreset] ?? 0;
 
@@ -263,7 +264,18 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
       castShadow
       onPointerDown={handlePointerDown}
     >
-      {isWax ? (
+      {isWaxPrint ? (
+        <meshStandardMaterial
+          color="#C8B896"
+          roughness={0.6}
+          metalness={0.0}
+          normalMap={lunarMaps?.normalMap ?? null}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
+          aoMap={lunarMaps?.aoMap ?? null}
+          aoMapIntensity={2.0}
+          normalScale={normalScale}
+        />
+      ) : isWax ? (
         <meshStandardMaterial
           color="#78A85B"
           roughness={0.82}
@@ -361,6 +373,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   }, [params, hasLunar]);
 
   const isWax = viewMode === "wax";
+  const isWaxPrint = viewMode === "wax-print";
   const mc = METAL_CONFIGS[metalPreset] ?? METAL_CONFIGS.silver;
   const finishRoughMod = FINISH_ROUGHNESS_MOD[finishPreset] ?? 0;
 
@@ -425,7 +438,21 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       castShadow
       onPointerDown={handlePointerDown}
     >
-      {isWax ? (
+      {isWaxPrint ? (
+        <meshStandardMaterial
+          color="#C8B896"
+          roughness={0.6}
+          metalness={0.0}
+          normalMap={lunarMaps?.normalMap ?? null}
+          roughnessMap={lunarMaps?.roughnessMap ?? null}
+          aoMap={lunarMaps?.aoMap ?? null}
+          aoMapIntensity={hasLunar ? 2.5 : 0.5}
+          normalScale={normalScale}
+          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementScale={dispScale}
+          displacementBias={-dispScale * 0.5}
+        />
+      ) : isWax ? (
         <meshStandardMaterial
           color="#78A85B"
           roughness={hasLunar ? 0.82 : 0.85}
@@ -841,47 +868,26 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           dpr={isMobile ? [1, 1.5] : [1, 2]}
         >
           <ClipPlaneManager mode={cutawayMode} />
-          <ambientLight intensity={viewMode === "cast" ? 0.15 : 0.3} />
-          {/* Key light — rakes across craters to show relief */}
-          <directionalLight
-            position={[4, 6, 3]}
-            intensity={viewMode === "cast" ? 2.2 : 1.8}
-            castShadow
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
-            shadow-bias={-0.001}
-            color={viewMode === "wax" ? "#fff5e0" : "#fff8f0"}
-          />
-          {/* Fill light — cool complement for metal contrast */}
-          <directionalLight
-            position={[-4, 2, -3]}
-            intensity={viewMode === "cast" ? 0.8 : 0.6}
-            color={viewMode === "wax" ? "#ffe8c0" : "#d8e0f8"}
-          />
-          {/* Rim light — highlights edges and crater rims */}
-          <pointLight
-            position={[0, -3, 4]}
-            intensity={viewMode === "cast" ? 1.0 : 0.7}
-            color="#ffffff"
-          />
-          {/* Top accent — broad specular highlight on crown */}
-          <pointLight
-            position={[0, 5, 0]}
-            intensity={viewMode === "cast" ? 0.6 : 0.4}
-            color="#f8f4ff"
-          />
-          {/* Side kicker — warm edge for depth on metals */}
-          <pointLight
-            position={[-5, 1, -2]}
-            intensity={viewMode === "cast" ? 0.5 : 0.3}
-            color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"}
-          />
-          {/* Back-rim grazer — catches crater rims from behind */}
-          <pointLight
-            position={[2, -1, -4]}
-            intensity={viewMode === "cast" ? 0.4 : 0}
-            color="#e8e8ff"
-          />
+
+          {/* Wax-print mode: clean, even, simplified lighting for surface inspection */}
+          {viewMode === "wax-print" ? (
+            <>
+              <ambientLight intensity={0.55} color="#f5f0e8" />
+              <directionalLight position={[3, 5, 3]} intensity={1.2} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color="#ffffff" />
+              <directionalLight position={[-3, 3, -2]} intensity={0.7} color="#f0f0f0" />
+              <pointLight position={[0, -2, 3]} intensity={0.4} color="#ffffff" />
+            </>
+          ) : (
+            <>
+              <ambientLight intensity={viewMode === "cast" ? 0.15 : 0.3} />
+              <directionalLight position={[4, 6, 3]} intensity={viewMode === "cast" ? 2.2 : 1.8} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color={viewMode === "wax" ? "#fff5e0" : "#fff8f0"} />
+              <directionalLight position={[-4, 2, -3]} intensity={viewMode === "cast" ? 0.8 : 0.6} color={viewMode === "wax" ? "#ffe8c0" : "#d8e0f8"} />
+              <pointLight position={[0, -3, 4]} intensity={viewMode === "cast" ? 1.0 : 0.7} color="#ffffff" />
+              <pointLight position={[0, 5, 0]} intensity={viewMode === "cast" ? 0.6 : 0.4} color="#f8f4ff" />
+              <pointLight position={[-5, 1, -2]} intensity={viewMode === "cast" ? 0.5 : 0.3} color={viewMode === "cast" ? "#ffe0c0" : "#d0d0ff"} />
+              <pointLight position={[2, -1, -4]} intensity={viewMode === "cast" ? 0.4 : 0} color="#e8e8ff" />
+            </>
+          )}
 
           <RingMesh
             params={params}
@@ -911,7 +917,8 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <WorkbenchGrid params={params} />
 
           {/* Measurement dimension guides */}
-          <MeasurementOverlay params={params} visible={!!showMeasurements} />
+          {/* Measurement dimension guides — always visible in wax-print mode */}
+          <MeasurementOverlay params={params} visible={viewMode === "wax-print" || !!showMeasurements} />
 
           <ContactShadows
             position={[0, -0.84, 0]}
@@ -921,7 +928,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             far={4}
           />
 
-          <Environment preset={viewMode === "wax" ? "warehouse" : "city"} />
+          <Environment preset={viewMode === "wax-print" ? "warehouse" : viewMode === "wax" ? "warehouse" : "city"} />
           <OrbitControls
             enablePan={false}
             minDistance={isMobile ? 1.2 : 1.5}
