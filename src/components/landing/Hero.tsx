@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Environment } from "@react-three/drei";
+import * as THREE from "three";
 
 // Pre-generate ember particles to avoid re-renders
 function useEmbers(count: number) {
@@ -22,6 +25,88 @@ function useEmbers(count: number) {
         : `hsl(${35 + Math.random() * 15}, 100%, ${55 + Math.random() * 15}%)`,
     }));
   }, [count]);
+}
+
+// ── Hero Ring 3D ─────────────────────────────────────────────────
+
+function HeroRingMesh() {
+  const groupRef = useRef<THREE.Group>(null);
+
+  const geometry = useMemo(() => {
+    const innerR = 0.85;
+    const outerR = 1.07;
+    const w = 0.8;
+    const steps = 96;
+    const points: THREE.Vector2[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const angle = t * Math.PI;
+      const r = innerR + (outerR - innerR) * (0.5 + 0.5 * Math.sin(angle));
+      points.push(new THREE.Vector2(r, (t - 0.5) * w));
+    }
+    const lathe = new THREE.LatheGeometry(points, 192);
+
+    // Subtle organic surface perturbation
+    const posAttr = lathe.attributes.position;
+    let seed = 42;
+    const rng = () => { seed = (seed * 16807) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
+    for (let i = 0; i < 50; i++) rng();
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const y = posAttr.getY(i);
+      const z = posAttr.getZ(i);
+      const r = Math.sqrt(x * x + z * z);
+      if (r < innerR + 0.005) continue;
+      const ang = Math.atan2(z, x);
+      const disp = Math.sin(ang * 23 + y * 40) * 0.0006 + Math.sin(ang * 47 + y * 80 + 1.3) * 0.0003;
+      const scale = (r + disp) / r;
+      posAttr.setX(i, x * scale);
+      posAttr.setZ(i, z * scale);
+    }
+    posAttr.needsUpdate = true;
+    lathe.computeVertexNormals();
+    return lathe;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const t = clock.getElapsedTime();
+    groupRef.current.rotation.y = t * 0.15;
+    groupRef.current.rotation.x = Math.sin(t * 0.25) * 0.15;
+    groupRef.current.rotation.z = Math.sin(t * 0.18 + 0.5) * 0.08;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh geometry={geometry} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <meshPhysicalMaterial
+          color="#D4A520"
+          roughness={0.08}
+          metalness={1.0}
+          envMapIntensity={3.5}
+          clearcoat={0.4}
+          clearcoatRoughness={0.1}
+          reflectivity={1.0}
+          ior={2.5}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+function HeroScene() {
+  return (
+    <>
+      <ambientLight intensity={0.05} />
+      <directionalLight position={[4, 8, 5]} intensity={2.0} color="#fff5e6" />
+      <directionalLight position={[-4, 2, -3]} intensity={0.4} color="#c8d8f0" />
+      <spotLight position={[0, 0, 4]} intensity={1.0} angle={0.6} penumbra={0.8} color="#ffffff" />
+      <pointLight position={[-2, -1, -3]} intensity={0.5} color="#ffa040" />
+      <pointLight position={[0, 4, 0]} intensity={0.6} color="#ffecd2" />
+      <HeroRingMesh />
+      <Environment preset="city" />
+    </>
+  );
 }
 
 export default function Hero() {
@@ -76,6 +161,28 @@ export default function Hero() {
             }}
           />
         ))}
+      </div>
+
+      {/* 3D Hero Ring — floating behind/beside the text */}
+      <div className="absolute inset-0 z-[3] pointer-events-none">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 1.5, delay: 0.3, ease: "easeOut" }}
+          className="absolute inset-0"
+        >
+          <Canvas
+            camera={{ position: [0, 0.8, 3.0], fov: 30 }}
+            gl={{ antialias: true, alpha: true }}
+            dpr={[1, 1.5]}
+            style={{ pointerEvents: "none" }}
+          >
+            <HeroScene />
+          </Canvas>
+        </motion.div>
+        {/* Gradient vignette to fade ring into background */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-background/80" />
       </div>
 
       <div className="relative z-10 text-center px-5 sm:px-6 max-w-3xl">
