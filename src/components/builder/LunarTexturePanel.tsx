@@ -1,4 +1,4 @@
-import { LunarTextureState, CraterDensity, CraterSize } from "@/types/lunar";
+import { LunarTextureState, CraterDensity, CraterSize, CraterShape, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -9,11 +9,19 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
+
+// ── Helper: build a full LunarTextureState from partial overrides ──
+const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
+  ...DEFAULT_LUNAR_TEXTURE,
+  enabled: true,
+  seed: newSeed(),
+  ...overrides,
+});
 
 // ── Presets ───────────────────────────────────────────────────────
 
@@ -28,80 +36,106 @@ const randBetween = (lo: number, hi: number) => Math.round(lo + Math.random() * 
 const LUNAR_PRESETS: LunarPreset[] = [
   {
     name: "Moon Craters Classic",
-    build: () => ({
-      enabled: true, intensity: 55, craterDensity: "med", craterSize: "med",
-      microDetail: 40, rimSharpness: 50, overlapIntensity: 25, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 55, craterDensity: "med", craterSize: "med",
+      microDetail: 40, rimSharpness: 50, overlapIntensity: 25, smoothEdges: true,
       rimHeight: 55, bowlDepth: 60, erosion: 25, terrainRoughness: 35, craterVariation: 50,
+      craterShape: "circular", ejectaStrength: 50,
     }),
   },
   {
     name: "Tycho Fresh Impact",
-    build: () => ({
-      enabled: true, intensity: 75, craterDensity: "med", craterSize: "large",
-      microDetail: 35, rimSharpness: 90, overlapIntensity: 20, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 75, craterDensity: "med", craterSize: "large",
+      microDetail: 35, rimSharpness: 90, overlapIntensity: 20, smoothEdges: false,
       rimHeight: 85, bowlDepth: 80, erosion: 5, terrainRoughness: 20, craterVariation: 30,
+      craterShape: "circular", ejectaStrength: 85,
     }),
   },
   {
     name: "South Pole Aitken",
-    build: () => ({
-      enabled: true, intensity: 65, craterDensity: "low", craterSize: "large",
-      microDetail: 50, rimSharpness: 40, overlapIntensity: 35, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 65, craterDensity: "low", craterSize: "large",
+      microDetail: 50, rimSharpness: 40, overlapIntensity: 35, smoothEdges: true,
       rimHeight: 40, bowlDepth: 90, erosion: 45, terrainRoughness: 50, craterVariation: 60,
+      craterShape: "organic", ejectaStrength: 40, mariaFill: 30,
     }),
   },
   {
     name: "Weathered Highlands",
-    build: () => ({
-      enabled: true, intensity: 50, craterDensity: "high", craterSize: "med",
-      microDetail: 60, rimSharpness: 25, overlapIntensity: 50, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 50, craterDensity: "high", craterSize: "med",
+      microDetail: 60, rimSharpness: 25, overlapIntensity: 50, smoothEdges: true,
       rimHeight: 30, bowlDepth: 45, erosion: 80, terrainRoughness: 65, craterVariation: 70,
+      craterShape: "organic", highlandRidges: 55, mariaFill: 15,
     }),
   },
   {
     name: "Dense Bombardment",
-    build: () => ({
-      enabled: true, intensity: 90, craterDensity: "high", craterSize: "med",
-      microDetail: 45, rimSharpness: 70, overlapIntensity: 85, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 90, craterDensity: "high", craterSize: "med",
+      microDetail: 45, rimSharpness: 70, overlapIntensity: 85, smoothEdges: false,
       rimHeight: 70, bowlDepth: 75, erosion: 15, terrainRoughness: 40, craterVariation: 80,
+      craterShape: "circular", ejectaStrength: 70,
     }),
   },
   {
     name: "Heavy Impact",
-    build: () => ({
-      enabled: true, intensity: 80, craterDensity: "high", craterSize: "large",
-      microDetail: 30, rimSharpness: 85, overlapIntensity: 75, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 80, craterDensity: "high", craterSize: "large",
+      microDetail: 30, rimSharpness: 85, overlapIntensity: 75, smoothEdges: false,
       rimHeight: 80, bowlDepth: 85, erosion: 10, terrainRoughness: 25, craterVariation: 40,
+      craterShape: "circular", ejectaStrength: 75,
     }),
   },
   {
     name: "Ancient Mare",
-    build: () => ({
-      enabled: true, intensity: 40, craterDensity: "low", craterSize: "med",
-      microDetail: 55, rimSharpness: 20, overlapIntensity: 10, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 40, craterDensity: "low", craterSize: "med",
+      microDetail: 55, rimSharpness: 20, overlapIntensity: 10, smoothEdges: true,
       rimHeight: 25, bowlDepth: 35, erosion: 70, terrainRoughness: 55, craterVariation: 45,
+      craterShape: "organic", mariaFill: 65, highlandRidges: 20,
     }),
   },
   {
     name: "Micro Regolith",
-    build: () => ({
-      enabled: true, intensity: 60, craterDensity: "low", craterSize: "small",
-      microDetail: 90, rimSharpness: 30, overlapIntensity: 15, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 60, craterDensity: "low", craterSize: "small",
+      microDetail: 90, rimSharpness: 30, overlapIntensity: 15, smoothEdges: true,
       rimHeight: 35, bowlDepth: 40, erosion: 30, terrainRoughness: 70, craterVariation: 55,
+      craterShape: "circular", craterFloorTexture: 60,
     }),
   },
   {
     name: "Rugged Terminator",
-    build: () => ({
-      enabled: true, intensity: 85, craterDensity: "med", craterSize: "large",
-      microDetail: 50, rimSharpness: 95, overlapIntensity: 45, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 85, craterDensity: "med", craterSize: "large",
+      microDetail: 50, rimSharpness: 95, overlapIntensity: 45, smoothEdges: false,
       rimHeight: 90, bowlDepth: 70, erosion: 8, terrainRoughness: 45, craterVariation: 35,
+      craterShape: "angular", ejectaStrength: 80, highlandRidges: 35,
+    }),
+  },
+  {
+    name: "Oblique Impacts",
+    build: () => preset({
+      intensity: 70, craterDensity: "med", craterSize: "large",
+      microDetail: 40, rimSharpness: 60, overlapIntensity: 30, smoothEdges: false,
+      rimHeight: 65, bowlDepth: 70, erosion: 20, terrainRoughness: 35, craterVariation: 60,
+      craterShape: "oval", ovalElongation: 75, ovalAngle: 45, ejectaStrength: 65,
+    }),
+  },
+  {
+    name: "Faceted Crystal",
+    build: () => preset({
+      intensity: 65, craterDensity: "med", craterSize: "med",
+      microDetail: 30, rimSharpness: 100, overlapIntensity: 40, smoothEdges: false,
+      rimHeight: 75, bowlDepth: 55, erosion: 5, terrainRoughness: 50, craterVariation: 45,
+      craterShape: "angular", craterFloorTexture: 20, highlandRidges: 40,
     }),
   },
   {
     name: "Random Chaos",
-    build: () => ({
-      enabled: true,
+    build: () => preset({
       intensity: randBetween(30, 100),
       craterDensity: (["low", "med", "high"] as const)[Math.floor(Math.random() * 3)],
       craterSize: (["small", "med", "large"] as const)[Math.floor(Math.random() * 3)],
@@ -109,12 +143,18 @@ const LUNAR_PRESETS: LunarPreset[] = [
       rimSharpness: randBetween(10, 100),
       overlapIntensity: randBetween(0, 100),
       smoothEdges: Math.random() > 0.5,
-      seed: newSeed(),
       rimHeight: randBetween(10, 100),
       bowlDepth: randBetween(10, 100),
       erosion: randBetween(0, 90),
       terrainRoughness: randBetween(10, 100),
       craterVariation: randBetween(10, 100),
+      craterShape: (["circular", "oval", "organic", "angular"] as const)[Math.floor(Math.random() * 4)],
+      ovalElongation: randBetween(20, 80),
+      ovalAngle: randBetween(0, 360),
+      mariaFill: randBetween(0, 60),
+      highlandRidges: randBetween(0, 60),
+      craterFloorTexture: randBetween(10, 80),
+      ejectaStrength: randBetween(10, 90),
     }),
   },
 ];
@@ -126,105 +166,89 @@ interface PlanetaryPreset {
   emoji: string;
   description: string;
   parent: string;
-  color: string; // tailwind-safe accent for the card
+  color: string;
   build: () => LunarTextureState;
 }
 
 const PLANETARY_PRESETS: PlanetaryPreset[] = [
   {
-    name: "Earth's Moon",
-    emoji: "🌕",
-    parent: "Earth",
-    color: "text-zinc-300",
+    name: "Earth's Moon", emoji: "🌕", parent: "Earth", color: "text-zinc-300",
     description: "Classic highlands — mixed crater sizes, moderate erosion, fine regolith dust",
-    build: () => ({
-      enabled: true, intensity: 60, craterDensity: "med", craterSize: "med",
-      microDetail: 55, rimSharpness: 50, overlapIntensity: 40, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 60, craterDensity: "med", craterSize: "med",
+      microDetail: 55, rimSharpness: 50, overlapIntensity: 40, smoothEdges: true,
       rimHeight: 55, bowlDepth: 60, erosion: 35, terrainRoughness: 40, craterVariation: 55,
+      craterShape: "circular", mariaFill: 25, ejectaStrength: 50,
     }),
   },
   {
-    name: "Mercury",
-    emoji: "☿",
-    parent: "Sun",
-    color: "text-amber-400",
+    name: "Mercury", emoji: "☿", parent: "Sun", color: "text-amber-400",
     description: "No atmosphere — sharp rims preserved, dense overlapping basins, Caloris-scale impacts",
-    build: () => ({
-      enabled: true, intensity: 85, craterDensity: "high", craterSize: "med",
-      microDetail: 40, rimSharpness: 80, overlapIntensity: 70, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 85, craterDensity: "high", craterSize: "med",
+      microDetail: 40, rimSharpness: 80, overlapIntensity: 70, smoothEdges: false,
       rimHeight: 75, bowlDepth: 70, erosion: 10, terrainRoughness: 30, craterVariation: 65,
+      craterShape: "circular", ejectaStrength: 75,
     }),
   },
   {
-    name: "Mars",
-    emoji: "♂",
-    parent: "Sun",
-    color: "text-red-400",
+    name: "Mars", emoji: "♂", parent: "Sun", color: "text-red-400",
     description: "Wind-eroded craters, dust-filled basins, volcanic plains with scattered impacts",
-    build: () => ({
-      enabled: true, intensity: 50, craterDensity: "med", craterSize: "large",
-      microDetail: 35, rimSharpness: 35, overlapIntensity: 30, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 50, craterDensity: "med", craterSize: "large",
+      microDetail: 35, rimSharpness: 35, overlapIntensity: 30, smoothEdges: true,
       rimHeight: 40, bowlDepth: 50, erosion: 55, terrainRoughness: 60, craterVariation: 70,
+      craterShape: "organic", mariaFill: 40, highlandRidges: 30,
     }),
   },
   {
-    name: "Phobos",
-    emoji: "🪨",
-    parent: "Mars",
-    color: "text-stone-400",
+    name: "Phobos", emoji: "🪨", parent: "Mars", color: "text-stone-400",
     description: "Stickney crater dominates — grooved terrain, low gravity stretching, rubble-pile texture",
-    build: () => ({
-      enabled: true, intensity: 70, craterDensity: "low", craterSize: "large",
-      microDetail: 30, rimSharpness: 35, overlapIntensity: 20, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 70, craterDensity: "low", craterSize: "large",
+      microDetail: 30, rimSharpness: 35, overlapIntensity: 20, smoothEdges: true,
       rimHeight: 30, bowlDepth: 85, erosion: 60, terrainRoughness: 75, craterVariation: 40,
+      craterShape: "oval", ovalElongation: 60, highlandRidges: 45,
     }),
   },
   {
-    name: "Deimos",
-    emoji: "🌑",
-    parent: "Mars",
-    color: "text-neutral-500",
+    name: "Deimos", emoji: "🌑", parent: "Mars", color: "text-neutral-500",
     description: "Smooth, buried craters — thick regolith blanket softening all features into gentle undulations",
-    build: () => ({
-      enabled: true, intensity: 35, craterDensity: "low", craterSize: "med",
-      microDetail: 70, rimSharpness: 15, overlapIntensity: 10, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 35, craterDensity: "low", craterSize: "med",
+      microDetail: 70, rimSharpness: 15, overlapIntensity: 10, smoothEdges: true,
       rimHeight: 15, bowlDepth: 30, erosion: 90, terrainRoughness: 50, craterVariation: 25,
+      craterShape: "organic",
     }),
   },
   {
-    name: "Europa",
-    emoji: "❄",
-    parent: "Jupiter",
-    color: "text-cyan-300",
+    name: "Europa", emoji: "❄", parent: "Jupiter", color: "text-cyan-300",
     description: "Icy shell — very few craters, ultra-smooth plains with faint lineae ridges and cryovolcanic marks",
-    build: () => ({
-      enabled: true, intensity: 25, craterDensity: "low", craterSize: "small",
-      microDetail: 85, rimSharpness: 60, overlapIntensity: 5, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 25, craterDensity: "low", craterSize: "small",
+      microDetail: 85, rimSharpness: 60, overlapIntensity: 5, smoothEdges: true,
       rimHeight: 45, bowlDepth: 25, erosion: 70, terrainRoughness: 80, craterVariation: 20,
+      craterShape: "circular", highlandRidges: 70, mariaFill: 10,
     }),
   },
   {
-    name: "Callisto",
-    emoji: "🌐",
-    parent: "Jupiter",
-    color: "text-amber-300",
+    name: "Callisto", emoji: "🌐", parent: "Jupiter", color: "text-amber-300",
     description: "Ancient, saturated — maximum bombardment over 4 billion years, heavily weathered Valhalla basin",
-    build: () => ({
-      enabled: true, intensity: 95, craterDensity: "high", craterSize: "large",
-      microDetail: 50, rimSharpness: 30, overlapIntensity: 90, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 95, craterDensity: "high", craterSize: "large",
+      microDetail: 50, rimSharpness: 30, overlapIntensity: 90, smoothEdges: true,
       rimHeight: 35, bowlDepth: 55, erosion: 75, terrainRoughness: 60, craterVariation: 80,
+      craterShape: "organic", mariaFill: 20,
     }),
   },
   {
-    name: "Titan",
-    emoji: "🟠",
-    parent: "Saturn",
-    color: "text-orange-400",
+    name: "Titan", emoji: "🟠", parent: "Saturn", color: "text-orange-400",
     description: "Dense atmosphere — almost no visible craters, methane-eroded dunes, hydrocarbon lakes, organic haze",
-    build: () => ({
-      enabled: true, intensity: 20, craterDensity: "low", craterSize: "small",
-      microDetail: 90, rimSharpness: 10, overlapIntensity: 5, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 20, craterDensity: "low", craterSize: "small",
+      microDetail: 90, rimSharpness: 10, overlapIntensity: 5, smoothEdges: true,
       rimHeight: 10, bowlDepth: 15, erosion: 95, terrainRoughness: 85, craterVariation: 15,
+      craterShape: "organic", mariaFill: 55,
     }),
   },
 ];
@@ -235,106 +259,90 @@ interface MeteoritePreset {
   name: string;
   emoji: string;
   description: string;
-  type: string; // classification
+  type: string;
   color: string;
   build: () => LunarTextureState;
 }
 
 const METEORITE_PRESETS: MeteoritePreset[] = [
   {
-    name: "Iron Widmanstätten",
-    emoji: "⚔",
-    type: "Iron (IIIAB)",
-    color: "text-zinc-300",
+    name: "Iron Widmanstätten", emoji: "⚔", type: "Iron (IIIAB)", color: "text-zinc-300",
     description: "Classic cross-hatched crystal pattern from slow cooling over millions of years — deep angular fractures with sharp metallic ridges",
-    build: () => ({
-      enabled: true, intensity: 70, craterDensity: "low", craterSize: "small",
-      microDetail: 85, rimSharpness: 95, overlapIntensity: 15, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 70, craterDensity: "low", craterSize: "small",
+      microDetail: 85, rimSharpness: 95, overlapIntensity: 15, smoothEdges: false,
       rimHeight: 80, bowlDepth: 20, erosion: 5, terrainRoughness: 90, craterVariation: 30,
+      craterShape: "angular", highlandRidges: 80,
     }),
   },
   {
-    name: "Pallasite Crystal",
-    emoji: "💎",
-    type: "Stony-Iron",
-    color: "text-amber-300",
+    name: "Pallasite Crystal", emoji: "💎", type: "Stony-Iron", color: "text-amber-300",
     description: "Olivine crystals embedded in nickel-iron matrix — smooth gem pockets surrounded by rough metallic ridges",
-    build: () => ({
-      enabled: true, intensity: 55, craterDensity: "med", craterSize: "large",
-      microDetail: 40, rimSharpness: 30, overlapIntensity: 60, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 55, craterDensity: "med", craterSize: "large",
+      microDetail: 40, rimSharpness: 30, overlapIntensity: 60, smoothEdges: true,
       rimHeight: 25, bowlDepth: 75, erosion: 40, terrainRoughness: 45, craterVariation: 90,
+      craterShape: "organic", craterFloorTexture: 15,
     }),
   },
   {
-    name: "Chondrite Regmaglypts",
-    emoji: "🪨",
-    type: "Stony (L5)",
-    color: "text-stone-400",
+    name: "Chondrite Regmaglypts", emoji: "🪨", type: "Stony (L5)", color: "text-stone-400",
     description: "Thumbprint-like ablation cavities from atmospheric entry — rounded pits with smooth interiors and rough ridges between",
-    build: () => ({
-      enabled: true, intensity: 65, craterDensity: "high", craterSize: "med",
-      microDetail: 50, rimSharpness: 25, overlapIntensity: 55, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 65, craterDensity: "high", craterSize: "med",
+      microDetail: 50, rimSharpness: 25, overlapIntensity: 55, smoothEdges: true,
       rimHeight: 20, bowlDepth: 70, erosion: 50, terrainRoughness: 55, craterVariation: 75,
+      craterShape: "oval", ovalElongation: 55, craterFloorTexture: 10,
     }),
   },
   {
-    name: "Gibeon Iron",
-    emoji: "🔩",
-    type: "Iron (IVA)",
-    color: "text-slate-300",
+    name: "Gibeon Iron", emoji: "🔩", type: "Iron (IVA)", color: "text-slate-300",
     description: "Fine octahedrite — tight geometric etching with subtle pitting and highly polished fracture faces",
-    build: () => ({
-      enabled: true, intensity: 60, craterDensity: "low", craterSize: "small",
-      microDetail: 95, rimSharpness: 85, overlapIntensity: 10, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 60, craterDensity: "low", craterSize: "small",
+      microDetail: 95, rimSharpness: 85, overlapIntensity: 10, smoothEdges: false,
       rimHeight: 70, bowlDepth: 15, erosion: 8, terrainRoughness: 95, craterVariation: 20,
+      craterShape: "angular", highlandRidges: 70,
     }),
   },
   {
-    name: "Campo del Cielo",
-    emoji: "🌋",
-    type: "Iron (IAB)",
-    color: "text-orange-400",
+    name: "Campo del Cielo", emoji: "🌋", type: "Iron (IAB)", color: "text-orange-400",
     description: "Coarse rust-pitted iron with deep irregular cavities — heavy weathering exposes rugged internal structure",
-    build: () => ({
-      enabled: true, intensity: 80, craterDensity: "med", craterSize: "large",
-      microDetail: 60, rimSharpness: 55, overlapIntensity: 45, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 80, craterDensity: "med", craterSize: "large",
+      microDetail: 60, rimSharpness: 55, overlapIntensity: 45, smoothEdges: false,
       rimHeight: 50, bowlDepth: 85, erosion: 65, terrainRoughness: 80, craterVariation: 70,
+      craterShape: "organic",
     }),
   },
   {
-    name: "Muonionalusta",
-    emoji: "❄",
-    type: "Iron (IVA)",
-    color: "text-sky-300",
+    name: "Muonionalusta", emoji: "❄", type: "Iron (IVA)", color: "text-sky-300",
     description: "Ancient Swedish meteorite — ultra-fine Widmanstätten with frost-like crystalline micro-texture and subtle impact dimples",
-    build: () => ({
-      enabled: true, intensity: 50, craterDensity: "low", craterSize: "small",
-      microDetail: 100, rimSharpness: 75, overlapIntensity: 5, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 50, craterDensity: "low", craterSize: "small",
+      microDetail: 100, rimSharpness: 75, overlapIntensity: 5, smoothEdges: false,
       rimHeight: 60, bowlDepth: 10, erosion: 15, terrainRoughness: 100, craterVariation: 15,
+      craterShape: "angular", highlandRidges: 60, craterFloorTexture: 5,
     }),
   },
   {
-    name: "Sikhote-Alin Shrapnel",
-    emoji: "💥",
-    type: "Iron (IIAB)",
-    color: "text-red-400",
+    name: "Sikhote-Alin Shrapnel", emoji: "💥", type: "Iron (IIAB)", color: "text-red-400",
     description: "Violent fragmentation — jagged torn edges, deep impact pits, and explosive shrapnel surface from 1947 fall",
-    build: () => ({
-      enabled: true, intensity: 95, craterDensity: "high", craterSize: "med",
-      microDetail: 70, rimSharpness: 100, overlapIntensity: 80, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 95, craterDensity: "high", craterSize: "med",
+      microDetail: 70, rimSharpness: 100, overlapIntensity: 80, smoothEdges: false,
       rimHeight: 95, bowlDepth: 65, erosion: 3, terrainRoughness: 75, craterVariation: 85,
+      craterShape: "angular", ejectaStrength: 90,
     }),
   },
   {
-    name: "Lunar Meteorite",
-    emoji: "🌙",
-    type: "Achondrite",
-    color: "text-neutral-300",
+    name: "Lunar Meteorite", emoji: "🌙", type: "Achondrite", color: "text-neutral-300",
     description: "Ejected lunar rock — fused regolith breccia with vesicular glass pockets and micro-crater surface",
-    build: () => ({
-      enabled: true, intensity: 55, craterDensity: "med", craterSize: "small",
-      microDetail: 75, rimSharpness: 45, overlapIntensity: 35, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 55, craterDensity: "med", craterSize: "small",
+      microDetail: 75, rimSharpness: 45, overlapIntensity: 35, smoothEdges: true,
       rimHeight: 40, bowlDepth: 50, erosion: 45, terrainRoughness: 65, craterVariation: 60,
+      craterShape: "circular", craterFloorTexture: 55,
     }),
   },
 ];
@@ -350,67 +358,68 @@ interface HammeredPreset {
 
 const HAMMERED_PRESETS: HammeredPreset[] = [
   {
-    name: "Light Planished",
-    color: "text-zinc-300",
+    name: "Light Planished", color: "text-zinc-300",
     description: "Gentle, uniform dents — classic hand-finished jewellery look with subtle surface movement",
-    build: () => ({
-      enabled: true, intensity: 35, craterDensity: "med", craterSize: "med",
-      microDetail: 20, rimSharpness: 15, overlapIntensity: 40, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 35, craterDensity: "med", craterSize: "med",
+      microDetail: 20, rimSharpness: 15, overlapIntensity: 40, smoothEdges: true,
       rimHeight: 10, bowlDepth: 40, erosion: 60, terrainRoughness: 25, craterVariation: 65,
+      craterShape: "oval", ovalElongation: 40, craterFloorTexture: 10,
     }),
   },
   {
-    name: "Artisan Hammered",
-    color: "text-amber-300",
+    name: "Artisan Hammered", color: "text-amber-300",
     description: "Varied irregular dents with moderate depth — each strike unique, warm handcrafted character",
-    build: () => ({
-      enabled: true, intensity: 55, craterDensity: "high", craterSize: "med",
-      microDetail: 30, rimSharpness: 25, overlapIntensity: 60, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 55, craterDensity: "high", craterSize: "med",
+      microDetail: 30, rimSharpness: 25, overlapIntensity: 60, smoothEdges: true,
       rimHeight: 15, bowlDepth: 60, erosion: 40, terrainRoughness: 30, craterVariation: 85,
+      craterShape: "organic",
     }),
   },
   {
-    name: "Deep Forge Strike",
-    color: "text-orange-400",
+    name: "Deep Forge Strike", color: "text-orange-400",
     description: "Bold, pronounced hammer marks — heavy blacksmith-style strikes with visible facets and sharp edges",
-    build: () => ({
-      enabled: true, intensity: 80, craterDensity: "med", craterSize: "large",
-      microDetail: 15, rimSharpness: 50, overlapIntensity: 35, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 80, craterDensity: "med", craterSize: "large",
+      microDetail: 15, rimSharpness: 50, overlapIntensity: 35, smoothEdges: false,
       rimHeight: 30, bowlDepth: 85, erosion: 10, terrainRoughness: 20, craterVariation: 70,
+      craterShape: "angular", craterFloorTexture: 25,
     }),
   },
   {
-    name: "Pin Hammer Fine",
-    color: "text-sky-300",
+    name: "Pin Hammer Fine", color: "text-sky-300",
     description: "Tiny dense dimples — delicate pin hammer texture giving a shimmering, light-catching surface",
-    build: () => ({
-      enabled: true, intensity: 45, craterDensity: "high", craterSize: "small",
-      microDetail: 40, rimSharpness: 20, overlapIntensity: 70, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 45, craterDensity: "high", craterSize: "small",
+      microDetail: 40, rimSharpness: 20, overlapIntensity: 70, smoothEdges: true,
       rimHeight: 8, bowlDepth: 35, erosion: 50, terrainRoughness: 15, craterVariation: 55,
+      craterShape: "circular",
     }),
   },
   {
-    name: "Rustic Beaten",
-    color: "text-stone-400",
+    name: "Rustic Beaten", color: "text-stone-400",
     description: "Rough, uneven strikes with weathered edges — organic, ancient-looking forged metal finish",
-    build: () => ({
-      enabled: true, intensity: 70, craterDensity: "high", craterSize: "large",
-      microDetail: 55, rimSharpness: 35, overlapIntensity: 80, smoothEdges: false, seed: newSeed(),
+    build: () => preset({
+      intensity: 70, craterDensity: "high", craterSize: "large",
+      microDetail: 55, rimSharpness: 35, overlapIntensity: 80, smoothEdges: false,
       rimHeight: 25, bowlDepth: 75, erosion: 55, terrainRoughness: 45, craterVariation: 95,
+      craterShape: "organic",
     }),
   },
   {
-    name: "Satin Peen",
-    color: "text-violet-300",
+    name: "Satin Peen", color: "text-violet-300",
     description: "Uniform ball-peen finish — consistent overlapping dimples creating a soft satin-like reflective surface",
-    build: () => ({
-      enabled: true, intensity: 40, craterDensity: "high", craterSize: "small",
-      microDetail: 25, rimSharpness: 10, overlapIntensity: 90, smoothEdges: true, seed: newSeed(),
+    build: () => preset({
+      intensity: 40, craterDensity: "high", craterSize: "small",
+      microDetail: 25, rimSharpness: 10, overlapIntensity: 90, smoothEdges: true,
       rimHeight: 5, bowlDepth: 30, erosion: 70, terrainRoughness: 10, craterVariation: 20,
+      craterShape: "circular",
     }),
   },
 ];
 
+// ── UI helpers ────────────────────────────────────────────────────
 
 function SubSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -429,11 +438,20 @@ function SubSection({ title, defaultOpen = true, children }: { title: string; de
   );
 }
 
-// ── Pre-computed thumbnail states (stable refs, no hooks needed) ──
+// ── Pre-computed thumbnail states ──
 const LUNAR_THUMB_STATES = LUNAR_PRESETS.filter(p => p.name !== "Random Chaos").map(p => ({ name: p.name, state: p.build() }));
 const PLANETARY_THUMB_STATES = PLANETARY_PRESETS.map(p => ({ name: p.name, state: p.build() }));
 const METEORITE_THUMB_STATES = METEORITE_PRESETS.map(p => ({ name: p.name, state: p.build() }));
 const HAMMERED_THUMB_STATES = HAMMERED_PRESETS.map(p => ({ name: p.name, state: p.build() }));
+
+// ── Crater shape icons ───────────────────────────────────────────
+
+const SHAPE_OPTIONS: { value: CraterShape; label: string; desc: string; icon: typeof Circle }[] = [
+  { value: "circular", label: "Circular", desc: "Perfect round craters", icon: Circle },
+  { value: "oval", label: "Oval", desc: "Elongated impacts", icon: Orbit },
+  { value: "organic", label: "Organic", desc: "Natural irregular shapes", icon: Waves },
+  { value: "angular", label: "Angular", desc: "Faceted crystalline", icon: Diamond },
+];
 
 // ── Panel ─────────────────────────────────────────────────────────
 
@@ -449,9 +467,9 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
   const patch = (p: Partial<LunarTextureState>) => onChange({ ...state, ...p });
 
   const handlePreset = (name: string) => {
-    const preset = LUNAR_PRESETS.find((p) => p.name === name);
-    if (!preset) return;
-    onApplyPreset(preset.build(), name);
+    const found = LUNAR_PRESETS.find((p) => p.name === name);
+    if (!found) return;
+    onApplyPreset(found.build(), name);
   };
 
   const handleRandomize = () => {
@@ -473,7 +491,7 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
   const craterCount = useMemo(() => {
     if (!state.enabled) return 0;
     try {
-      const maps = generateLunarSurfaceMaps(state, 8); // approximate aspect for count display
+      const maps = generateLunarSurfaceMaps(state, 8);
       return maps.craterCount;
     } catch {
       return 0;
@@ -661,10 +679,61 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
           {/* ── Crater Shape ── */}
           <SubSection title="Crater Shape">
             <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5">
-              Control crater size, density, and form
+              Control crater geometry, size, density, and form
             </p>
 
+            {/* Shape selector */}
             <div className="space-y-1.5">
+              <Label className="text-[10px] text-muted-foreground">Crater Shape</Label>
+              <div className="grid grid-cols-4 gap-1">
+                {SHAPE_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => patch({ craterShape: opt.value })}
+                      className={cn(
+                        "flex flex-col items-center gap-0.5 px-1 py-2 rounded-md text-center transition-all border",
+                        state.craterShape === opt.value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span className="text-[8px] font-medium">{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[8px] text-muted-foreground/40">
+                {SHAPE_OPTIONS.find(o => o.value === state.craterShape)?.desc}
+              </p>
+            </div>
+
+            {/* Oval-specific controls */}
+            {state.craterShape === "oval" && (
+              <div className="space-y-1.5 mt-2 p-2 rounded-md bg-secondary/20 border border-border/30">
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground/70 font-display">Oval Settings</span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">Elongation</Label>
+                    <span className="text-[10px] font-mono text-primary/80">{state.ovalElongation}%</span>
+                  </div>
+                  <Slider value={[state.ovalElongation]} onValueChange={([v]) => patch({ ovalElongation: v })} min={10} max={90} step={1} />
+                  <p className="text-[8px] text-muted-foreground/40">How stretched the oval shape is</p>
+                </div>
+                <div className="space-y-1.5 mt-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">Direction</Label>
+                    <span className="text-[10px] font-mono text-primary/80">{state.ovalAngle}°</span>
+                  </div>
+                  <Slider value={[state.ovalAngle]} onValueChange={([v]) => patch({ ovalAngle: v })} min={0} max={360} step={5} />
+                  <p className="text-[8px] text-muted-foreground/40">Angle of elongation (0° = horizontal)</p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5 mt-2">
               <div className="flex items-center justify-between">
                 <Label className="text-[10px] text-muted-foreground">Overall Intensity</Label>
                 <span className="text-[10px] font-mono text-primary/80">{state.intensity}%</span>
@@ -782,6 +851,42 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               </div>
               <Slider value={[state.overlapIntensity]} onValueChange={([v]) => patch({ overlapIntensity: v })} min={0} max={100} step={1} />
               <p className="text-[8px] text-muted-foreground/40">How much craters merge into each other</p>
+            </div>
+
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Crater Floor Texture</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.craterFloorTexture}%</span>
+              </div>
+              <Slider value={[state.craterFloorTexture]} onValueChange={([v]) => patch({ craterFloorTexture: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Roughness inside crater bowls — smooth vs fractured</p>
+            </div>
+
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Ejecta Rays</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.ejectaStrength}%</span>
+              </div>
+              <Slider value={[state.ejectaStrength]} onValueChange={([v]) => patch({ ejectaStrength: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Radial debris streaks from large impacts</p>
+            </div>
+
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Maria Fill</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.mariaFill}%</span>
+              </div>
+              <Slider value={[state.mariaFill]} onValueChange={([v]) => patch({ mariaFill: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Smooth dark plains filling low areas (like lunar maria)</p>
+            </div>
+
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Highland Ridges</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.highlandRidges}%</span>
+              </div>
+              <Slider value={[state.highlandRidges]} onValueChange={([v]) => patch({ highlandRidges: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">Raised ridge networks between craters</p>
             </div>
 
             <div className="flex items-center justify-between mt-2 p-2 rounded-md bg-secondary/20">

@@ -1,5 +1,6 @@
 export type CraterDensity = "low" | "med" | "high";
 export type CraterSize = "small" | "med" | "large";
+export type CraterShape = "circular" | "oval" | "organic" | "angular";
 
 export interface LunarTextureState {
   enabled: boolean;
@@ -11,12 +12,20 @@ export interface LunarTextureState {
   microDetail: number;     // 0–100
   rimSharpness: number;    // 0–100
   overlapIntensity: number; // 0–100
-  // ── New v2 fields ──
+  // ── v2 fields ──
   rimHeight: number;        // 0–100, how much rims protrude above surface
   bowlDepth: number;        // 0–100, how deep crater bowls carve
   erosion: number;          // 0–100, weathering/softening of older craters
   terrainRoughness: number; // 0–100, base landscape bumpiness
   craterVariation: number;  // 0–100, per-crater randomness in shape
+  // ── v3 fields ──
+  craterShape: CraterShape;     // overall crater shape mode
+  ovalElongation: number;       // 0–100, how stretched oval craters are (only for oval mode)
+  ovalAngle: number;            // 0–360, direction of elongation
+  mariaFill: number;            // 0–100, dark smooth plains between craters (like lunar maria)
+  highlandRidges: number;       // 0–100, raised ridge networks between craters
+  craterFloorTexture: number;   // 0–100, roughness inside crater bowls
+  ejectaStrength: number;       // 0–100, intensity of radial ejecta rays
 }
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
@@ -34,4 +43,11 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   erosion: 25,
   terrainRoughness: 35,
   craterVariation: 50,
+  craterShape: "circular",
+  ovalElongation: 50,
+  ovalAngle: 0,
+  mariaFill: 0,
+  highlandRidges: 0,
+  craterFloorTexture: 30,
+  ejectaStrength: 50,
 };
