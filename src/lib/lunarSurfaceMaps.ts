@@ -22,6 +22,8 @@ export interface LunarSurfaceMapSet {
 
 export const MAP_W = 4096;
 export const MAP_H = 1024;
+export const MAP_W_PREVIEW = 2048;
+export const MAP_H_PREVIEW = 512;
 export const MAP_DIMENSIONS = { width: MAP_W, height: MAP_H } as const;
 
 const cache = new Map<string, LunarSurfaceMapSet>();
@@ -502,21 +504,42 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
 function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: number) {
   if (erosionFactor <= 0) return;
 
-  const blurred = new Float32Array(hmap.length);
+  // Separable box blur — O(n*2k) instead of O(n*k²)
   const kernelR = Math.max(1, Math.round(2 + erosionFactor * 4));
+  const kernelSize = kernelR * 2 + 1;
+  const temp = new Float32Array(hmap.length);
 
+  // Horizontal pass
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let sum = 0, count = 0;
-      for (let ky = -kernelR; ky <= kernelR; ky++) {
-        const sy = Math.max(0, Math.min(h - 1, y + ky));
-        for (let kx = -kernelR; kx <= kernelR; kx++) {
-          const sx = ((x + kx) % w + w) % w;
-          sum += hmap[sy * w + sx];
-          count++;
-        }
-      }
-      blurred[y * w + x] = sum / count;
+    let sum = 0;
+    // Initialize window
+    for (let kx = -kernelR; kx <= kernelR; kx++) {
+      const sx = ((kx % w) + w) % w;
+      sum += hmap[y * w + sx];
+    }
+    temp[y * w + 0] = sum / kernelSize;
+    for (let x = 1; x < w; x++) {
+      const addX = ((x + kernelR) % w + w) % w;
+      const removeX = ((x - kernelR - 1) % w + w) % w;
+      sum += hmap[y * w + addX] - hmap[y * w + removeX];
+      temp[y * w + x] = sum / kernelSize;
+    }
+  }
+
+  // Vertical pass
+  const blurred = new Float32Array(hmap.length);
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let ky = -kernelR; ky <= kernelR; ky++) {
+      const sy = Math.max(0, Math.min(h - 1, ky));
+      sum += temp[sy * w + x];
+    }
+    blurred[x] = sum / kernelSize;
+    for (let y = 1; y < h; y++) {
+      const addY = Math.min(h - 1, y + kernelR);
+      const removeY = Math.max(0, y - kernelR - 1);
+      sum += temp[addY * w + x] - temp[removeY * w + x];
+      blurred[y * w + x] = sum / kernelSize;
     }
   }
 
@@ -1009,23 +1032,28 @@ export interface RingDimensions {
   thicknessMm: number;
 }
 
-export function generateLunarSurfaceMaps(
+export type GenerationStage = "heightmap" | "craters" | "erosion" | "normal" | "roughness" | "ao" | "albedo" | "displacement" | "done";
+
+export interface GenerationProgress {
+  stage: GenerationStage;
+  label: string;
+  craterCount: number;
+  percent: number;
+}
+
+function buildMapsFromHeightmap(
+  hmap: Float32Array,
+  w: number,
+  h: number,
   lunar: LunarTextureState,
-  physicalAspect?: number,
-  ringDims?: RingDimensions,
+  aspect: number,
+  craterCount: number,
 ): LunarSurfaceMapSet {
-  const aspect = physicalAspect ?? 1;
-  const dimsKey = ringDims ? `-d${ringDims.innerDiameterMm.toFixed(1)}_${ringDims.widthMm.toFixed(1)}_${ringDims.thicknessMm.toFixed(1)}` : "";
-  const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}` + dimsKey;
-  if (cache.has(key)) return cache.get(key)!;
-
-  const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
-
-  const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
-  const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
-  const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
-  const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
-  const displacementCanvas = heightmapToDisplacementCanvas(hmap, MAP_W, MAP_H);
+  const normalCanvas = heightmapToNormalCanvas(hmap, w, h, 2.5, aspect);
+  const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail);
+  const aoCanvas = heightmapToAOCanvas(hmap, w, h);
+  const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed);
+  const displacementCanvas = heightmapToDisplacementCanvas(hmap, w, h);
 
   const normalMap = new THREE.CanvasTexture(normalCanvas);
   const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
@@ -1040,9 +1068,129 @@ export function generateLunarSurfaceMaps(
   setupDataTexture(displacementMap);
   albedoMap.colorSpace = THREE.SRGBColorSpace;
 
-  const maps: LunarSurfaceMapSet = { normalMap, roughnessMap, aoMap, albedoMap, displacementMap, craterCount };
+  return { normalMap, roughnessMap, aoMap, albedoMap, displacementMap, craterCount };
+}
+
+export function generateLunarSurfaceMaps(
+  lunar: LunarTextureState,
+  physicalAspect?: number,
+  ringDims?: RingDimensions,
+): LunarSurfaceMapSet {
+  const aspect = physicalAspect ?? 1;
+  const dimsKey = ringDims ? `-d${ringDims.innerDiameterMm.toFixed(1)}_${ringDims.widthMm.toFixed(1)}_${ringDims.thicknessMm.toFixed(1)}` : "";
+  const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}` + dimsKey;
+  if (cache.has(key)) return cache.get(key)!;
+
+  const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
+  const maps = buildMapsFromHeightmap(hmap, MAP_W, MAP_H, lunar, aspect, craterCount);
   cache.set(key, maps);
   return maps;
+}
+
+/** Generate a fast preview at half resolution */
+export function generateLunarPreviewMaps(
+  lunar: LunarTextureState,
+  physicalAspect?: number,
+  ringDims?: RingDimensions,
+): LunarSurfaceMapSet {
+  const aspect = physicalAspect ?? 1;
+  const previewKey = "preview-" + cacheKey(lunar) + `-a${aspect.toFixed(2)}`;
+  if (cache.has(previewKey)) return cache.get(previewKey)!;
+
+  const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
+  const maps = buildMapsFromHeightmap(hmap, MAP_W, MAP_H, lunar, aspect, craterCount);
+  cache.set(previewKey, maps);
+  return maps;
+}
+
+/** Async generation with progress callback — non-blocking via setTimeout chunks */
+export function generateLunarSurfaceMapsAsync(
+  lunar: LunarTextureState,
+  physicalAspect: number,
+  ringDims: RingDimensions | undefined,
+  onProgress: (progress: GenerationProgress) => void,
+): Promise<LunarSurfaceMapSet> {
+  const aspect = physicalAspect;
+  const dimsKey = ringDims ? `-d${ringDims.innerDiameterMm.toFixed(1)}_${ringDims.widthMm.toFixed(1)}_${ringDims.thicknessMm.toFixed(1)}` : "";
+  const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}` + dimsKey;
+
+  if (cache.has(key)) {
+    const cached = cache.get(key)!;
+    onProgress({ stage: "done", label: "Complete", craterCount: cached.craterCount, percent: 100 });
+    return Promise.resolve(cached);
+  }
+
+  return new Promise((resolve) => {
+    // Step 1: heightmap (most expensive)
+    onProgress({ stage: "heightmap", label: "Building terrain…", craterCount: 0, percent: 5 });
+
+    setTimeout(() => {
+      const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
+      onProgress({ stage: "craters", label: `${craterCount.toLocaleString()} craters stamped`, craterCount, percent: 40 });
+
+      setTimeout(() => {
+        onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 55 });
+        const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
+        const normalMap = new THREE.CanvasTexture(normalCanvas);
+        setupDataTexture(normalMap);
+
+        setTimeout(() => {
+          onProgress({ stage: "roughness", label: "Computing roughness…", craterCount, percent: 65 });
+          const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
+          const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
+          setupDataTexture(roughnessMap);
+
+          setTimeout(() => {
+            onProgress({ stage: "ao", label: "Computing ambient occlusion…", craterCount, percent: 75 });
+            const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
+            const aoMap = new THREE.CanvasTexture(aoCanvas);
+            setupDataTexture(aoMap);
+
+            setTimeout(() => {
+              onProgress({ stage: "albedo", label: "Generating surface color…", craterCount, percent: 85 });
+              const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
+              const albedoMap = new THREE.CanvasTexture(albedoCanvas);
+              setupDataTexture(albedoMap);
+              albedoMap.colorSpace = THREE.SRGBColorSpace;
+
+              setTimeout(() => {
+                onProgress({ stage: "displacement", label: "Computing displacement…", craterCount, percent: 95 });
+                const displacementCanvas = heightmapToDisplacementCanvas(hmap, MAP_W, MAP_H);
+                const displacementMap = new THREE.CanvasTexture(displacementCanvas);
+                setupDataTexture(displacementMap);
+
+                const maps: LunarSurfaceMapSet = { normalMap, roughnessMap, aoMap, albedoMap, displacementMap, craterCount };
+                cache.set(key, maps);
+                onProgress({ stage: "done", label: "Surface complete ✓", craterCount, percent: 100 });
+                resolve(maps);
+              }, 0);
+            }, 0);
+          }, 0);
+        }, 0);
+      }, 0);
+    }, 0);
+  });
+}
+
+/** Get crater count without generating full maps (uses cached heightmap result) */
+export function estimateCraterCount(lunar: LunarTextureState): number {
+  const densityMul = lunar.craterDensity === "low" ? 0.5 : lunar.craterDensity === "med" ? 1.0 : 1.8;
+  const sizeMul = lunar.craterSize === "small" ? 0.6 : lunar.craterSize === "med" ? 1.0 : 1.5;
+  const overlapFactor = lunar.overlapIntensity / 100;
+  const microFactor = lunar.microDetail / 100;
+
+  const mega = Math.round(1 + densityMul * 1.5);
+  const hero = Math.round(3 + densityMul * 5);
+  const med = Math.round(15 + densityMul * 35 * sizeMul);
+  const small = Math.round(40 + densityMul * 160);
+  const micro = Math.round((200 + densityMul * 600) * microFactor);
+
+  const base = mega + hero + med + small;
+  const overlap = Math.round(base * overlapFactor * 0.4);
+  // Estimate secondary from ejecta rays (~3% hit rate per ray step for mega+hero)
+  const ejectaSecondary = Math.round((mega + hero) * 6 * 0.03 * (lunar.ejectaStrength ?? 50) / 100 * 20);
+
+  return base + overlap + ejectaSecondary + micro;
 }
 
 /** Dispose old textures when no longer needed */
