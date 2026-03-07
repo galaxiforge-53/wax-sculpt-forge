@@ -1330,7 +1330,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               </span>
             </div>
           </div>
-        )
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
