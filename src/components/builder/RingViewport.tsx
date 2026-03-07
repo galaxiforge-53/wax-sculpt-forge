@@ -1273,6 +1273,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     const rRot = ringRotation ?? [0, 0, 0];
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
+    const [surfaceProgress, setSurfaceProgress] = useState<GenerationProgress | null>(null);
+
+    const handleGenProgress = useCallback((p: GenerationProgress | null) => {
+      setSurfaceProgress(p);
+    }, []);
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
       snapshotApiRef.current = api;
@@ -1290,14 +1295,42 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       },
     }), []);
 
-    // Closer camera on mobile so ring fills screen — slightly angled for better initial view
-    // Inspection mode starts closer for detail viewing
+    // Camera positioned further back so ring is fully visible
     const initialCamPos: [number, number, number] = insp
-      ? [0, 1.2, 2.2]
-      : isMobile ? [0.6, 1.0, 2.4] : [0, 2, 4];
+      ? [0, 1.8, 3.5]
+      : isMobile ? [1.0, 1.5, 4.0] : [0, 3, 6];
 
     return (
       <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none relative">
+        {/* Surface generation progress overlay */}
+        {surfaceProgress && surfaceProgress.stage !== "done" && (
+          <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
+            <div className="bg-background/90 backdrop-blur-md border border-primary/20 rounded-lg px-4 py-3 shadow-lg">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-medium text-foreground/90">{surfaceProgress.label}</span>
+                <span className="text-[10px] text-muted-foreground tabular-nums">{surfaceProgress.percent}%</span>
+              </div>
+              <Progress value={surfaceProgress.percent} className="h-1.5" />
+              {surfaceProgress.craterCount > 0 && (
+                <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
+                  <span>🌑 {surfaceProgress.craterCount.toLocaleString()} craters</span>
+                  <span>·</span>
+                  <span className="capitalize">{surfaceProgress.stage.replace(/([A-Z])/g, " $1")}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Completion flash */}
+        {surfaceProgress?.stage === "done" && (
+          <div className="absolute bottom-4 left-4 z-20 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="bg-primary/15 backdrop-blur-md border border-primary/30 rounded-lg px-3 py-2 shadow-lg">
+              <span className="text-[11px] font-medium text-primary">
+                ✓ {surfaceProgress.craterCount.toLocaleString()} craters · Surface ready
+              </span>
+            </div>
+          </div>
+        )
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
