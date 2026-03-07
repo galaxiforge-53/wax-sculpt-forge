@@ -770,7 +770,7 @@ function EngravingText3D({ params, engraving }: { params: RingParameters; engrav
         const angle = startAngle + (i + 0.5) * (charWidth / textR);
         const x = Math.cos(angle) * textR;
         const z = Math.sin(angle) * textR;
-        const rotY = -angle + Math.PI / 2;
+        const rotY = -angle - Math.PI / 2;
 
         return (
           <Text
