@@ -1500,6 +1500,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               onAddWaxMark={onAddWaxMark}
               stampSettings={stampSettings}
               lunarTexture={lunarTexture}
+              onGenProgress={handleGenProgress}
             />
 
             {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (
@@ -1544,18 +1545,16 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
           <OrbitControls
             enablePan={false}
-            minDistance={insp ? 0.8 : (isMobile ? 1.0 : 1.5)}
-            maxDistance={insp ? 5 : (isMobile ? 7 : 8)}
-            autoRotate={insp || (!isMobile)}
-            autoRotateSpeed={insp ? 0.15 : 0.4}
+            minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
+            maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
+            autoRotate={false}
             enableDamping
-            dampingFactor={insp ? 0.06 : (isMobile ? 0.12 : 0.08)}
-            rotateSpeed={insp ? 0.35 : (isMobile ? 0.5 : 1)}
-            zoomSpeed={insp ? 0.6 : (isMobile ? 0.8 : 1)}
+            dampingFactor={0.08}
+            rotateSpeed={isMobile ? 0.6 : 1.0}
+            zoomSpeed={isMobile ? 0.8 : 1.0}
             touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-            /* Polar limits prevent flipping upside down on touch */
-            minPolarAngle={isMobile ? Math.PI * 0.1 : 0}
-            maxPolarAngle={isMobile ? Math.PI * 0.9 : Math.PI}
+            minPolarAngle={0}
+            maxPolarAngle={Math.PI}
           />
 
           {/* Camera preset animator */}
