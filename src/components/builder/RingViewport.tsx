@@ -10,8 +10,9 @@ import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
-import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
+import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
 
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
@@ -24,10 +25,10 @@ export interface RingViewportHandle {
 }
 
 const CAMERA_PRESETS: Record<SnapshotAngle, [number, number, number]> = {
-  front: [0, 0, 3.5],
-  angle: [2.5, 1.8, 2.5],
-  side: [3.5, 0.2, 0],
-  inside: [0, -0.1, 0.6],  // looking into the ring bore
+  front: [0, 0, 5.5],
+  angle: [3.8, 2.8, 3.8],
+  side: [5.5, 0.3, 0],
+  inside: [0, -0.1, 0.8],
 };
 
 // ── Ring Mesh ─────────────────────────────────────────────────────
