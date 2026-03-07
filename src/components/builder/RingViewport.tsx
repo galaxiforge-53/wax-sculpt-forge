@@ -415,7 +415,7 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
 
   const { outerGeo, innerGeo, capGeoTop, capGeoBot } = useMemo(
