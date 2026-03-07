@@ -4,7 +4,9 @@ import { LunarTextureState } from "@/types/lunar";
 /**
  * Generates full-ring UV-space maps (normalMap, roughnessMap, aoMap, albedoMap, displacementMap)
  * from a heightmap with 5-tier crater distribution, central peaks, terraced walls,
- * ejecta rays, secondary impacts, erosion simulation, and terrain roughness.
+ * ejecta rays, secondary impacts, erosion simulation, terrain roughness,
+ * crater shape modes (circular/oval/organic/angular), maria fill, highland ridges,
+ * and crater floor texturing.
  *
  * U = circumference, V = ring width.
  */
@@ -25,7 +27,16 @@ export const MAP_DIMENSIONS = { width: MAP_W, height: MAP_H } as const;
 const cache = new Map<string, LunarSurfaceMapSet>();
 
 function cacheKey(lunar: LunarTextureState): string {
-  return `${lunar.seed}-${lunar.craterDensity}-${lunar.craterSize}-${lunar.intensity}-${lunar.microDetail}-${lunar.rimSharpness}-${lunar.overlapIntensity}-${lunar.smoothEdges ? 1 : 0}-${lunar.rimHeight}-${lunar.bowlDepth}-${lunar.erosion}-${lunar.terrainRoughness}-${lunar.craterVariation}`;
+  return [
+    lunar.seed, lunar.craterDensity, lunar.craterSize, lunar.intensity,
+    lunar.microDetail, lunar.rimSharpness, lunar.overlapIntensity,
+    lunar.smoothEdges ? 1 : 0, lunar.rimHeight, lunar.bowlDepth,
+    lunar.erosion, lunar.terrainRoughness, lunar.craterVariation,
+    lunar.craterShape ?? "circular",
+    lunar.ovalElongation ?? 50, lunar.ovalAngle ?? 0,
+    lunar.mariaFill ?? 0, lunar.highlandRidges ?? 0,
+    lunar.craterFloorTexture ?? 30, lunar.ejectaStrength ?? 50,
+  ].join("-");
 }
 
 // ── Seeded RNG ────────────────────────────────────────────────────
@@ -57,7 +68,7 @@ function makeNoise2D(seed: number) {
   for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
 
   function fade(t: number) { return t * t * t * (t * (t * 6 - 15) + 10); }
-  function lerp(a: number, b: number, t: number) { return a + t * (b - a); }
+  function lerpN(a: number, b: number, t: number) { return a + t * (b - a); }
   function dot2(g: number[], x: number, y: number) { return g[0] * x + g[1] * y; }
 
   return (x: number, y: number): number => {
@@ -73,9 +84,9 @@ function makeNoise2D(seed: number) {
     const ba = perm[perm[xi + 1] + yi] & 255;
     const bb = perm[perm[xi + 1] + yi + 1] & 255;
 
-    return lerp(
-      lerp(dot2(grad[aa], xf, yf), dot2(grad[ba], xf - 1, yf), u),
-      lerp(dot2(grad[ab], xf, yf - 1), dot2(grad[bb], xf - 1, yf - 1), u),
+    return lerpN(
+      lerpN(dot2(grad[aa], xf, yf), dot2(grad[ba], xf - 1, yf), u),
+      lerpN(dot2(grad[ab], xf, yf - 1), dot2(grad[bb], xf - 1, yf - 1), u),
       v
     );
   };
@@ -118,6 +129,87 @@ function buildEdgeMask(w: number, h: number): Float32Array {
   return mask;
 }
 
+// ── Crater shape distance function ────────────────────────────────
+// Returns a normalized distance (0 = center, 1 = edge) that respects
+// the selected crater shape mode.
+
+interface ShapeParams {
+  shape: string;       // "circular" | "oval" | "organic" | "angular"
+  ovalElongation: number;  // 0-1 normalized
+  ovalAngleRad: number;    // per-crater random angle (derived from global + variation)
+  warpNoise: (x: number, y: number) => number;
+  noiseScale: number;
+  warpAmp: number;
+  angularFacets: number; // 4-8 for angular mode
+  angularPhase: number;
+}
+
+function shapedDistance(
+  du: number, dv: number,
+  sp: ShapeParams,
+  px: number, py: number,
+  w: number, h: number,
+): { dist: number; wdu: number; wdv: number } {
+  let sdu = du;
+  let sdv = dv;
+
+  // Apply shape transformation
+  switch (sp.shape) {
+    case "oval": {
+      // Rotate into oval frame, scale one axis
+      const cos = Math.cos(sp.ovalAngleRad);
+      const sin = Math.sin(sp.ovalAngleRad);
+      const ru = du * cos + dv * sin;
+      const rv = -du * sin + dv * cos;
+      // Elongation: stretch one axis (0.3 to 1.0 ratio)
+      const ratio = 1.0 - sp.ovalElongation * 0.7;
+      sdu = ru / Math.max(0.3, ratio);
+      sdv = rv;
+      // Rotate back for warp
+      const cos2 = Math.cos(-sp.ovalAngleRad);
+      const sin2 = Math.sin(-sp.ovalAngleRad);
+      const finalU = sdu * cos2 + sdv * sin2;
+      const finalV = -sdu * sin2 + sdv * cos2;
+      sdu = finalU;
+      sdv = finalV;
+      break;
+    }
+    case "angular": {
+      // Polygonal distance — reduces circular to N-sided polygon
+      const angle = Math.atan2(sdv, sdu);
+      const r = Math.sqrt(sdu * sdu + sdv * sdv);
+      const n = sp.angularFacets;
+      const sector = (2 * Math.PI) / n;
+      const sectorAngle = ((angle - sp.angularPhase) % sector + sector) % sector;
+      const halfSector = sector / 2;
+      // Scale distance by cos of angle within sector to make polygon
+      const polyScale = Math.cos(halfSector) / Math.cos(sectorAngle - halfSector);
+      const pr = r * polyScale;
+      sdu = pr * Math.cos(angle);
+      sdv = pr * Math.sin(angle);
+      break;
+    }
+    case "organic": {
+      // Extra domain warp for irregular natural shapes
+      const wU2 = sp.warpNoise(px * sp.noiseScale * 1.5 / w + 200, py * sp.noiseScale * 1.5 / h + 200);
+      const wV2 = sp.warpNoise(py * sp.noiseScale * 1.5 / h + 300, px * sp.noiseScale * 1.5 / w + 300);
+      sdu += sp.warpAmp * 0.35 * wU2;
+      sdv += sp.warpAmp * 0.35 * wV2;
+      break;
+    }
+    // "circular" — no transformation
+  }
+
+  // Standard domain warp (applies to all shapes for natural variation)
+  const wU = sp.warpNoise(px * sp.noiseScale / w, py * sp.noiseScale / h);
+  const wV = sp.warpNoise(py * sp.noiseScale / h + 100, px * sp.noiseScale / w + 100);
+  const wdu = sdu + sp.warpAmp * 0.22 * wU;
+  const wdv = sdv + sp.warpAmp * 0.22 * wV;
+
+  const dist = Math.sqrt(wdu * wdu + wdv * wdv);
+  return { dist, wdu, wdv };
+}
+
 // ── Crater stamp ──────────────────────────────────────────────────
 
 interface CraterStamp {
@@ -129,12 +221,17 @@ interface CraterStamp {
   rimCenterJitter: number;
   rimWidthJitter: number;
   warpSeed: number;
-  tier: number; // 0=mega, 1=hero, 2=medium, 3=small, 4=micro
-  age: number;  // 0=oldest(mega), 1=newest(micro) — for erosion weighting
-  rimAsymmetry: number;    // 0-1 angular rim height variation
-  rimAsymAngle: number;    // preferred direction for thicker rim
-  slumpAngle: number;      // wall slump direction
-  slumpStrength: number;   // 0-1
+  tier: number;
+  age: number;
+  rimAsymmetry: number;
+  rimAsymAngle: number;
+  slumpAngle: number;
+  slumpStrength: number;
+  // v3 shape per-crater
+  shapeAngleRad: number;
+  angularFacets: number;
+  angularPhase: number;
+  floorTextureFactor: number; // 0-1
 }
 
 function stampCrater(
@@ -149,16 +246,11 @@ function stampCrater(
   hasCentralPeak: boolean,
   hasTerraces: boolean,
   physicalAspect: number = 1,
+  shapeMode: string = "circular",
+  ovalElongation: number = 0.5,
+  floorNoise?: (x: number, y: number) => number,
 ) {
-  // Physical aspect correction: V is stretched so craters are circular on the ring surface
-  // U maps to circumference, V maps to width. physicalAspect = circumference / width.
-  // A circle of physical radius R covers:
-  //   U extent (in UV) = R / circumference
-  //   V extent (in UV) = R / width = (R / circumference) * physicalAspect
-  // So in pixel space, V pixels = U pixels * physicalAspect * (MAP_H / MAP_W)
   const vStretch = physicalAspect;
-
-  // Pixel radii for distance normalisation — ensures circular craters
   const pxR = c.radius * w;
   const pyR = c.radius * h * vStretch;
 
@@ -169,22 +261,29 @@ function stampCrater(
   const y0 = Math.max(0, Math.floor((c.cv - spreadV) * h));
   const y1 = Math.min(h - 1, Math.ceil((c.cv + spreadV) * h));
 
-  // ── Realistic crater profile zones (based on lunar morphology) ──
-  // Bowl uses hemispherical parabolic profile instead of flat floor
-  const bowlEnd = 0.58;             // where bowl wall meets rim inner face
+  const bowlEnd = 0.58;
   const rimInner = 0.62 + rimSharpness * 0.04 + c.rimCenterJitter;
   const rimPeak = 0.72 + rimSharpness * 0.05 + c.rimCenterJitter;
   const rimOuter = 0.88 + c.rimWidthJitter;
-  const ejectaEnd = 1.45;           // faint ejecta blanket
+  const ejectaEnd = 1.45;
 
   const noiseScale = 6 + c.warpSeed * 3;
 
-  // Central peak parameters (for mega/hero craters)
   const peakRadius = 0.18;
   const peakHeight = c.depth * 0.35;
 
-  // Terrace parameters
   const terraceCount = hasTerraces ? 3 : 0;
+
+  const sp: ShapeParams = {
+    shape: shapeMode,
+    ovalElongation,
+    ovalAngleRad: c.shapeAngleRad,
+    warpNoise,
+    noiseScale,
+    warpAmp,
+    angularFacets: c.angularFacets,
+    angularPhase: c.angularPhase,
+  };
 
   for (let py = y0; py <= y1; py++) {
     for (let px = x0; px <= x1; px++) {
@@ -194,23 +293,13 @@ function stampCrater(
       const du = (px - c.cu * w) / pxR;
       const dv = (py - c.cv * h) / pyR;
 
-      // Domain warp for organic shapes
-      const wU = warpNoise(px * noiseScale / w, py * noiseScale / h);
-      const wV = warpNoise(py * noiseScale / h + 100, px * noiseScale / w + 100);
-      const wdu = du + warpAmp * 0.22 * wU;
-      const wdv = dv + warpAmp * 0.22 * wV;
-
-      const dist = Math.sqrt(wdu * wdu + wdv * wdv);
+      const { dist, wdu, wdv } = shapedDistance(du, dv, sp, px, py, w, h);
       if (dist > ejectaEnd) continue;
 
-      // Angular position for asymmetric rim
       const angle = Math.atan2(wdv, wdu);
-
-      // Rim asymmetry — one side higher (simulates oblique impact / gravity slump)
       const angleDiff = Math.cos(angle - c.rimAsymAngle);
       const rimAsymFactor = 1.0 + c.rimAsymmetry * 0.4 * angleDiff;
 
-      // Wall slump — shifts bowl slightly off-center
       const slumpShift = c.slumpStrength * 0.08;
       const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
       const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
@@ -220,24 +309,23 @@ function stampCrater(
       const effectiveRimH = c.rimHeight * rimAsymFactor;
 
       if (dist < bowlEnd) {
-        // ── Hemispherical parabolic bowl ──
-        // Smooth parabolic curve: depth * (dist/bowlEnd)^2 - depth
-        // This creates a natural concave bowl, deepest at center
-        const t = slumpDist / bowlEnd;  // use slumped distance for asymmetry
+        const t = slumpDist / bowlEnd;
         const tClamped = Math.min(t, 1.0);
-
-        // Parabolic bowl: -depth at center, rises to ~0 at bowlEnd
         const parabola = tClamped * tClamped;
         delta = -c.depth * (1.0 - parabola * 0.92);
 
-        // Central peak — smooth bell mound (complex craters only)
+        // Crater floor texture — add roughness inside the bowl
+        if (floorNoise && c.floorTextureFactor > 0 && tClamped < 0.7) {
+          const floorN = floorNoise(wpx * 0.05, py * 0.05);
+          delta += floorN * c.depth * 0.15 * c.floorTextureFactor * (1 - tClamped / 0.7);
+        }
+
         if (hasCentralPeak && dist < peakRadius) {
           const pt = dist / peakRadius;
           const bell = Math.exp(-pt * pt * 5.0);
           delta += peakHeight * bell;
         }
 
-        // Terraced inner walls (mega craters — concentric step-downs)
         if (terraceCount > 0 && tClamped > 0.35) {
           const terraceT = (tClamped - 0.35) / 0.65;
           const step = Math.floor(terraceT * terraceCount);
@@ -246,25 +334,18 @@ function stampCrater(
           delta += c.depth * 0.08 * stepSmooth;
         }
       } else if (dist < rimInner) {
-        // ── Steep inner wall — transition from bowl to rim ──
         const t = (dist - bowlEnd) / (rimInner - bowlEnd);
-        // Cubic ease for steep inner wall face
         const s = t * t * (3 - 2 * t);
         delta = lerp(-c.depth * 0.08, effectiveRimH * 0.35, s);
       } else if (dist < rimPeak) {
-        // ── Rim crest — sharp raised peak ──
         const t = (dist - rimInner) / (rimPeak - rimInner);
-        // Sinusoidal peak for natural rounded crest
         const s = Math.sin(t * Math.PI);
         delta = effectiveRimH * 0.35 + s * effectiveRimH * 0.65;
       } else if (dist < rimOuter) {
-        // ── Outer rim slope — gentler asymmetric decline ──
         const t = (dist - rimPeak) / (rimOuter - rimPeak);
-        // Cubic falloff for natural outer slope
         const s = 1 - (1 - t) * (1 - t) * (1 - t);
         delta = effectiveRimH * (1 - s);
       } else if (dist < ejectaEnd) {
-        // ── Ejecta blanket — very faint raised material ──
         const t = (dist - rimOuter) / (ejectaEnd - rimOuter);
         const falloff = (1 - t) * (1 - t) * (1 - t);
         delta = effectiveRimH * 0.05 * Math.max(0, falloff);
@@ -274,19 +355,13 @@ function stampCrater(
       delta *= mask;
 
       const idx = py * w + wpx;
-      // For overlapping impacts: newer craters can carve INTO older rims
-      // Use additive for bowls (negative delta) and max for rims (positive delta)
       if (delta < 0) {
-        // Bowl excavation — always applies (newer impact digs through old material)
         hmap[idx] = Math.max(0, Math.min(1, hmap[idx] + delta));
       } else {
-        // Rim deposition — only raise if this rim is higher than existing surface
-        // This prevents weird double-rim artifacts from overlapping craters
         const target = 0.5 + delta;
         if (target > hmap[idx]) {
           hmap[idx] = Math.min(1, hmap[idx] + delta * 0.7);
         } else {
-          // Faint contribution even when below existing surface
           hmap[idx] = Math.min(1, hmap[idx] + delta * 0.15);
         }
       }
@@ -305,27 +380,30 @@ function stampEjectaRays(
   edgeMask: Float32Array,
   secondaryStamps: CraterStamp[],
   physicalAspect: number = 1,
+  ejectaStrength: number = 0.5,
+  shapeMode: string = "circular",
+  ovalElongation: number = 0.5,
+  globalOvalAngle: number = 0,
 ) {
+  if (ejectaStrength <= 0.01) return;
+
   const rayCount = 4 + Math.floor(rand() * 5);
   const rayLength = c.radius * (2.5 + rand() * 2.0);
-  const rayBrightness = c.rimHeight * 0.12;
+  const rayBrightness = c.rimHeight * 0.12 * ejectaStrength;
 
   for (let r = 0; r < rayCount; r++) {
     const angle = rand() * Math.PI * 2;
     const rayWidth = c.radius * (0.06 + rand() * 0.08);
 
-    // Walk along ray
     const steps = Math.floor(rayLength * w * 0.5);
     for (let s = 0; s < steps; s++) {
       const t = s / steps;
       const dist = c.radius * 0.8 + t * rayLength;
       const ru = c.cu + Math.cos(angle) * dist;
-      // Use physicalAspect so rays extend equally in physical space
       const rv = c.cv + Math.sin(angle) * dist * physicalAspect;
 
       if (rv < 0.05 || rv > 0.95) continue;
 
-      // Brighten pixels in a thin strip
       const px = Math.floor(((ru % 1 + 1) % 1) * w);
       const py = Math.floor(rv * h);
       if (py < 0 || py >= h) continue;
@@ -339,8 +417,7 @@ function stampEjectaRays(
         hmap[idx] = Math.min(1, hmap[idx] + rayBrightness * fadeoff * mask);
       }
 
-      // Occasional secondary crater along ray
-      if (rand() < 0.03) {
+      if (rand() < 0.03 * ejectaStrength) {
         secondaryStamps.push({
           cu: ((ru % 1) + 1) % 1,
           cv: Math.max(0.08, Math.min(0.92, rv)),
@@ -356,7 +433,65 @@ function stampEjectaRays(
           rimAsymAngle: rand() * Math.PI * 2,
           slumpAngle: rand() * Math.PI * 2,
           slumpStrength: rand() * 0.15,
+          shapeAngleRad: globalOvalAngle + (rand() - 0.5) * 0.5,
+          angularFacets: 5 + Math.floor(rand() * 3),
+          angularPhase: rand() * Math.PI * 2,
+          floorTextureFactor: 0,
         });
+      }
+    }
+  }
+}
+
+// ── Maria fill pass ──────────────────────────────────────────────
+// Simulates dark smooth plains that fill low-lying areas
+
+function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeMask: Float32Array, seed: number) {
+  if (mariaFactor <= 0) return;
+
+  // Find height threshold — maria fills below median
+  const sorted = Float32Array.from(hmap).sort();
+  const threshold = sorted[Math.floor(sorted.length * (0.35 + mariaFactor * 0.15))];
+
+  const mariaNoise = makeNoise2D(seed + 6000);
+  const mariaStrength = mariaFactor * 0.7;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const hVal = hmap[idx];
+      if (hVal < threshold) {
+        const depth = (threshold - hVal) / Math.max(0.01, threshold);
+        const noise = mariaNoise(x / w * 6, y / h * 6) * 0.3 + 0.5;
+        const fill = depth * mariaStrength * noise;
+        const mask = edgeMask[idx];
+        // Raise low areas toward threshold (fill in)
+        hmap[idx] = lerp(hVal, threshold * 0.85, fill * mask);
+      }
+    }
+  }
+}
+
+// ── Highland ridges pass ─────────────────────────────────────────
+// Adds raised ridge networks using directional fBm
+
+function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeMask: Float32Array, seed: number, depthScale: number) {
+  if (ridgeFactor <= 0) return;
+
+  const ridgeNoise = makeNoise2D(seed + 7500);
+  const ridgeAmp = ridgeFactor * 0.08 * depthScale;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const u = x / w * 12;
+      const v = y / h * 12;
+      // Ridged noise: abs(fbm) creates sharp ridges
+      const n = Math.abs(fbm(ridgeNoise, u, v, 4, 2.2, 0.5));
+      // Invert so ridges are peaks
+      const ridge = (1.0 - n * 2.0);
+      if (ridge > 0) {
+        const mask = edgeMask[y * w + x];
+        hmap[y * w + x] += ridge * ridgeAmp * mask;
       }
     }
   }
@@ -370,7 +505,6 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
   const blurred = new Float32Array(hmap.length);
   const kernelR = Math.max(1, Math.round(2 + erosionFactor * 4));
 
-  // Box blur approximation
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       let sum = 0, count = 0;
@@ -386,7 +520,6 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
     }
   }
 
-  // Blend original with blurred
   const blend = erosionFactor * 0.6;
   for (let i = 0; i < hmap.length; i++) {
     hmap[i] = lerp(hmap[i], blurred[i], blend);
@@ -395,17 +528,15 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
 
 // ── Build heightmap ───────────────────────────────────────────────
 
-// Reference ring for surface-area scaling (US size 8, 6mm wide, 2mm thick)
-const REF_INNER_DIAM = 18.1; // mm
-const REF_WIDTH = 6;         // mm
-const REF_THICKNESS = 2;     // mm
+const REF_INNER_DIAM = 18.1;
+const REF_WIDTH = 6;
+const REF_THICKNESS = 2;
 
 function computeSurfaceAreaFactor(innerDiameterMm: number, widthMm: number, thicknessMm: number): number {
   const refOuterR = REF_INNER_DIAM / 2 + REF_THICKNESS;
   const refArea = 2 * Math.PI * refOuterR * REF_WIDTH;
   const outerR = innerDiameterMm / 2 + thicknessMm;
   const area = 2 * Math.PI * outerR * widthMm;
-  // Clamp so very small rings don't drop to zero craters
   return Math.max(0.35, Math.min(3.0, area / refArea));
 }
 
@@ -414,11 +545,6 @@ export interface HeightmapResult {
   craterCount: number;
 }
 
-/**
- * Build the lunar heightmap. When ring dimensions are provided, crater counts
- * scale proportionally to the physical surface area so a narrow size-3 ring
- * isn't overcrowded and a wide size-16 ring isn't sparse.
- */
 export function buildHeightmap(
   lunar: LunarTextureState,
   physicalAspect: number = 1,
@@ -439,10 +565,17 @@ export function buildHeightmap(
   const erosionFactor = (lunar.erosion ?? 25) / 100;
   const terrainRough = (lunar.terrainRoughness ?? 35) / 100;
   const craterVar = (lunar.craterVariation ?? 50) / 100;
+  const shapeMode = lunar.craterShape ?? "circular";
+  const ovalElong = (lunar.ovalElongation ?? 50) / 100;
+  const globalOvalAngle = ((lunar.ovalAngle ?? 0) / 180) * Math.PI;
+  const mariaFactor = (lunar.mariaFill ?? 0) / 100;
+  const ridgeFactor = (lunar.highlandRidges ?? 0) / 100;
+  const floorTexFactor = (lunar.craterFloorTexture ?? 30) / 100;
+  const ejectaFactor = (lunar.ejectaStrength ?? 50) / 100;
 
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
-  // ─── 1) fBm base terrain layer (6 octaves for high-res detail) ──
+  // ─── 1) fBm base terrain layer ──
   const baseNoise = makeNoise2D(lunar.seed + 500);
   const baseAmp = (0.04 + terrainRough * 0.12) * depthScale;
   for (let y = 0; y < MAP_H; y++) {
@@ -455,45 +588,44 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 2) Domain warp noise ──────────────────────────────
+  // ─── 1b) Highland ridges layer ──
+  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeMask, lunar.seed, depthScale);
+
+  // ─── 2) Domain warp noise ──
   const warpNoise = makeNoise2D(lunar.seed + 1234);
   const warpAmp = 0.15 + rimSharp * 0.12;
 
-  // ─── 3) 5-tier crater distribution (scaled by surface area) ─────
+  // ─── 2b) Floor texture noise ──
+  const floorNoise = makeNoise2D(lunar.seed + 8888);
+
+  // ─── 3) 5-tier crater distribution ──
   const densityMul = lunar.craterDensity === "low" ? 0.5 : lunar.craterDensity === "med" ? 1.0 : 1.8;
   const sizeMul = lunar.craterSize === "small" ? 0.6 : lunar.craterSize === "med" ? 1.0 : 1.5;
-  const saf = surfaceAreaFactor; // shorthand
+  const saf = surfaceAreaFactor;
 
-  // Tier 0: MEGA craters (1-3, massive basin impacts) — count barely scales
   const megaCount = Math.round((1 + densityMul * 1.5) * Math.max(0.6, Math.min(1.5, saf)));
   const megaRadMin = 0.12 * sizeMul, megaRadMax = 0.22 * sizeMul;
 
-  // Tier 1: HERO craters (3-8) — moderate scaling
   const heroCount = Math.round((3 + densityMul * 5) * Math.sqrt(saf));
   const heroRadMin = 0.06 * sizeMul, heroRadMax = 0.12 * sizeMul;
 
-  // Tier 2: MEDIUM craters (15-50) — full scaling
   const medCount = Math.round((15 + densityMul * 35 * sizeMul) * saf);
   const medRadMin = 0.025 * sizeMul, medRadMax = 0.06 * sizeMul;
 
-  // Tier 3: SMALL craters (40-200) — full scaling
   const smallCount = Math.round((40 + densityMul * 160) * saf);
   const smallRadMin = 0.008, smallRadMax = 0.025 * sizeMul;
 
-  // Tier 4: MICRO-PITS (hundreds) — full scaling
   const microPitCount = Math.round((200 + densityMul * 600) * saf);
 
   const stamps: CraterStamp[] = [];
 
   function addCraters(count: number, rMin: number, rMax: number, depthMul: number, tier: number) {
     for (let i = 0; i < count; i++) {
-      // Power-law size distribution: more small craters, fewer large ones
       const t = Math.pow(rand(), 1.5);
       const radius = rMin + (rMax - rMin) * t;
       const cu = rand();
       const cv = 0.12 + rand() * 0.76;
 
-      // Apply crater variation — randomize depth and rim per-crater
       const varScale = 1.0 + (rand() - 0.5) * craterVar * 0.8;
       const depth = (0.5 + rand() * 0.5) * depthScale * depthMul * bowlDepthScale * varScale;
       const rimH = (0.35 + rimSharp * 0.65) * depthScale * depthMul * rimHeightScale * varScale;
@@ -501,23 +633,28 @@ export function buildHeightmap(
       const rimCenterJitter = (rand() - 0.5) * 0.04;
       const rimWidthJitter = (rand() - 0.5) * 0.02;
       const warpSeed = rand();
-      const age = tier / 4; // mega=0 (oldest), micro=1 (newest)
+      const age = tier / 4;
 
-      // Asymmetric rim and slump for realism
       const rimAsymmetry = rand() * (tier <= 1 ? 0.5 : 0.3);
       const rimAsymAngle = rand() * Math.PI * 2;
       const slumpAngle = rand() * Math.PI * 2;
       const slumpStrength = rand() * (tier <= 1 ? 0.3 : 0.15);
 
+      // Per-crater shape variation
+      const shapeAngleRad = globalOvalAngle + (rand() - 0.5) * craterVar * Math.PI * 0.5;
+      const angularFacets = 4 + Math.floor(rand() * 5);
+      const angularPhase = rand() * Math.PI * 2;
+
       stamps.push({
         cu, cv, radius, depth, rimHeight: rimH,
         rimCenterJitter, rimWidthJitter, warpSeed, tier, age,
         rimAsymmetry, rimAsymAngle, slumpAngle, slumpStrength,
+        shapeAngleRad, angularFacets, angularPhase,
+        floorTextureFactor: floorTexFactor,
       });
     }
   }
 
-  // Stamp largest first (oldest impacts)
   addCraters(megaCount, megaRadMin, megaRadMax, 1.2, 0);
   addCraters(heroCount, heroRadMin, heroRadMax, 1.0, 1);
   addCraters(medCount, medRadMin, medRadMax, 0.8, 2);
@@ -547,6 +684,10 @@ export function buildHeightmap(
         rimAsymAngle: rand() * Math.PI * 2,
         slumpAngle: rand() * Math.PI * 2,
         slumpStrength: rand() * 0.2,
+        shapeAngleRad: globalOvalAngle + (rand() - 0.5) * craterVar * Math.PI * 0.3,
+        angularFacets: 4 + Math.floor(rand() * 5),
+        angularPhase: rand() * Math.PI * 2,
+        floorTextureFactor: floorTexFactor,
       });
     }
   }
@@ -554,27 +695,41 @@ export function buildHeightmap(
   // Stamp all craters
   const secondaryStamps: CraterStamp[] = [];
   for (const s of stamps) {
-    const hasPeak = s.tier <= 1; // mega + hero get central peaks
-    const hasTerraces = s.tier === 0; // only mega gets terraces
-    stampCrater(hmap, MAP_W, MAP_H, s, rimSharp, edgeMask, warpNoise, warpAmp, hasPeak, hasTerraces, physicalAspect);
+    const hasPeak = s.tier <= 1;
+    const hasTerraces = s.tier === 0;
+    stampCrater(
+      hmap, MAP_W, MAP_H, s, rimSharp, edgeMask, warpNoise, warpAmp,
+      hasPeak, hasTerraces, physicalAspect,
+      shapeMode, ovalElong, floorNoise,
+    );
 
     // Ejecta rays for mega + hero
     if (s.tier <= 1) {
-      stampEjectaRays(hmap, MAP_W, MAP_H, s, rand, edgeMask, secondaryStamps, physicalAspect);
+      stampEjectaRays(
+        hmap, MAP_W, MAP_H, s, rand, edgeMask, secondaryStamps,
+        physicalAspect, ejectaFactor, shapeMode, ovalElong, globalOvalAngle,
+      );
     }
   }
 
   // Stamp secondary impact chains from ejecta
   for (const sec of secondaryStamps) {
-    stampCrater(hmap, MAP_W, MAP_H, sec, rimSharp, edgeMask, warpNoise, warpAmp, false, false, physicalAspect);
+    stampCrater(
+      hmap, MAP_W, MAP_H, sec, rimSharp, edgeMask, warpNoise, warpAmp,
+      false, false, physicalAspect,
+      shapeMode, ovalElong, floorNoise,
+    );
   }
 
   const totalCraterCount = stamps.length + secondaryStamps.length + microPitCount;
 
-  // ─── 4) Erosion pass — blur older craters ──────────────
+  // ─── 4) Maria fill pass ──
+  applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeMask, lunar.seed);
+
+  // ─── 5) Erosion pass ──
   applyErosion(hmap, MAP_W, MAP_H, erosionFactor);
 
-  // ─── 5) Micro-pitting layer ────────────────────────────
+  // ─── 6) Micro-pitting layer ──
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
     const pitCount = Math.floor(microPitCount * microFactor);
@@ -609,14 +764,13 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 6) Regolith micro-texture (high-frequency coherent noise + grain) ─────
+  // ─── 7) Regolith micro-texture ──
   if (microFactor > 0) {
-    // Primary regolith noise — powdery surface at medium scale
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
     const regolithStrength = microFactor * 0.05 * depthScale;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        const u = x / MAP_W * 48;  // higher frequency for 4K maps
+        const u = x / MAP_W * 48;
         const v = y / MAP_H * 48;
         const n = fbm(regolithNoise, u, v, 5, 2.2, 0.45);
         const mask = edgeMask[y * MAP_W + x];
@@ -624,7 +778,6 @@ export function buildHeightmap(
       }
     }
 
-    // Secondary high-frequency regolith — very fine powdery detail
     const fineRegolith = makeNoise2D(lunar.seed + 4444);
     const fineStrength = microFactor * 0.025 * depthScale;
     for (let y = 0; y < MAP_H; y++) {
@@ -637,7 +790,6 @@ export function buildHeightmap(
       }
     }
 
-    // Fine grain noise on top — per-pixel randomness for gritty texture
     const grainRng = seededRng(lunar.seed + 9999);
     const grainStrength = microFactor * 0.035 * depthScale;
     for (let i = 0; i < hmap.length; i++) {
@@ -646,7 +798,7 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 7) Depth contrast boost ───────────────────────────
+  // ─── 8) Depth contrast boost ──
   for (let i = 0; i < hmap.length; i++) {
     hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.2;
     hmap[i] = Math.max(0, Math.min(1, hmap[i]));
@@ -664,10 +816,8 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
 
-  // Correct Y gradient for physical aspect ratio so normals match circular craters
   const yScale = physicalAspect * (h / w);
 
-  // Helper to sample with wrapping (U wraps, V clamps)
   const sample = (sx: number, sy: number) => {
     const wx = ((sx % w) + w) % w;
     const wy = Math.max(0, Math.min(h - 1, sy));
@@ -676,7 +826,6 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      // Full 3×3 Sobel kernel for sharper gradients
       const tl = sample(x - 1, y - 1);
       const tc = sample(x,     y - 1);
       const tr = sample(x + 1, y - 1);
@@ -686,9 +835,7 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
       const bc = sample(x,     y + 1);
       const br = sample(x + 1, y + 1);
 
-      // Sobel X: [-1 0 1; -2 0 2; -1 0 1]
       let nx = (tl - tr + 2 * (ml - mr) + bl - br) * strength * 0.25;
-      // Sobel Y: [-1 -2 -1; 0 0 0; 1 2 1]
       let ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * strength * yScale * 0.25;
       let nz = 1.0;
       const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
@@ -867,7 +1014,6 @@ export function generateLunarSurfaceMaps(
   physicalAspect?: number,
   ringDims?: RingDimensions,
 ): LunarSurfaceMapSet {
-  // physicalAspect = circumference / width; defaults to 1 (square) for backward compat
   const aspect = physicalAspect ?? 1;
   const dimsKey = ringDims ? `-d${ringDims.innerDiameterMm.toFixed(1)}_${ringDims.widthMm.toFixed(1)}_${ringDims.thicknessMm.toFixed(1)}` : "";
   const key = cacheKey(lunar) + `-a${aspect.toFixed(2)}` + dimsKey;
@@ -875,7 +1021,6 @@ export function generateLunarSurfaceMaps(
 
   const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
 
-  // Scale normal map Y gradient by aspect ratio so lighting responds to circular craters correctly
   const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
