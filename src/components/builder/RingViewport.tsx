@@ -10,8 +10,9 @@ import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
-import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
+import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
 
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
@@ -24,10 +25,10 @@ export interface RingViewportHandle {
 }
 
 const CAMERA_PRESETS: Record<SnapshotAngle, [number, number, number]> = {
-  front: [0, 0, 3.5],
-  angle: [2.5, 1.8, 2.5],
-  side: [3.5, 0.2, 0],
-  inside: [0, -0.1, 0.6],  // looking into the ring bore
+  front: [0, 0, 5.5],
+  angle: [3.8, 2.8, 3.8],
+  side: [5.5, 0.3, 0],
+  inside: [0, -0.1, 0.8],
 };
 
 // ── Ring Mesh ─────────────────────────────────────────────────────
@@ -220,10 +221,19 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
     return width > 0 ? circumference / width : 1;
   }, [params.innerDiameter, params.thickness, params.width]);
 
-  // Generate procedural maps for micro-detail enhancement on top of real geometry
-  const lunarMaps = useMemo(() => {
-    if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture, physicalAspect);
+  // Async procedural maps for micro-detail enhancement on top of real geometry
+  const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
+  const stlGenIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!lunarTexture?.enabled) {
+      setLunarMaps(null);
+      return;
+    }
+    const genId = ++stlGenIdRef.current;
+    generateLunarSurfaceMapsAsync(lunarTexture, physicalAspect, undefined, () => {}).then((maps) => {
+      if (stlGenIdRef.current === genId) setLunarMaps(maps);
+    });
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
@@ -414,7 +424,7 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture }: RingMeshProps) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
 
   const { outerGeo, innerGeo, capGeoTop, capGeoBot } = useMemo(
@@ -442,10 +452,38 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     thicknessMm: params.thickness,
   }), [params.innerDiameter, params.width, params.thickness]);
 
-  // Generate lunar procedural maps for outer surface only
-  const lunarMaps = useMemo(() => {
-    if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture, physicalAspect, ringDims);
+  // Async texture generation with progress tracking
+  const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
+  const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
+  const genIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!lunarTexture?.enabled) {
+      setLunarMaps(null);
+      setGenProgress(null);
+      onGenProgress?.(null);
+    }
+    const genId = ++genIdRef.current;
+    setGenProgress({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
+    onGenProgress?.({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
+
+    generateLunarSurfaceMapsAsync(
+      lunarTexture,
+      physicalAspect,
+      ringDims,
+      (progress) => {
+        if (genIdRef.current !== genId) return;
+        setGenProgress(progress);
+        onGenProgress?.(progress);
+      },
+    ).then((maps) => {
+      if (genIdRef.current !== genId) return;
+      setLunarMaps(maps);
+      // Clear progress after brief delay to show completion
+      setTimeout(() => {
+        if (genIdRef.current === genId) setGenProgress(null);
+      }, 1200);
+    });
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
@@ -454,6 +492,9 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
     lunarTexture?.erosion, lunarTexture?.terrainRoughness,
     lunarTexture?.craterVariation,
+    lunarTexture?.craterShape, lunarTexture?.ovalElongation, lunarTexture?.ovalAngle,
+    lunarTexture?.mariaFill, lunarTexture?.highlandRidges,
+    lunarTexture?.craterFloorTexture, lunarTexture?.ejectaStrength,
     physicalAspect, ringDims,
   ]);
 
@@ -643,7 +684,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 }
 
 // ── Wrapper ───────────────────────────────────────────────────────
-function RingMesh(props: RingMeshProps) {
+function RingMesh(props: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   return <ProceduralRingMesh {...props} />;
 }
 
@@ -1241,6 +1282,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     const rRot = ringRotation ?? [0, 0, 0];
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
+    const [surfaceProgress, setSurfaceProgress] = useState<GenerationProgress | null>(null);
+
+    const handleGenProgress = useCallback((p: GenerationProgress | null) => {
+      setSurfaceProgress(p);
+    }, []);
 
     const handleSnapshotReady = useCallback((api: { capture: (pos: [number, number, number]) => Promise<string> }) => {
       snapshotApiRef.current = api;
@@ -1258,14 +1304,42 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       },
     }), []);
 
-    // Closer camera on mobile so ring fills screen — slightly angled for better initial view
-    // Inspection mode starts closer for detail viewing
+    // Camera positioned further back so ring is fully visible
     const initialCamPos: [number, number, number] = insp
-      ? [0, 1.2, 2.2]
-      : isMobile ? [0.6, 1.0, 2.4] : [0, 2, 4];
+      ? [0, 1.8, 3.5]
+      : isMobile ? [1.0, 1.5, 4.0] : [0, 3, 6];
 
     return (
       <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none relative">
+        {/* Surface generation progress overlay */}
+        {surfaceProgress && surfaceProgress.stage !== "done" && (
+          <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
+            <div className="bg-background/90 backdrop-blur-md border border-primary/20 rounded-lg px-4 py-3 shadow-lg">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-medium text-foreground/90">{surfaceProgress.label}</span>
+                <span className="text-[10px] text-muted-foreground tabular-nums">{surfaceProgress.percent}%</span>
+              </div>
+              <Progress value={surfaceProgress.percent} className="h-1.5" />
+              {surfaceProgress.craterCount > 0 && (
+                <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
+                  <span>🌑 {surfaceProgress.craterCount.toLocaleString()} craters</span>
+                  <span>·</span>
+                  <span className="capitalize">{surfaceProgress.stage.replace(/([A-Z])/g, " $1")}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Completion flash */}
+        {surfaceProgress?.stage === "done" && (
+          <div className="absolute bottom-4 left-4 z-20 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="bg-primary/15 backdrop-blur-md border border-primary/30 rounded-lg px-3 py-2 shadow-lg">
+              <span className="text-[11px] font-medium text-primary">
+                ✓ {surfaceProgress.craterCount.toLocaleString()} craters · Surface ready
+              </span>
+            </div>
+          </div>
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
@@ -1435,6 +1509,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               onAddWaxMark={onAddWaxMark}
               stampSettings={stampSettings}
               lunarTexture={lunarTexture}
+              onGenProgress={handleGenProgress}
             />
 
             {viewMode === "wax" && waxMarks && waxMarks.length > 0 && (
@@ -1479,18 +1554,16 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
           <OrbitControls
             enablePan={false}
-            minDistance={insp ? 0.8 : (isMobile ? 1.0 : 1.5)}
-            maxDistance={insp ? 5 : (isMobile ? 7 : 8)}
-            autoRotate={insp || (!isMobile)}
-            autoRotateSpeed={insp ? 0.15 : 0.4}
+            minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
+            maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
+            autoRotate={false}
             enableDamping
-            dampingFactor={insp ? 0.06 : (isMobile ? 0.12 : 0.08)}
-            rotateSpeed={insp ? 0.35 : (isMobile ? 0.5 : 1)}
-            zoomSpeed={insp ? 0.6 : (isMobile ? 0.8 : 1)}
+            dampingFactor={0.08}
+            rotateSpeed={isMobile ? 0.6 : 1.0}
+            zoomSpeed={isMobile ? 0.8 : 1.0}
             touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-            /* Polar limits prevent flipping upside down on touch */
-            minPolarAngle={isMobile ? Math.PI * 0.1 : 0}
-            maxPolarAngle={isMobile ? Math.PI * 0.9 : Math.PI}
+            minPolarAngle={0}
+            maxPolarAngle={Math.PI}
           />
 
           {/* Camera preset animator */}

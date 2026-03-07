@@ -13,7 +13,7 @@ import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Un
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
-import { generateLunarSurfaceMaps } from "@/lib/lunarSurfaceMaps";
+import { estimateCraterCount } from "@/lib/lunarSurfaceMaps";
 
 // ── Helper: build a full LunarTextureState from partial overrides ──
 const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
@@ -487,15 +487,10 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
     onChange({ ...state, seed: newSeed() });
   };
 
-  // Live crater count
+  // Fast crater count estimate (no texture generation)
   const craterCount = useMemo(() => {
     if (!state.enabled) return 0;
-    try {
-      const maps = generateLunarSurfaceMaps(state, 8);
-      return maps.craterCount;
-    } catch {
-      return 0;
-    }
+    return estimateCraterCount(state);
   }, [state]);
 
   return (
