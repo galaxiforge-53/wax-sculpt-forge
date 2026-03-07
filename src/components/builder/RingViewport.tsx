@@ -452,10 +452,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     if (!lunarTexture?.enabled) {
       setLunarMaps(null);
       setGenProgress(null);
-      return;
+      onGenProgress?.(null);
     }
     const genId = ++genIdRef.current;
     setGenProgress({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
+    onGenProgress?.({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
 
     generateLunarSurfaceMapsAsync(
       lunarTexture,
@@ -464,6 +465,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       (progress) => {
         if (genIdRef.current !== genId) return;
         setGenProgress(progress);
+        onGenProgress?.(progress);
       },
     ).then((maps) => {
       if (genIdRef.current !== genId) return;
