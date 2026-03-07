@@ -443,10 +443,36 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     thicknessMm: params.thickness,
   }), [params.innerDiameter, params.width, params.thickness]);
 
-  // Generate lunar procedural maps for outer surface only
-  const lunarMaps = useMemo(() => {
-    if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture, physicalAspect, ringDims);
+  // Async texture generation with progress tracking
+  const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
+  const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
+  const genIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!lunarTexture?.enabled) {
+      setLunarMaps(null);
+      setGenProgress(null);
+      return;
+    }
+    const genId = ++genIdRef.current;
+    setGenProgress({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
+
+    generateLunarSurfaceMapsAsync(
+      lunarTexture,
+      physicalAspect,
+      ringDims,
+      (progress) => {
+        if (genIdRef.current !== genId) return;
+        setGenProgress(progress);
+      },
+    ).then((maps) => {
+      if (genIdRef.current !== genId) return;
+      setLunarMaps(maps);
+      // Clear progress after brief delay to show completion
+      setTimeout(() => {
+        if (genIdRef.current === genId) setGenProgress(null);
+      }, 1200);
+    });
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
@@ -455,6 +481,9 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
     lunarTexture?.erosion, lunarTexture?.terrainRoughness,
     lunarTexture?.craterVariation,
+    lunarTexture?.craterShape, lunarTexture?.ovalElongation, lunarTexture?.ovalAngle,
+    lunarTexture?.mariaFill, lunarTexture?.highlandRidges,
+    lunarTexture?.craterFloorTexture, lunarTexture?.ejectaStrength,
     physicalAspect, ringDims,
   ]);
 
