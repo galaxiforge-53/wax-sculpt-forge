@@ -221,10 +221,19 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
     return width > 0 ? circumference / width : 1;
   }, [params.innerDiameter, params.thickness, params.width]);
 
-  // Generate procedural maps for micro-detail enhancement on top of real geometry
-  const lunarMaps = useMemo(() => {
-    if (!lunarTexture?.enabled) return null;
-    return generateLunarSurfaceMaps(lunarTexture, physicalAspect);
+  // Async procedural maps for micro-detail enhancement on top of real geometry
+  const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
+  const stlGenIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!lunarTexture?.enabled) {
+      setLunarMaps(null);
+      return;
+    }
+    const genId = ++stlGenIdRef.current;
+    generateLunarSurfaceMapsAsync(lunarTexture, physicalAspect, undefined, () => {}).then((maps) => {
+      if (stlGenIdRef.current === genId) setLunarMaps(maps);
+    });
   }, [
     lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
     lunarTexture?.craterDensity, lunarTexture?.craterSize,
