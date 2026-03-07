@@ -675,7 +675,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 }
 
 // ── Wrapper ───────────────────────────────────────────────────────
-function RingMesh(props: RingMeshProps) {
+function RingMesh(props: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   return <ProceduralRingMesh {...props} />;
 }
 
