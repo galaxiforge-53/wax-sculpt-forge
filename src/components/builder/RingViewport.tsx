@@ -889,12 +889,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
+        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
         metalness={mc.metalness}
         normalMap={lunarMaps?.normalMap ?? null}
         roughnessMap={lunarMaps?.roughnessMap ?? null}
         aoMap={lunarMaps?.aoMap ?? null}
-        aoMapIntensity={hasLunar ? 2.0 : 0}
+        aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) : 0}
         normalScale={normalScale}
         envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15)}
         clearcoat={Math.max(0, (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss))}
@@ -905,8 +905,8 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1)}
         ior={mc.ior}
         displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
-        displacementScale={dispScale * (1 - wearFactor * 0.3)}
-        displacementBias={-dispScale * (1 - wearFactor * 0.3) * 0.5}
+        displacementScale={dispScale}
+        displacementBias={-dispScale * 0.5}
         side={THREE.FrontSide}
       />
     );
