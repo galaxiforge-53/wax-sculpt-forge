@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import SEOHead from "@/components/SEOHead";
 import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
 import PreferencesPanel from "@/components/builder/PreferencesPanel";
+import { cn } from "@/lib/utils";
 
 function BuilderInner() {
   const navigate = useNavigate();
