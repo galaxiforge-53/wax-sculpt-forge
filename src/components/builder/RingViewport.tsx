@@ -10,10 +10,20 @@ import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
-import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
+import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, disposeLunarMaps, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
+
+// ── Debounce hook for lunar texture regeneration ──────────────────
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
 
