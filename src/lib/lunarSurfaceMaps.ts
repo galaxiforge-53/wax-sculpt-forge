@@ -1438,13 +1438,16 @@ export function buildHeightmap(
 
       for (let py = y0; py <= y1; py++) {
         for (let px = x0; px <= x1; px++) {
+          // Wrap x for seamless circumference
+          let wpx = px % MAP_W;
+          if (wpx < 0) wpx += MAP_W;
           const du = (px - pu * MAP_W) / pxR;
           const dv = (py - pv * MAP_H) / pyR;
           const d = Math.sqrt(du * du + dv * dv);
           if (d > 1.0) continue;
           const falloff = 1 - d * d;
-          const mask = edgeMask[py * MAP_W + px];
-          hmap[py * MAP_W + px] -= pd * falloff * mask;
+          const mask = edgeMask[py * MAP_W + wpx];
+          hmap[py * MAP_W + wpx] -= pd * falloff * mask;
         }
       }
     }
