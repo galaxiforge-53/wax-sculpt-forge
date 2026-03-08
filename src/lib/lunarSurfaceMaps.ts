@@ -426,7 +426,14 @@ function stampCrater(
 
       let dist: number, wdu: number, wdv: number;
 
-      if (isCircular) {
+      // Skip expensive domain warp for small craters (tier 3+) — they're too small
+      // for warp to be perceptible. Saves ~4 noise calls × ~160M pixels.
+      if (c.tier >= 3) {
+        // Simple Euclidean — no warp noise
+        dist = Math.sqrt(du * du + dv * dv);
+        wdu = du;
+        wdv = dv;
+      } else if (isCircular) {
         // Fast path for circular craters: skip shape transformation, only do domain warp
         const pxInvW = px * invW;
         const pyInvH = py * invH;
