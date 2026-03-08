@@ -834,18 +834,16 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
-    // Wear erodes rims, polishing buffs them smooth — both reduce normal detail
-    const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction) * (1 - polishNormalSoften);
+    const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction) * (1 - polishNormalSoften) * detailNormalMul;
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften]);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften, detailNormalMul]);
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
     const baseDisp = outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
-    // Wear shallows craters; polishing files down high points (rims)
-    return baseDisp * (1 - lunarWearDispReduction) * (1 - polishDispSoften);
-  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale, lunarWearDispReduction, polishDispSoften]);
+    return baseDisp * (1 - lunarWearDispReduction) * (1 - polishDispSoften) * detailDispMul;
+  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale, lunarWearDispReduction, polishDispSoften, detailDispMul]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
