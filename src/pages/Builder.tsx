@@ -462,6 +462,7 @@ function BuilderInner() {
               rotationLocked={rotationLocked}
               scaleReference={scaleReference}
               wearPreview={wearPreview}
+              polishPreview={polishPreview}
               turntableSpeed={turntableSpeed}
               bgPreset={bgPreset}
             />
