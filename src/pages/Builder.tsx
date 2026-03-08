@@ -38,6 +38,116 @@ import PreferencesPanel from "@/components/builder/PreferencesPanel";
 import { cn } from "@/lib/utils";
 import { useAutosave, loadAutosave, clearAutosave } from "@/hooks/useAutosave";
 import { useViewportState } from "@/hooks/useViewportState";
+import { ChevronDown, ChevronUp } from "lucide-react";
+
+// ── Collapsible Transform Panel ────────────────────────────────────
+// Extracted to reduce Builder's render tree when collapsed
+function TransformPanel({
+  ringPosition,
+  ringRotation,
+  setRingPosition,
+  setRingRotation,
+}: {
+  ringPosition: [number, number, number];
+  ringRotation: [number, number, number];
+  setRingPosition: (v: [number, number, number]) => void;
+  setRingRotation: (v: [number, number, number]) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(true);
+  const isDefault =
+    ringPosition[0] === 0 && ringPosition[1] === 0 && ringPosition[2] === 0 &&
+    ringRotation[0] === 0 && ringRotation[1] === 0 && ringRotation[2] === 0;
+
+  return (
+    <div className="absolute bottom-14 right-3 z-10 bg-card/90 backdrop-blur-xl border border-builder-divider rounded-xl shadow-lg shadow-black/30 min-w-[180px]">
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center justify-between px-2.5 py-1.5 hover:bg-secondary/30 transition-colors rounded-xl"
+      >
+        <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-display flex items-center gap-1">
+          <Move className="w-3 h-3" /> Transform
+          {!isDefault && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+        </span>
+        {collapsed ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
+      </button>
+      {!collapsed && (
+        <div className="px-2.5 pb-2.5 space-y-2">
+          <div className="flex justify-end">
+            <button
+              onClick={() => { setRingPosition([0, 0, 0]); setRingRotation([0, 0, 0]); }}
+              className="text-[9px] text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
+            >
+              <RefreshCw className="w-2.5 h-2.5" /> Reset
+            </button>
+          </div>
+          {/* Position */}
+          <div className="space-y-1">
+            <span className="text-[8px] text-muted-foreground/60 uppercase tracking-widest">Position</span>
+            <div className="flex gap-1">
+              {(["X", "Y", "Z"] as const).map((axis, idx) => (
+                <div key={axis} className="flex-1">
+                  <label className={`text-[8px] font-mono font-bold ${idx === 0 ? "text-red-400" : idx === 1 ? "text-emerald-400" : "text-blue-400"}`}>{axis}</label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={ringPosition[idx].toFixed(2)}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value) || 0;
+                      const next = [...ringPosition] as [number, number, number];
+                      next[idx] = v;
+                      setRingPosition(next);
+                    }}
+                    className="w-full h-5 px-1 text-[9px] font-mono bg-secondary/50 border border-border/30 rounded text-foreground text-center"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Rotation */}
+          <div className="space-y-1">
+            <span className="text-[8px] text-muted-foreground/60 uppercase tracking-widest">Rotation °</span>
+            <div className="flex gap-1">
+              {(["X", "Y", "Z"] as const).map((axis, idx) => (
+                <div key={axis} className="flex-1">
+                  <label className={`text-[8px] font-mono font-bold ${idx === 0 ? "text-red-400" : idx === 1 ? "text-emerald-400" : "text-blue-400"}`}>{axis}</label>
+                  <input
+                    type="number"
+                    step="5"
+                    value={Math.round(ringRotation[idx] * 180 / Math.PI)}
+                    onChange={(e) => {
+                      const deg = parseFloat(e.target.value) || 0;
+                      const next = [...ringRotation] as [number, number, number];
+                      next[idx] = deg * Math.PI / 180;
+                      setRingRotation(next);
+                    }}
+                    className="w-full h-5 px-1 text-[9px] font-mono bg-secondary/50 border border-border/30 rounded text-foreground text-center"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Quick presets */}
+          <div className="flex gap-1">
+            {([
+              ["Flat", [Math.PI / 2, 0, 0]],
+              ["Upright", [0, 0, 0]],
+              ["Tilted", [Math.PI / 4, Math.PI / 6, 0]],
+              ["Side", [0, 0, Math.PI / 2]],
+            ] as const).map(([label, rot]) => (
+              <button
+                key={label}
+                onClick={() => setRingRotation(rot as unknown as [number, number, number])}
+                className="flex-1 px-1.5 py-1 text-[8px] rounded bg-secondary/40 border border-border/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BuilderInner() {
   const navigate = useNavigate();
