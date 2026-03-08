@@ -56,6 +56,8 @@ function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
     lunar.layerLargeCraters ?? 50,
     lunar.layerMediumImpacts ?? 50,
     lunar.layerMicroPitting ?? 50,
+    lunar.symmetry ?? "none",
+    lunar.symmetryBlend ?? 30,
     // Include ring aspect ratio so different ring sizes get distinct textures
     ringAspect !== undefined ? ringAspect.toFixed(2) : "1.00",
   ].join("-");
