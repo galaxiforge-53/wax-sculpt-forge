@@ -37,6 +37,8 @@ export interface ImageTerrainState {
   autoCleanup: boolean;
   /** Active preset id or null for custom */
   presetId: string | null;
+  /** Blend with planetary terrain instead of replacing it. 0 = image only, 100 = planet only, 50 = equal mix */
+  planetaryBlend: number;
   /** Terrain strength: overall amplitude multiplier, 0–100 (50 = 1×) */
   strength: number;
   /** Terrain compression: compresses dynamic range to avoid extreme peaks/valleys, 0–100 */
