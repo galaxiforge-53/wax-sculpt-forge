@@ -10,7 +10,8 @@ export type TerrainType =
   | "deimos"        // Deimos — buried soft craters
   | "europa"        // Europa — icy fractures, very few craters
   | "callisto"      // Callisto — saturated ancient bombardment
-  | "titan";        // Titan — almost no craters, organic dunes
+  | "titan"         // Titan — almost no craters, organic dunes
+  | "asteroid";     // Asteroid — irregular rubble-pile, deep regolith pits
 
 export interface LunarTextureState {
   enabled: boolean;

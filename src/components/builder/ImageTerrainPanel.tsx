@@ -358,6 +358,18 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
             />
           </div>
 
+          {/* Planetary blend */}
+          <div className="space-y-2">
+            <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 block">Planet Terrain Blend</span>
+            <ParamRow
+              label="Blend with Lunar/Planet"
+              value={state.planetaryBlend}
+              onChange={(v) => patch({ planetaryBlend: v })}
+              icon={<Layers className="w-2.5 h-2.5 text-muted-foreground/40" />}
+            />
+            <span className="text-[7px] text-muted-foreground/50 block">0% = image only · 50% = equal mix · 100% = planet only</span>
+          </div>
+
           {/* Image processing controls */}
           <div className="space-y-2">
             <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 block">Image Processing</span>
