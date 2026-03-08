@@ -1930,8 +1930,9 @@ export function buildHeightmap(
       }
     }
 
-    // ─── 7) Single-pass regolith + grain + directional scratches ──
-    // Previously 3 separate full-map traversals; now combined into one
+    // ─── 7) Half-res regolith fBm + full-res grain/scratches ──
+    // The 5-octave regolith fBm is the most expensive per-pixel op in this section.
+    // Computing at half-res then upscaling saves ~75% of noise lookups (1M vs 4M).
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
     const fineRegolith = makeNoise2D(lunar.seed + 4444);
     const impactNoise = makeNoise2D(lunar.seed + 11111);
@@ -1944,26 +1945,63 @@ export function buildHeightmap(
     const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
     const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
 
-    // Pre-compute reciprocals to avoid repeated division in the 4M-pixel inner loop
+    // Compute coarse regolith at half resolution
+    const halfW_r = MAP_W >> 1;
+    const halfH_r = MAP_H >> 1;
+    const halfRegolith = new Float32Array(halfW_r * halfH_r);
+    const invHalfW_r48 = 48 / halfW_r;
+    const invHalfH_r48 = 48 * aspectCorrection / halfH_r;
+    for (let y = 0; y < halfH_r; y++) {
+      const vCoord = y * invHalfH_r48;
+      const rowOff = y * halfW_r;
+      for (let x = 0; x < halfW_r; x++) {
+        halfRegolith[rowOff + x] = fbm(regolithNoise, x * invHalfW_r48, vCoord, 5, 2.2, 0.45) * regolithStrength;
+      }
+    }
+
+    // Upscale regolith + add full-res fine detail, grain, and scratches
     const invMapW = 1 / MAP_W;
     const invMapH = 1 / MAP_H;
+    const invMapW_halfW = (halfW_r - 1) / MAP_W;
+    const invMapH_halfH = (halfH_r - 1) / MAP_H;
+    const halfHm1_r = halfH_r - 1;
 
     for (let y = 0; y < MAP_H; y++) {
+      // Bilinear interpolation Y weights (constant per row)
+      const fy = y * invMapH_halfH;
+      const iy = Math.floor(fy);
+      const fy1 = fy - iy;
+      const fy0 = 1 - fy1;
+      const iy0 = iy < halfHm1_r ? iy : halfHm1_r;
+      const iy1c = iy + 1 < halfH_r ? iy + 1 : halfHm1_r;
+      const row0 = iy0 * halfW_r;
+      const row1 = iy1c * halfW_r;
+
       const yNorm = y * invMapH;
-      const vCoord48 = yNorm * 48 * aspectCorrection;
       const vCoord96 = yNorm * 96 * aspectCorrection;
       const vCoord200 = yNorm * 200 * aspectCorrection;
       const rowOff = y * MAP_W;
+
       for (let x = 0; x < MAP_W; x++) {
         const idx = rowOff + x;
         const mask = edgeMask[idx];
-        if (mask < 0.01) continue; // Skip fully masked edge pixels
+        if (mask < 0.01) continue;
 
         const uNorm = x * invMapW;
 
-        // Coarse regolith (5 octave fBm)
-        const regN = fbm(regolithNoise, uNorm * 48, vCoord48, 5, 2.2, 0.45);
-        // Fine regolith (single octave)
+        // Upscale coarse regolith via bilinear interpolation
+        const fx = x * invMapW_halfW;
+        const ix = Math.floor(fx);
+        const fx1 = fx - ix;
+        const fx0 = 1 - fx1;
+        const ix0 = ix % halfW_r;
+        const ix1c = (ix + 1) % halfW_r;
+        const regN = halfRegolith[row0 + ix0] * fx0 * fy0 +
+          halfRegolith[row0 + ix1c] * fx1 * fy0 +
+          halfRegolith[row1 + ix0] * fx0 * fy1 +
+          halfRegolith[row1 + ix1c] * fx1 * fy1;
+
+        // Fine regolith (single octave — fast, stays full-res)
         const fineN = fineRegolith(uNorm * 96, vCoord96);
         // Random grain particle
         const grain = (grainRng() - 0.5) * grainStrength;
@@ -1972,7 +2010,7 @@ export function buildHeightmap(
         const rv = -(uNorm * 200) * sinA + vCoord200 * cosA;
         const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
 
-        hmap[idx] += (regN * regolithStrength + fineN * fineStrength + grain + scratch) * mask;
+        hmap[idx] += (regN + fineN * fineStrength + grain + scratch) * mask;
       }
     }
   }
