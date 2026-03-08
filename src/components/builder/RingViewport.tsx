@@ -68,13 +68,14 @@ function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
 
   useEffect(() => {
     if (isShowcase || isInspection) {
-      gl.setPixelRatio(2);
+      gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       return;
     }
     if (tier === "preview") {
+      // Drop DPR during interaction for responsiveness
       gl.setPixelRatio(isMobile ? 1 : 1);
     } else {
-      gl.setPixelRatio(isMobile ? 1.5 : Math.min(window.devicePixelRatio, 2));
+      gl.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
     }
   }, [tier, isMobile, isShowcase, isInspection, gl]);
 
