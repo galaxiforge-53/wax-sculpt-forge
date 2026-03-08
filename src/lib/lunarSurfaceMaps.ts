@@ -1475,7 +1475,15 @@ export function buildHeightmap(
 
   const stamps: CraterStamp[] = [];
 
+  // NASA empirical depth-diameter relationship:
+  // Simple craters (D < ~15km): d/D ≈ 0.2 (constant)
+  // Complex craters (D > ~15km): d/D ∝ D^(-0.3) (shallower as they get bigger)
+  // Here radius thresholds map: mega/hero = complex, med/small = simple
   function addCraters(count: number, rMin: number, rMax: number, depthMul: number, tier: number) {
+    const isComplex = tier <= 1; // mega & hero are complex craters
+    const asymMax = isComplex ? 0.5 : 0.3;
+    const slumpMax = isComplex ? 0.3 : 0.15;
+
     for (let i = 0; i < count; i++) {
       const t = Math.pow(rand(), 1.5);
       const radius = rMin + (rMax - rMin) * t;
@@ -1483,7 +1491,14 @@ export function buildHeightmap(
       const cv = 0.12 + rand() * 0.76;
 
       const varScale = 1.0 + (rand() - 0.5) * craterVar * 0.8;
-      const depth = (0.5 + rand() * 0.5) * depthScale * depthMul * bowlDepthScale * varScale;
+
+      // Apply empirical depth-diameter scaling for complex craters
+      // Larger complex craters are proportionally shallower (realistic)
+      const ddRatio = isComplex
+        ? 0.2 * Math.pow(radius / rMin, -0.3) // complex: shallower with size
+        : 0.2; // simple: constant d/D
+      const depthFromDiameter = ddRatio * (radius * 2) * 10; // scale to our heightmap units
+      const depth = depthFromDiameter * depthScale * depthMul * bowlDepthScale * varScale * (0.5 + rand() * 0.5);
       const rimH = (0.35 + rimSharp * 0.65) * depthScale * depthMul * rimHeightScale * varScale;
 
       const rimCenterJitter = (rand() - 0.5) * 0.04;
@@ -1491,10 +1506,10 @@ export function buildHeightmap(
       const warpSeed = rand();
       const age = tier / 4;
 
-      const rimAsymmetry = rand() * (tier <= 1 ? 0.5 : 0.3);
+      const rimAsymmetry = rand() * asymMax;
       const rimAsymAngle = rand() * Math.PI * 2;
       const slumpAngle = rand() * Math.PI * 2;
-      const slumpStrength = rand() * (tier <= 1 ? 0.3 : 0.15);
+      const slumpStrength = rand() * slumpMax;
 
       // Per-crater shape variation
       const shapeAngleRad = globalOvalAngle + (rand() - 0.5) * craterVar * Math.PI * 0.5;
