@@ -247,6 +247,7 @@ export default function BuilderSidebar({
   balanceAnalysis, onAutoBalance,
 }: BuilderSidebarProps) {
   const { isPremium } = useAccess();
+  const { toast } = useToast();
 
   return (
     <ScrollArea className="h-full">
