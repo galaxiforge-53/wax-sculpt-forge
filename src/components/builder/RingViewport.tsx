@@ -646,6 +646,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   // Debounce params for geometry builds to avoid thrashing during slider drags
   const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
   const debouncedWear = useDebouncedValue(wearAmount, 100);
+  const debouncedPolish = useDebouncedValue(polishAmount, 100);
 
   // Adaptive quality for geometry detail
   const geoQuality = useAdaptiveQuality(
