@@ -74,7 +74,7 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
       const dataUrl = reader.result as string;
 
       // Resize to max 1024px for performance
-      const img = new Image();
+      const img = new NativeImage();
       img.onload = () => {
         const maxDim = 1024;
         let w = img.width, h = img.height;
