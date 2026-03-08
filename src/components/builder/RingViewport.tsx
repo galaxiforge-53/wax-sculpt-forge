@@ -2060,10 +2060,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
           <OrbitControls
             enablePan={false}
-            enableRotate={!isRotationLocked}
+            enableRotate={!isRotationLocked && turntableSpeed === 0}
             minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
             maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
-            autoRotate={false}
+            autoRotate={turntableSpeed > 0}
+            autoRotateSpeed={turntableSpeed}
             enableDamping
             dampingFactor={isMobile ? 0.12 : 0.08}
             rotateSpeed={isMobile ? 0.5 : 1.0}
