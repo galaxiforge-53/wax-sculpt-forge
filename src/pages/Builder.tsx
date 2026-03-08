@@ -464,6 +464,7 @@ function BuilderInner() {
               scaleReference={scaleReference}
               wearPreview={wearPreview}
               polishPreview={polishPreview}
+              detailBoost={detailBoost}
               turntableSpeed={turntableSpeed}
               bgPreset={bgPreset}
             />
