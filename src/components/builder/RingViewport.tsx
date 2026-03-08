@@ -693,6 +693,13 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const wearClearcoatLoss = wearFactor * 0.8;      // clearcoat wears off
   const wearSheenBoost = wearFactor * 0.15;        // subtle patina sheen
 
+  // ── Lunar-specific wear: craters flatten, rims soften, texture detail erodes ──
+  // High-contact areas (outer ring edges, raised rims) wear fastest
+  const lunarWearNormalReduction = wearFactor * 0.55;   // normal map strength drops — rims flatten
+  const lunarWearAoReduction = wearFactor * 0.5;        // AO fades — debris fills crevices
+  const lunarWearDispReduction = wearFactor * 0.45;     // displacement softens — craters shallow out
+  const lunarWearRoughnessUniformity = wearFactor * 0.3; // roughness map becomes more uniform
+
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
     const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
