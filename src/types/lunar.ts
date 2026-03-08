@@ -45,7 +45,12 @@ export interface LunarTextureState {
   layerMicroPitting?: number;   // 0–100, strength of micro pits + regolith texture (default 50)
   // ── v6 freeze field ──
   frozen?: boolean;             // if true, terrain won't regenerate when ring params change
+  // ── v7 symmetry fields ──
+  symmetry?: SymmetryMode;      // how many times the pattern repeats around the ring
+  symmetryBlend?: number;       // 0–100, how smoothly mirrored sections blend (0 = hard edge, 100 = gradient)
 }
+
+export type SymmetryMode = "none" | "2" | "3" | "4" | "6" | "8";
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   enabled: false,
