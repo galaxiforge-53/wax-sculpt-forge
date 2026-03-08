@@ -1632,16 +1632,16 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </div>
           </div>
         )}
-        {/* Quality tier indicator — subtle badge */}
+        {/* Quality tier indicator — bottom-left to avoid toolbar overlap */}
         {qualityTier === "preview" && !surfaceProgress && (
-          <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in duration-150">
+          <div className="absolute bottom-3 left-3 z-20 pointer-events-none animate-in fade-in duration-150">
             <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-muted-foreground/70 bg-muted/40 border border-border/30 rounded-full backdrop-blur-sm">
               Preview
             </span>
           </div>
         )}
         {qualityTier === "high" && !surfaceProgress && !insp && !sc && (
-          <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in duration-500">
+          <div className="absolute bottom-3 left-3 z-20 pointer-events-none animate-in fade-in duration-500">
             <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-primary/60 bg-primary/5 border border-primary/15 rounded-full backdrop-blur-sm">
               HD
             </span>
@@ -1667,7 +1667,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         <Canvas
           camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
           shadows={sc || insp ? "soft" : (isMobile ? false : true)}
-          frameloop={isMobile ? "demand" : "always"}
+          frameloop="always"
           gl={{
             preserveDrawingBuffer: true,
             antialias: !isMobile,
@@ -1675,7 +1675,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : 0.95),
             powerPreference: isMobile ? "low-power" : "high-performance",
           }}
-          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1] : [1, 2]))}
+          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
         >
           <AdaptiveDprController tier={qualityTier} isMobile={isMobile} isShowcase={sc} isInspection={insp} />
           <ClipPlaneManager mode={cutawayMode} offset={cutawayOffset} params={params} />
@@ -1871,15 +1871,12 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
             autoRotate={false}
             enableDamping
-            dampingFactor={0.08}
-            rotateSpeed={isMobile ? 0.6 : 1.0}
-            zoomSpeed={isMobile ? 0.8 : 1.0}
+            dampingFactor={isMobile ? 0.12 : 0.08}
+            rotateSpeed={isMobile ? 0.5 : 1.0}
+            zoomSpeed={isMobile ? 0.7 : 1.0}
             touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0}
             maxPolarAngle={Math.PI}
-            onChange={() => {
-              // In demand mode, OrbitControls auto-invalidates but damping needs continuous frames
-            }}
           />
 
           {/* Camera preset animator */}

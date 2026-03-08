@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import {
   Layers, Moon, PenTool, Palette, Send, Save, Flame,
   ChevronUp, ChevronDown, Lock, Sparkles, Wand2, X,
-  GripHorizontal,
 } from "lucide-react";
 
 // ── Tab definitions ──────────────────────────────────────────────
