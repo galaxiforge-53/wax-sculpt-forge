@@ -88,11 +88,14 @@ function makeNoise2D(seed: number) {
   const rng = seededRng(seed);
   const SIZE = 256;
   const perm = new Uint8Array(SIZE * 2);
-  const grad: number[][] = [];
+  // Flatten gradient vectors into a single Float64Array with stride 2
+  // Eliminates pointer indirection on every noise lookup (~50M+ calls per generation)
+  const gradFlat = new Float64Array(SIZE * 2);
   for (let i = 0; i < SIZE; i++) {
     perm[i] = i;
     const angle = rng() * Math.PI * 2;
-    grad.push([Math.cos(angle), Math.sin(angle)]);
+    gradFlat[i * 2] = Math.cos(angle);
+    gradFlat[i * 2 + 1] = Math.sin(angle);
   }
   for (let i = SIZE - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -100,28 +103,30 @@ function makeNoise2D(seed: number) {
   }
   for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
 
-  function fade(t: number) { return t * t * t * (t * (t * 6 - 15) + 10); }
-  function lerpN(a: number, b: number, t: number) { return a + t * (b - a); }
-  function dot2(g: number[], x: number, y: number) { return g[0] * x + g[1] * y; }
-
   return (x: number, y: number): number => {
     const xi = Math.floor(x) & 255;
     const yi = Math.floor(y) & 255;
     const xf = x - Math.floor(x);
     const yf = y - Math.floor(y);
-    const u = fade(xf);
-    const v = fade(yf);
+    // Inline fade: t³(6t²-15t+10)
+    const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
+    const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
 
-    const aa = perm[perm[xi] + yi] & 255;
-    const ab = perm[perm[xi] + yi + 1] & 255;
-    const ba = perm[perm[xi + 1] + yi] & 255;
-    const bb = perm[perm[xi + 1] + yi + 1] & 255;
+    const aa = (perm[perm[xi] + yi] & 255) * 2;
+    const ab = (perm[perm[xi] + yi + 1] & 255) * 2;
+    const ba = (perm[perm[xi + 1] + yi] & 255) * 2;
+    const bb = (perm[perm[xi + 1] + yi + 1] & 255) * 2;
 
-    return lerpN(
-      lerpN(dot2(grad[aa], xf, yf), dot2(grad[ba], xf - 1, yf), u),
-      lerpN(dot2(grad[ab], xf, yf - 1), dot2(grad[bb], xf - 1, yf - 1), u),
-      v
-    );
+    // Inline dot products with flat gradient array
+    const d00 = gradFlat[aa] * xf + gradFlat[aa + 1] * yf;
+    const d10 = gradFlat[ba] * (xf - 1) + gradFlat[ba + 1] * yf;
+    const d01 = gradFlat[ab] * xf + gradFlat[ab + 1] * (yf - 1);
+    const d11 = gradFlat[bb] * (xf - 1) + gradFlat[bb + 1] * (yf - 1);
+
+    // Inline bilinear interpolation
+    const x0 = d00 + u * (d10 - d00);
+    const x1 = d01 + u * (d11 - d01);
+    return x0 + v * (x1 - x0);
   };
 }
 
@@ -1752,6 +1757,27 @@ export function buildHeightmap(
     }
   }
 
+  // ─── 13) Seam healing at U=0/U=1 boundary ──
+  // Ensures the heightmap wraps seamlessly around the ring circumference
+  // Uses hermite blending in a thin strip at both edges
+  {
+    const seamWidth = Math.max(4, Math.round(MAP_W * 0.008)); // ~0.8% of width = ~32px
+    for (let y = 0; y < MAP_H; y++) {
+      const row = y * MAP_W;
+      for (let dx = 0; dx < seamWidth; dx++) {
+        const t = dx / seamWidth;
+        const blend = t * t * (3 - 2 * t); // hermite smooth step
+        const leftIdx = row + dx;
+        const rightIdx = row + MAP_W - 1 - dx;
+        const avg = hmap[leftIdx] * (1 - blend) + hmap[rightIdx] * blend;
+        const avgR = hmap[rightIdx] * (1 - blend) + hmap[leftIdx] * blend;
+        // Blend toward each other at the seam
+        hmap[leftIdx] = hmap[leftIdx] * blend + avg * (1 - blend);
+        hmap[rightIdx] = hmap[rightIdx] * blend + avgR * (1 - blend);
+      }
+    }
+  }
+
   return { hmap, craterCount: totalCraterCount };
 }
 
@@ -1821,7 +1847,7 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
 // Roughness is a low-frequency property — half-res gives ~4× speedup
 // with no visible quality loss on the curved ring surface.
 
-function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, microDetail: number): HTMLCanvasElement {
+function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, microDetail: number, sharedHalf?: Float32Array): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -1832,13 +1858,13 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   const microFactor = microDetail / 100;
   const grainRng = seededRng(7777 + Math.round(microDetail));
 
+  // Use shared half-res if provided, otherwise compute locally
+  const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
+
   const halfRough = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
-    const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
     for (let x = 0; x < hw; x++) {
-      const sx = x * 2;
-      const hVal = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
+      const hVal = halfHmap[y * hw + x];
       let roughness = 0.92 - (hVal - 0.5) * 0.9;
       if (microFactor > 0) roughness += (grainRng() - 0.5) * 0.12 * microFactor;
       halfRough[y * hw + x] = roughness < 0.2 ? 0.2 : roughness > 1.0 ? 1.0 : roughness;
@@ -1879,7 +1905,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
 // The multi-kernel sampling is O(pixels × kernelSamples), so halving resolution
 // gives ~4× speedup with minimal visual difference on a curved ring surface.
 
-function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
+function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHalf?: Float32Array): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -1888,15 +1914,8 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   const hw = w >> 1;
   const hh = h >> 1;
 
-  const halfHmap = new Float32Array(hw * hh);
-  for (let y = 0; y < hh; y++) {
-    const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
-    for (let x = 0; x < hw; x++) {
-      const sx = x * 2;
-      halfHmap[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
-    }
-  }
+  // Use shared half-res if provided
+  const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
   const kernels = [
     { radius: 2, step: 1, weight: 0.5 },
@@ -1968,7 +1987,7 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
 // Albedo is a very low-frequency property (subtle stone color variation).
 // Computing fBm at half-res eliminates ~3M redundant noise evaluations.
 
-function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed: number): HTMLCanvasElement {
+function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed: number, sharedHalf?: Float32Array): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -1979,15 +1998,8 @@ function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed:
   const stoneNoise = makeNoise2D(seed + 7000);
   const grainRng = seededRng(seed + 8000);
 
-  const halfHmap = new Float32Array(hw * hh);
-  for (let y = 0; y < hh; y++) {
-    const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
-    for (let x = 0; x < hw; x++) {
-      const sx = x * 2;
-      halfHmap[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
-    }
-  }
+  // Use shared half-res if provided
+  const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
   const halfAlbedo = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
@@ -2086,6 +2098,34 @@ export interface GenerationProgress {
   percent: number;
 }
 
+// Shared half-res heightmap downsample — computed once, reused by roughness/AO/albedo
+// Previously each map function downsampled independently (3× redundant work on 4M pixels)
+let _sharedHalfHmap: Float32Array | null = null;
+let _sharedHalfW = 0;
+let _sharedHalfH = 0;
+
+function getSharedHalfHmap(hmap: Float32Array, w: number, h: number): Float32Array {
+  const hw = w >> 1;
+  const hh = h >> 1;
+  if (_sharedHalfHmap && _sharedHalfW === hw && _sharedHalfH === hh) {
+    // Recompute into existing buffer
+  } else {
+    _sharedHalfHmap = new Float32Array(hw * hh);
+    _sharedHalfW = hw;
+    _sharedHalfH = hh;
+  }
+  const half = _sharedHalfHmap;
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    const sy1 = Math.min(sy + 1, h - 1);
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      half[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
+    }
+  }
+  return half;
+}
+
 function buildMapsFromHeightmap(
   hmap: Float32Array,
   w: number,
@@ -2094,12 +2134,14 @@ function buildMapsFromHeightmap(
   aspect: number,
   craterCount: number,
 ): LunarSurfaceMapSet {
-  // Normal map strength scales with intensity: low intensity → subtle normals, high → sharp
+  // Pre-compute shared half-res downsample (used by roughness, AO, albedo)
+  const sharedHalf = getSharedHalfHmap(hmap, w, h);
+
   const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
   const normalCanvas = heightmapToNormalCanvas(hmap, w, h, normalStrength, aspect);
-  const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail);
-  const aoCanvas = heightmapToAOCanvas(hmap, w, h);
-  const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed);
+  const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail, sharedHalf);
+  const aoCanvas = heightmapToAOCanvas(hmap, w, h, sharedHalf);
+  const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed, sharedHalf);
   const displacementCanvas = heightmapToDisplacementCanvas(hmap, w, h);
 
   const normalMap = new THREE.CanvasTexture(normalCanvas);
@@ -2178,27 +2220,30 @@ export function generateLunarSurfaceMapsAsync(
       onProgress({ stage: "craters", label: `${craterCount.toLocaleString()} craters stamped`, craterCount, percent: 40 });
 
       setTimeout(() => {
-        onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 55 });
+        onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 50 });
         const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
         const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, normalStrength, aspect);
         const normalMap = new THREE.CanvasTexture(normalCanvas);
         setupDataTexture(normalMap);
 
+        // Pre-compute shared half-res downsample for roughness/AO/albedo
+        const sharedHalf = getSharedHalfHmap(hmap, MAP_W, MAP_H);
+
         setTimeout(() => {
-          onProgress({ stage: "roughness", label: "Computing roughness…", craterCount, percent: 65 });
-          const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
+          onProgress({ stage: "roughness", label: "Computing roughness…", craterCount, percent: 62 });
+          const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail, sharedHalf);
           const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
           setupDataTexture(roughnessMap);
 
           setTimeout(() => {
-            onProgress({ stage: "ao", label: "Computing ambient occlusion…", craterCount, percent: 75 });
-            const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
+            onProgress({ stage: "ao", label: "Computing ambient occlusion…", craterCount, percent: 74 });
+            const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H, sharedHalf);
             const aoMap = new THREE.CanvasTexture(aoCanvas);
             setupDataTexture(aoMap);
 
             setTimeout(() => {
-              onProgress({ stage: "albedo", label: "Generating surface color…", craterCount, percent: 85 });
-              const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
+              onProgress({ stage: "albedo", label: "Generating surface color…", craterCount, percent: 86 });
+              const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed, sharedHalf);
               const albedoMap = new THREE.CanvasTexture(albedoCanvas);
               setupDataTexture(albedoMap);
               albedoMap.colorSpace = THREE.SRGBColorSpace;
