@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { DesignPackage } from "@/types/ring";
+import { saveVersion } from "@/lib/designVersionStore";
 
 export interface CloudDesign {
   id: string;
