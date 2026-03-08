@@ -163,7 +163,7 @@ function BuilderInner() {
     prefsAppliedRef.current = true;
     setMetalPreset(prefs.defaultMetal);
     setFinishPreset(prefs.defaultFinish);
-    if (prefs.showMeasurements) vpSet("showMeasurements", true);
+    if (prefs.showMeasurements) setShowMeasurements(true);
     const lightPreset = LIGHTING_PRESETS.find(p => p.id === prefs.lightingPreset);
     if (lightPreset?.settings) setLighting({ ...DEFAULT_LIGHTING, ...lightPreset.settings });
   }, []);
