@@ -3,7 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { useRingDesign } from "@/hooks/useRingDesign";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect, useRef, useState } from "react";
-import RingViewport, { RingViewportHandle, SnapshotAngle, CutawayMode } from "@/components/builder/RingViewport";
+import RingViewport, { RingViewportHandle, SnapshotAngle, CutawayMode, BackgroundPreset, BG_PRESETS } from "@/components/builder/RingViewport";
 import { ScaleReferenceType } from "@/components/builder/ScaleReference";
 import ViewportErrorBoundary from "@/components/builder/ViewportErrorBoundary";
 import ToolRail from "@/components/builder/ToolRail";
