@@ -10,10 +10,20 @@ import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
-import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
+import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, disposeLunarMaps, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
+
+// ── Debounce hook for lunar texture regeneration ──────────────────
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
 
@@ -225,25 +235,19 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
   const stlGenIdRef = useRef(0);
 
+  // Debounce lunar texture changes for STL mesh too
+  const debouncedStlLunar = useDebouncedValue(lunarTexture, 300);
+
   useEffect(() => {
-    if (!lunarTexture?.enabled) {
+    if (!debouncedStlLunar?.enabled) {
       setLunarMaps(null);
       return;
     }
     const genId = ++stlGenIdRef.current;
-    generateLunarSurfaceMapsAsync(lunarTexture, physicalAspect, undefined, () => {}).then((maps) => {
+    generateLunarSurfaceMapsAsync(debouncedStlLunar, physicalAspect, undefined, () => {}).then((maps) => {
       if (stlGenIdRef.current === genId) setLunarMaps(maps);
     });
-  }, [
-    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
-    lunarTexture?.craterDensity, lunarTexture?.craterSize,
-    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
-    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
-    lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
-    lunarTexture?.erosion, lunarTexture?.terrainRoughness,
-    lunarTexture?.craterVariation,
-    physicalAspect,
-  ]);
+  }, [debouncedStlLunar, physicalAspect]);
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
@@ -322,14 +326,15 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
 }
 
 // ── Build solid ring geometry with separate outer, inner, and cap surfaces ──
-function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
+function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMobile: boolean = false) {
   const innerR = params.innerDiameter / 2 / 10;
   const outerR = innerR + params.thickness / 10;
   const halfW = params.width / 2 / 10;
   const bevel = params.bevelSize / 10;
 
-  const radSegs = hasLunar ? 768 : 128;
-  const profileSteps = hasLunar ? 192 : 32;
+  // Adaptive segments: lower on mobile to keep frame rates smooth
+  const radSegs = hasLunar ? (isMobile ? 256 : 768) : (isMobile ? 64 : 128);
+  const profileSteps = hasLunar ? (isMobile ? 64 : 192) : (isMobile ? 16 : 32);
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];
@@ -426,10 +431,11 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
 function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
+  const isMobile = useIsMobile();
 
   const { outerGeo, innerGeo, capGeoTop, capGeoBot } = useMemo(
-    () => buildSolidRingGeometry(params, hasLunar),
-    [params, hasLunar]
+    () => buildSolidRingGeometry(params, hasLunar, isMobile),
+    [params, hasLunar, isMobile]
   );
 
   const isWax = viewMode === "wax";
@@ -452,23 +458,33 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     thicknessMm: params.thickness,
   }), [params.innerDiameter, params.width, params.thickness]);
 
-  // Async texture generation with progress tracking
+  // Async texture generation with progress tracking + debounce
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const genIdRef = useRef(0);
+  const prevMapsRef = useRef<LunarSurfaceMapSet | null>(null);
+
+  // Debounce all lunar params so rapid slider drags don't spam regeneration
+  const debouncedLunar = useDebouncedValue(lunarTexture, isMobile ? 400 : 250);
 
   useEffect(() => {
-    if (!lunarTexture?.enabled) {
+    if (!debouncedLunar?.enabled) {
+      // Dispose previous maps
+      if (prevMapsRef.current) {
+        disposeLunarMaps(prevMapsRef.current);
+        prevMapsRef.current = null;
+      }
       setLunarMaps(null);
       setGenProgress(null);
       onGenProgress?.(null);
+      return;
     }
     const genId = ++genIdRef.current;
     setGenProgress({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
     onGenProgress?.({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
 
     generateLunarSurfaceMapsAsync(
-      lunarTexture,
+      debouncedLunar,
       physicalAspect,
       ringDims,
       (progress) => {
@@ -478,25 +494,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       },
     ).then((maps) => {
       if (genIdRef.current !== genId) return;
+      // Dispose previous maps to free GPU memory
+      if (prevMapsRef.current && prevMapsRef.current !== maps) {
+        disposeLunarMaps(prevMapsRef.current);
+      }
+      prevMapsRef.current = maps;
       setLunarMaps(maps);
       // Clear progress after brief delay to show completion
       setTimeout(() => {
         if (genIdRef.current === genId) setGenProgress(null);
       }, 1200);
     });
-  }, [
-    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
-    lunarTexture?.craterDensity, lunarTexture?.craterSize,
-    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
-    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
-    lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
-    lunarTexture?.erosion, lunarTexture?.terrainRoughness,
-    lunarTexture?.craterVariation,
-    lunarTexture?.craterShape, lunarTexture?.ovalElongation, lunarTexture?.ovalAngle,
-    lunarTexture?.mariaFill, lunarTexture?.highlandRidges,
-    lunarTexture?.craterFloorTexture, lunarTexture?.ejectaStrength,
-    physicalAspect, ringDims,
-  ]);
+  }, [debouncedLunar, physicalAspect, ringDims]);
 
   // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
   // Smaller rings → stronger normals per-texel; larger rings → softer
@@ -1359,14 +1368,16 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         )}
         <Canvas
           camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
-          shadows={sc || insp ? "soft" : true}
+          shadows={sc || insp ? "soft" : (isMobile ? false : true)}
+          frameloop={isMobile ? "demand" : "always"}
           gl={{
             preserveDrawingBuffer: true,
-            antialias: true,
+            antialias: !isMobile,
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : 0.95),
+            powerPreference: isMobile ? "low-power" : "high-performance",
           }}
-          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
+          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1] : [1, 2]))}
         >
           <ClipPlaneManager mode={cutawayMode} />
 
@@ -1395,7 +1406,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               return (
                 <>
                   <ambientLight intensity={lighting.ambientIntensity + 0.3} color="#f5f0e8" />
-                  <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity * 0.6} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color="#ffffff" />
+                  <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity * 0.6} castShadow={!isMobile} shadow-mapSize-width={isMobile ? 512 : 1024} shadow-mapSize-height={isMobile ? 512 : 1024} shadow-bias={-0.001} color="#ffffff" />
                   <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity + 0.2} color="#f0f0f0" />
                   <pointLight position={[0, -2, 3]} intensity={0.4} color="#ffffff" />
                 </>
@@ -1418,9 +1429,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                 <directionalLight
                   position={[keyX, keyY, keyZ]}
                   intensity={sc ? lighting.keyIntensity * 1.3 : lighting.keyIntensity}
-                  castShadow
-                  shadow-mapSize-width={sc || insp ? 2048 : 1024}
-                  shadow-mapSize-height={sc || insp ? 2048 : 1024}
+                  castShadow={!isMobile}
+                  shadow-mapSize-width={isMobile ? 512 : (sc || insp ? 2048 : 1024)}
+                  shadow-mapSize-height={isMobile ? 512 : (sc || insp ? 2048 : 1024)}
                   shadow-bias={-0.0003}
                   shadow-radius={4}
                   color={keyColor}
@@ -1542,11 +1553,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             return (
               <ContactShadows
                 position={[0, shadowY, 0]}
-                opacity={sc ? 0.65 : 0.5}
-                scale={sc ? 8 : 6}
-                blur={sc ? 3 : 2}
-                far={sc ? 5 : 4}
-                resolution={sc ? 512 : 256}
+                opacity={sc ? 0.65 : (isMobile ? 0.35 : 0.5)}
+                scale={sc ? 8 : (isMobile ? 4 : 6)}
+                blur={sc ? 3 : (isMobile ? 1.5 : 2)}
+                far={sc ? 5 : (isMobile ? 3 : 4)}
+                resolution={sc ? 512 : (isMobile ? 128 : 256)}
               />
             );
           })()}
@@ -1564,6 +1575,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0}
             maxPolarAngle={Math.PI}
+            onChange={() => {
+              // In demand mode, OrbitControls auto-invalidates but damping needs continuous frames
+            }}
           />
 
           {/* Camera preset animator */}
