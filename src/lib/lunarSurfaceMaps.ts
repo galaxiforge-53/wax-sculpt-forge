@@ -761,7 +761,15 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
 
   const blend = erosionFactor * 0.6;
   const oneMinusBlend = 1 - blend;
-  for (let i = 0; i < len; i++) {
+  // 4-wide unrolled blend — reduces loop overhead by 75%
+  const len4e = len & ~3;
+  for (let i = 0; i < len4e; i += 4) {
+    hmap[i]     = hmap[i]     * oneMinusBlend + blurred[i]     * blend;
+    hmap[i + 1] = hmap[i + 1] * oneMinusBlend + blurred[i + 1] * blend;
+    hmap[i + 2] = hmap[i + 2] * oneMinusBlend + blurred[i + 2] * blend;
+    hmap[i + 3] = hmap[i + 3] * oneMinusBlend + blurred[i + 3] * blend;
+  }
+  for (let i = len4e; i < len; i++) {
     hmap[i] = hmap[i] * oneMinusBlend + blurred[i] * blend;
   }
 }
