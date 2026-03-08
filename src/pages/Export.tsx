@@ -294,6 +294,14 @@ export default function Export() {
     return w;
   }, [pkg]);
 
+  // Castability report for production summary
+  const castReport = useMemo(() => {
+    if (!pkg) return undefined;
+    const lunar = pkg.craftState?.lunarTexture ?? null;
+    const engr = pkg.craftState?.engraving ?? null;
+    return evaluateCastability(pkg.parameters, lunar, engr);
+  }, [pkg]);
+
   if (!pkg) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
