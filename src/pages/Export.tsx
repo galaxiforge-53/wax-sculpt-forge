@@ -7,6 +7,8 @@ import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
 import { getReturnUrl, getHandoffUrl, isEmbedMode } from "@/config/galaxiforge";
 import { generateExportSTL, downloadBlob, STLExportResult, SHRINKAGE_PROFILES, ShrinkageMetal } from "@/lib/stlExporter";
+import { evaluateCastability } from "@/lib/castabilityEngine";
+import ProductionSummaryPanel from "@/components/builder/ProductionSummaryPanel";
 import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale } from "lucide-react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
@@ -292,6 +294,14 @@ export default function Export() {
     return w;
   }, [pkg]);
 
+  // Castability report for production summary
+  const castReport = useMemo(() => {
+    if (!pkg) return undefined;
+    const lunar = pkg.craftState?.lunarTexture ?? null;
+    const engr = pkg.craftState?.engraving ?? null;
+    return evaluateCastability(pkg.parameters, lunar, engr);
+  }, [pkg]);
+
   if (!pkg) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -358,6 +368,15 @@ export default function Export() {
           />
           <SpecBadge icon={Box} label="Ring Size" value={`${pkg.parameters.size} US`} />
         </div>
+
+        {/* ── Production Summary ── */}
+        <ProductionSummaryPanel
+          params={pkg.parameters}
+          metalPreset={pkg.metalPreset}
+          finishPreset={pkg.finishPreset}
+          craftState={pkg.craftState}
+          castabilityReport={castReport}
+        />
 
         {/* ── Casting Shrinkage Compensation ── */}
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
