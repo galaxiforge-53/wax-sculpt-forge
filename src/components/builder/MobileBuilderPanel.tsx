@@ -167,6 +167,13 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
           onChange={props.onLunarChange}
           onApplyPreset={props.onApplyLunarPreset}
           onRandomize={props.onRandomizeLunar}
+          ringThickness={props.params.thickness}
+          onEnhanceSummary={(summary) => {
+            toast({
+              title: "✨ Surface Enhanced",
+              description: summary.slice(0, 3).join(" · "),
+            });
+          }}
         />
       ) : (
         <PremiumLock />
