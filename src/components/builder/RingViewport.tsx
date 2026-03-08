@@ -110,6 +110,7 @@ interface RingMeshProps {
   lunarTexture?: LunarTextureState;
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional polishing finish
+  detailBoost?: number; // 0–100, exaggerates surface detail for inspection
 }
 
 // ── Physically-based metal material configs ───────────────────────
