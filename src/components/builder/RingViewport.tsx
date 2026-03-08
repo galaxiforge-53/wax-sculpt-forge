@@ -889,6 +889,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const genIdRef = useRef(0);
   const prevMapsRef = useRef<LunarSurfaceMapSet | null>(null);
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounce all lunar params so rapid slider drags don't spam regeneration
   const debouncedLunar = useDebouncedValue(lunarTexture, isMobile ? 400 : 250);
@@ -901,6 +902,8 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   }, [debouncedLunar]);
 
   useEffect(() => {
+    if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+
     if (!debouncedLunar?.enabled) {
       // Dispose previous maps
       if (prevMapsRef.current) {
@@ -934,10 +937,17 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       prevMapsRef.current = maps;
       setLunarMaps(maps);
       // Clear progress after brief delay to show completion
-      setTimeout(() => {
-        if (genIdRef.current === genId) setGenProgress(null);
+      completionTimerRef.current = setTimeout(() => {
+        if (genIdRef.current === genId) {
+          setGenProgress(null);
+          onGenProgress?.(null);
+        }
       }, 1200);
     });
+
+    return () => {
+      if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+    };
     // When frozen, only regenerate if lunar params (excluding frozen) change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lunarParamsKey, effectiveAspect, effectiveDims]);
@@ -2080,7 +2090,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         <Canvas
           camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
           shadows={sc || insp ? "soft" : (isMobile ? false : (qualityTier === "preview" ? false : true))}
-          frameloop={turntableSpeed > 0 || surfaceProgress ? "always" : "demand"}
+          frameloop={turntableSpeed > 0 || (surfaceProgress && surfaceProgress.stage !== "done") ? "always" : "demand"}
           gl={{
             preserveDrawingBuffer: true,
             antialias: !isMobile,
