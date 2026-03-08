@@ -217,6 +217,70 @@ export default function MyDesigns() {
     return parts.join(" · ");
   };
 
+  // ── Version history handlers ──
+
+  const toggleHistory = async (designId: string) => {
+    if (historyOpenId === designId) {
+      setHistoryOpenId(null);
+      setVersions([]);
+      return;
+    }
+    setHistoryOpenId(designId);
+    setVersionsLoading(true);
+    try {
+      const v = await listVersions(designId);
+      setVersions(v);
+    } catch (err: any) {
+      toast({ title: "Error loading history", description: err.message, variant: "destructive" });
+    } finally {
+      setVersionsLoading(false);
+    }
+  };
+
+  const handleRestore = async (designId: string, versionId: string, versionLabel: string) => {
+    if (!window.confirm(`Restore to "${versionLabel}"? Current state will be auto-saved first.`)) return;
+    setActionLoading(versionId);
+    try {
+      await restoreVersion(designId, versionId);
+      toast({ title: "Restored", description: `Design restored to ${versionLabel}.` });
+      refresh();
+      // Refresh versions list
+      const v = await listVersions(designId);
+      setVersions(v);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBranch = async (versionId: string, parentName: string, versionLabel: string) => {
+    setActionLoading(versionId);
+    try {
+      await branchFromVersion(versionId, `${parentName} — ${versionLabel} branch`);
+      toast({ title: "Branched!", description: "New design created from this version." });
+      refresh();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteVersion = async (designId: string, versionId: string) => {
+    setActionLoading(versionId);
+    try {
+      await deleteVersion(versionId);
+      toast({ title: "Version deleted" });
+      const v = await listVersions(designId);
+      setVersions(v);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background px-4 sm:px-6 py-10 sm:py-16">
       <div className="max-w-5xl mx-auto">
