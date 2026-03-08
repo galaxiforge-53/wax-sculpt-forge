@@ -1142,8 +1142,8 @@ function applyAsteroidRubble(
     const vn10 = y * invH_rubble * 10 * aspectCorr;
     const vn35 = y * invH_rubble * 35 * aspectCorr;
     const rowOff = y * w;
-    const rubbleRowMask = edgeMask[rowOff]; // row-constant
-    if (rubbleRowMask < 0.01) continue; // skip entire edge rows
+    const rubbleRowMask = edgeRow[y];
+    if (rubbleRowMask < 0.01) continue;
 
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
