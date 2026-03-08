@@ -1375,7 +1375,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         <Canvas
           camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
           shadows={sc || insp ? "soft" : (isMobile ? false : true)}
-          frameloop="demand"
+          frameloop={isMobile ? "demand" : "always"}
           gl={{
             preserveDrawingBuffer: true,
             antialias: !isMobile,
