@@ -606,6 +606,14 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const mc = METAL_CONFIGS[metalPreset] ?? METAL_CONFIGS.silver;
   const finishRoughMod = FINISH_ROUGHNESS_MOD[finishPreset] ?? 0;
 
+  // ── Wear material adjustments ──
+  // Wear increases roughness slightly (micro-scratches), reduces clearcoat (worn polish),
+  // and slightly increases env map intensity (smoother worn metal reflects more)
+  const wearFactor = debouncedWear / 100;
+  const wearRoughnessBoost = wearFactor * 0.12;   // worn surfaces get slightly rougher
+  const wearClearcoatLoss = wearFactor * 0.8;      // clearcoat wears off
+  const wearSheenBoost = wearFactor * 0.15;        // subtle patina sheen
+
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
     const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
