@@ -104,10 +104,36 @@ function PremiumLock() {
 type PanelHeight = "collapsed" | "peek" | "half" | "full";
 const PANEL_HEIGHTS: Record<PanelHeight, number> = {
   collapsed: 0,
-  peek: 25,
-  half: 40,
-  full: 70,
+  peek: 28,
+  half: 42,
+  full: 72,
 };
+
+const HEIGHT_ORDER: PanelHeight[] = ["collapsed", "peek", "half", "full"];
+
+// Snap to nearest height based on current position + velocity
+function snapToHeight(currentVh: number, velocityPxPerMs: number): PanelHeight {
+  // If flicking fast, jump in that direction
+  if (Math.abs(velocityPxPerMs) > 0.4) {
+    const direction = velocityPxPerMs > 0 ? -1 : 1; // negative velocity = dragging up = expand
+    const currentIdx = HEIGHT_ORDER.findIndex(
+      (h) => Math.abs(PANEL_HEIGHTS[h] - currentVh) < 15
+    );
+    const bestIdx = Math.max(0, Math.min(HEIGHT_ORDER.length - 1, (currentIdx === -1 ? 1 : currentIdx) + direction));
+    return HEIGHT_ORDER[bestIdx];
+  }
+  // Otherwise snap to closest
+  let closest: PanelHeight = "collapsed";
+  let closestDist = Infinity;
+  for (const h of HEIGHT_ORDER) {
+    const dist = Math.abs(PANEL_HEIGHTS[h] - currentVh);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = h;
+    }
+  }
+  return closest;
+}
 
 // ── Component ────────────────────────────────────────────────────
 
@@ -124,13 +150,6 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
       setActiveTab(tab);
       setPanelHeight("half");
     }
-  };
-
-  const cycleHeight = () => {
-    if (panelHeight === "collapsed") setPanelHeight("peek");
-    else if (panelHeight === "peek") setPanelHeight("half");
-    else if (panelHeight === "half") setPanelHeight("full");
-    else setPanelHeight("collapsed");
   };
 
   // ── Tab content renderers ──────────────────────────────────────
