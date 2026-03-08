@@ -1416,7 +1416,7 @@ export function buildHeightmap(
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 48;
-        const v = y / MAP_H * 48;
+        const v = y / MAP_H * 48 * aspectCorrection;
         const n = fbm(regolithNoise, u, v, 5, 2.2, 0.45);
         const mask = edgeMask[y * MAP_W + x];
         hmap[y * MAP_W + x] += n * regolithStrength * mask;
@@ -1428,7 +1428,7 @@ export function buildHeightmap(
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 96;
-        const v = y / MAP_H * 96;
+        const v = y / MAP_H * 96 * aspectCorrection;
         const n = fineRegolith(u, v);
         const mask = edgeMask[y * MAP_W + x];
         hmap[y * MAP_W + x] += n * fineStrength * mask;
