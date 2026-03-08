@@ -61,6 +61,7 @@ function BuilderInner() {
   const [rotationLocked, setRotationLocked] = useState(false);
   const [scaleReference, setScaleReference] = useState<ScaleReferenceType>("none");
   const [wearPreview, setWearPreview] = useState(0);
+  const [turntableSpeed, setTurntableSpeed] = useState(0);
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
