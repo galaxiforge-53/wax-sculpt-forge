@@ -802,28 +802,28 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod)}
+        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
         metalness={mc.metalness}
         normalMap={lunarMaps?.normalMap ?? null}
         roughnessMap={lunarMaps?.roughnessMap ?? null}
         aoMap={lunarMaps?.aoMap ?? null}
         aoMapIntensity={hasLunar ? 2.0 : 0}
         normalScale={normalScale}
-        envMapIntensity={mc.envMapIntensity}
-        clearcoat={hasLunar ? mc.clearcoat : mc.clearcoat * 1.5}
-        clearcoatRoughness={mc.clearcoatRoughness}
+        envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15)}
+        clearcoat={Math.max(0, (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss))}
+        clearcoatRoughness={mc.clearcoatRoughness + wearFactor * 0.15}
         reflectivity={mc.reflectivity}
-        sheen={mc.sheen}
+        sheen={mc.sheen + wearSheenBoost}
         sheenColor={mc.sheenColor}
-        sheenRoughness={mc.sheenRoughness}
+        sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1)}
         ior={mc.ior}
         displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
-        displacementScale={dispScale}
-        displacementBias={-dispScale * 0.5}
+        displacementScale={dispScale * (1 - wearFactor * 0.3)}
+        displacementBias={-dispScale * (1 - wearFactor * 0.3) * 0.5}
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
