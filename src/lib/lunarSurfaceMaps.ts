@@ -1093,7 +1093,7 @@ function applyValhallaConcentric(
 
 function applyOrganicDunes(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const duneNoise = makeNoise2D(seed + 16001);
   const duneNoise2 = makeNoise2D(seed + 16002);
