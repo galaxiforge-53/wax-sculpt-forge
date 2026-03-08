@@ -1496,6 +1496,7 @@ export function generateLunarSurfaceMapsAsync(
                 setupDataTexture(displacementMap);
 
                 const maps: LunarSurfaceMapSet = { normalMap, roughnessMap, aoMap, albedoMap, displacementMap, craterCount };
+                evictCache();
                 cache.set(key, maps);
                 onProgress({ stage: "done", label: "Surface complete ✓", craterCount, percent: 100 });
                 resolve(maps);
