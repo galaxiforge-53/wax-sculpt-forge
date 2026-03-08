@@ -1118,7 +1118,7 @@ export function buildHeightmap(
     }
 
     const fineRegolith = makeNoise2D(lunar.seed + 4444);
-    const fineStrength = microFactor * 0.025 * depthScale;
+    const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 96;
