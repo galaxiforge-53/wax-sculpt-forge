@@ -920,7 +920,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         normalMap={lunarMaps?.normalMap ?? null}
         roughnessMap={lunarMaps?.roughnessMap ?? null}
         aoMap={lunarMaps?.aoMap ?? null}
-        aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) : 0}
+        aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) * detailAoMul : 0}
         normalScale={normalScale}
         envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15 + polishEnvBoost)}
         clearcoat={Math.min(1, Math.max(0,
