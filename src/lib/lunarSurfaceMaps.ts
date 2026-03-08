@@ -887,7 +887,7 @@ function applyLobateScarps(
 
 function applyPhobosGrooves(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
   rand: () => number,
 ) {
   const grooveCount = 8 + Math.floor(rand() * 12);
