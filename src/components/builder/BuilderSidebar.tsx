@@ -245,6 +245,7 @@ export default function BuilderSidebar({
   lunarTexture, onLunarChange, onApplyLunarPreset, onRandomizeLunar,
   onApplyTemplate,
   engraving, onEngravingChange,
+  imageTerrain, onImageTerrainChange,
   metalPreset, finishPreset,
   onViewModeChange, onMetalChange, onFinishChange,
   lighting, onLightingChange,
