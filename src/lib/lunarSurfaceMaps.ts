@@ -1395,27 +1395,95 @@ function applySurfaceMasks(
 
   const noiseFunc = makeNoise2D(seed + 77777);
 
+  // Pre-compute per-mask trig values to avoid recomputing cos/sin per pixel
+  const maskCosR = new Float64Array(activeMasks.length);
+  const maskSinR = new Float64Array(activeMasks.length);
+  for (let m = 0; m < activeMasks.length; m++) {
+    const rad = (activeMasks[m].rotation / 180) * Math.PI;
+    maskCosR[m] = Math.cos(rad);
+    maskSinR[m] = Math.sin(rad);
+  }
+
+  const isInclude = mode === "include";
+  const invW = 1 / w;
+  const invH = 1 / h;
+
   for (let y = 0; y < h; y++) {
-    const v = y / h;
+    const v = y * invH;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const u = x / w;
-      const idx = y * w + x;
+      const u = x * invW;
+      const idx = rowOff + x;
       const original = hmap[idx];
 
-      // Combine all mask values (union for include, intersection for exclude)
-      let combinedMask = mode === "include" ? 0 : 1;
-      for (const mask of activeMasks) {
-        const maskVal = computeMaskValue(u, v, mask, noiseFunc);
-        if (mode === "include") {
-          combinedMask = Math.max(combinedMask, maskVal);
+      let combinedMask = isInclude ? 0 : 1;
+      for (let m = 0; m < activeMasks.length; m++) {
+        const mask = activeMasks[m];
+        // Inline pre-computed trig into mask computation
+        const du = u - mask.centerU;
+        const dv = v - mask.centerV;
+        const ru = du * maskCosR[m] + dv * maskSinR[m];
+        const rv = -du * maskSinR[m] + dv * maskCosR[m];
+        const featherNorm = mask.feather / 100;
+
+        let value = 0;
+        // Inline shape computation (avoids function call overhead per pixel per mask)
+        switch (mask.shape) {
+          case "circle": {
+            const hw = mask.width / 2;
+            const hh = mask.height / 2;
+            const dist = Math.sqrt((ru / hw) * (ru / hw) + (rv / hh) * (rv / hh));
+            if (dist < 1 - featherNorm) value = 1;
+            else if (dist < 1) value = 1 - (dist - (1 - featherNorm)) / featherNorm;
+            break;
+          }
+          case "rectangle": {
+            const distU = Math.abs(ru) / (mask.width / 2);
+            const distV = Math.abs(rv) / (mask.height / 2);
+            const maxDist = distU > distV ? distU : distV;
+            if (maxDist < 1 - featherNorm) value = 1;
+            else if (maxDist < 1) value = 1 - (maxDist - (1 - featherNorm)) / featherNorm;
+            break;
+          }
+          case "noise": {
+            const scale = (mask.noiseScale ?? 50) / 10;
+            const threshold = (mask.noiseThreshold ?? 50) / 100;
+            const n = noiseFunc(u * scale, v * scale) * 0.5 + 0.5;
+            const fr = featherNorm * 0.3;
+            if (n > threshold + fr) value = 1;
+            else if (n > threshold - fr) value = (n - (threshold - fr)) / (fr * 2);
+            break;
+          }
+          case "gradient-h": {
+            const start = mask.centerU - mask.width / 2;
+            const end = mask.centerU + mask.width / 2;
+            if (u >= start && u <= end) value = (u - start) / (end - start);
+            else if (u > end) value = 1;
+            break;
+          }
+          case "gradient-v": {
+            const start = mask.centerV - mask.height / 2;
+            const end = mask.centerV + mask.height / 2;
+            if (v >= start && v <= end) value = (v - start) / (end - start);
+            else if (v > end) value = 1;
+            break;
+          }
+          default: {
+            value = computeMaskValue(u, v, mask, noiseFunc);
+            break;
+          }
+        }
+        if (mask.invert) value = 1 - value;
+
+        if (isInclude) {
+          if (value > combinedMask) combinedMask = value;
         } else {
-          combinedMask = Math.min(combinedMask, 1 - maskVal);
+          const inv = 1 - value;
+          if (inv < combinedMask) combinedMask = inv;
         }
       }
 
-      // Apply mask: blend between original texture and flat surface
-      const flat = 0.5;
-      hmap[idx] = flat + (original - flat) * combinedMask;
+      hmap[idx] = 0.5 + (original - 0.5) * combinedMask;
     }
   }
 }
