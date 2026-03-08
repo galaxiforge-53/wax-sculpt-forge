@@ -9,7 +9,7 @@ import { getReturnUrl, getHandoffUrl, isEmbedMode } from "@/config/galaxiforge";
 import { generateExportSTL, downloadBlob, STLExportResult, SHRINKAGE_PROFILES, ShrinkageMetal } from "@/lib/stlExporter";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import ProductionSummaryPanel from "@/components/builder/ProductionSummaryPanel";
-import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale } from "lucide-react";
+import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale, Save, ExternalLink } from "lucide-react";
 import ViewportErrorBoundary from "@/components/builder/ViewportErrorBoundary";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
