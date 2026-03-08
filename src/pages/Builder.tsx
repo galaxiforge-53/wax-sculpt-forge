@@ -878,7 +878,7 @@ function BuilderInner() {
           )}
 
           {/* Desktop guided mode toggle — bottom-left overlay */}
-          {!isMobile && !guidedMode && (
+          {!isMobile && !guidedMode && !compareSnapshot && (
             <div className="absolute bottom-3 left-3 z-10">
               <Button
                 size="sm"
@@ -890,6 +890,23 @@ function BuilderInner() {
               </Button>
             </div>
           )}
+
+          {/* Compare view overlay */}
+          <AnimatePresence>
+            {compareSnapshot && (
+              <CompareView
+                currentParams={params}
+                currentViewMode={viewMode}
+                currentMetal={metalPreset}
+                currentFinish={finishPreset}
+                currentLunar={lunarTexture}
+                currentEngraving={engraving}
+                lighting={lighting}
+                snapshot={compareSnapshot}
+                onClose={() => setCompareSnapshot(null)}
+              />
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Desktop sidebar */}
