@@ -527,6 +527,15 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
 
+  // Debounce params for geometry builds to avoid thrashing during slider drags
+  const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
+
+  // Adaptive quality for geometry detail
+  const geoQuality = useAdaptiveQuality(
+    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar],
+    isMobile ? 1200 : 600,
+  );
+
   // Build geometry and dispose previous on param changes
   const geoRef = useRef<{ outerGeo: THREE.LatheGeometry; innerGeo: THREE.LatheGeometry; capGeoTop: THREE.RingGeometry; capGeoBot: THREE.RingGeometry } | null>(null);
 
@@ -538,10 +547,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       geoRef.current.capGeoTop.dispose();
       geoRef.current.capGeoBot.dispose();
     }
-    const result = buildSolidRingGeometry(params, hasLunar, isMobile);
+    const result = buildSolidRingGeometry(debouncedParams, hasLunar, isMobile, geoQuality);
     geoRef.current = result;
     return result;
-  }, [params, hasLunar, isMobile]);
+  }, [debouncedParams, hasLunar, isMobile, geoQuality]);
 
   // Cleanup on unmount
   useEffect(() => {
