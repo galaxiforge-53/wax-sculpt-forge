@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Undo2, Redo2, Save, Send, Flame, MoreVertical, Wand2 } from "lucide-react";
+import { Undo2, Redo2, Save, Send, Flame, MoreVertical, Wand2, Share2 } from "lucide-react";
 import { isEmbedMode, getReturnUrl } from "@/config/galaxiforge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
