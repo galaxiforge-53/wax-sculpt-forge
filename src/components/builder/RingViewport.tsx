@@ -638,12 +638,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   // Smaller rings → stronger normals per-texel; larger rings → softer
   const dimScale = useMemo(() => {
     const refOuterR = 18.1 / 2 + 2; // reference outer radius for size 8
-    const outerR = params.innerDiameter / 2 + params.thickness;
+    const outerR = debouncedParams.innerDiameter / 2 + debouncedParams.thickness;
     const refWidth = 6;
     // Geometric mean so both radius and width contribute
-    const sizeRatio = Math.sqrt((outerR / refOuterR) * (params.width / refWidth));
+    const sizeRatio = Math.sqrt((outerR / refOuterR) * (debouncedParams.width / refWidth));
     return Math.max(0.5, Math.min(2.0, 1 / sizeRatio));
-  }, [params.innerDiameter, params.thickness, params.width]);
+  }, [debouncedParams.innerDiameter, debouncedParams.thickness, debouncedParams.width]);
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
@@ -654,11 +654,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
-    const outerR = params.innerDiameter / 2 / 10 + params.thickness / 10;
+    const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
     // Base displacement scales with intensity and ring radius, modulated by dimScale
     // so that craters maintain proportional physical depth
     return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
-  }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness, dimScale]);
+  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
