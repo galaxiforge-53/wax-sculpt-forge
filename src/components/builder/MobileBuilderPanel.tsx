@@ -127,7 +127,8 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
   };
 
   const cycleHeight = () => {
-    if (panelHeight === "collapsed") setPanelHeight("half");
+    if (panelHeight === "collapsed") setPanelHeight("peek");
+    else if (panelHeight === "peek") setPanelHeight("half");
     else if (panelHeight === "half") setPanelHeight("full");
     else setPanelHeight("collapsed");
   };
