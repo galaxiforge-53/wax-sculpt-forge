@@ -1163,6 +1163,9 @@ export function buildHeightmap(
     hmap[i] = Math.max(0, Math.min(1, hmap[i]));
   }
 
+  // ─── 9) Apply symmetry ──
+  applySymmetry(hmap, MAP_W, MAP_H, lunar.symmetry ?? "none", lunar.symmetryBlend ?? 30);
+
   return { hmap, craterCount: totalCraterCount };
 }
 
