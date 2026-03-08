@@ -300,7 +300,7 @@ export default function Export() {
     if (!pkg) return undefined;
     const lunar = pkg.craftState?.lunarTexture ?? null;
     const engr = pkg.craftState?.engraving ?? null;
-    const inlayChannels = pkg.craftState?.inlays ?? null;
+    const inlayChannels = pkg.craftState?.inlays?.channels ?? null;
     return evaluateCastability(pkg.parameters, lunar, engr, inlayChannels);
   }, [pkg]);
 
