@@ -1,4 +1,4 @@
-import { RingParameters, RingProfile, InteriorProfile, RING_SIZE_MAP, ViewMode, MetalPreset } from "@/types/ring";
+import { RingParameters, RingProfile, InteriorProfile, RING_SIZE_MAP, ViewMode, MetalPreset, EdgeStyle } from "@/types/ring";
 import { WaxMarkType } from "@/types/waxmarks";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { Slider } from "@/components/ui/slider";
