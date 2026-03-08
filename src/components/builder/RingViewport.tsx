@@ -25,6 +25,60 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+// ── Adaptive quality tier ─────────────────────────────────────────
+// Tracks prop changes: while editing → "preview", after idle → "high"
+export type QualityTier = "preview" | "high";
+
+function useAdaptiveQuality(
+  deps: unknown[],
+  idleMs: number = 800,
+): QualityTier {
+  const [tier, setTier] = useState<QualityTier>("high");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    // Skip the initial mount — start in high quality
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    // Props changed → drop to preview
+    setTier("preview");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setTier("high"), idleMs);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return tier;
+}
+
+// ── DPR controller inside Canvas ──────────────────────────────────
+function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
+  tier: QualityTier;
+  isMobile: boolean;
+  isShowcase: boolean;
+  isInspection: boolean;
+}) {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    if (isShowcase || isInspection) {
+      gl.setPixelRatio(2);
+      return;
+    }
+    if (tier === "preview") {
+      gl.setPixelRatio(isMobile ? 1 : 1);
+    } else {
+      gl.setPixelRatio(isMobile ? 1.5 : Math.min(window.devicePixelRatio, 2));
+    }
+  }, [tier, isMobile, isShowcase, isInspection, gl]);
+
+  return null;
+}
+
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
 
 export interface RingViewportHandle {
