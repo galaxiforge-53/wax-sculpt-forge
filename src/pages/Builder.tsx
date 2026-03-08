@@ -40,6 +40,7 @@ function BuilderInner() {
   const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
+  const [cutawayOffset, setCutawayOffset] = useState(0);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showcaseMode, setShowcaseMode] = useState(false);
   const [inspectionMode, setInspectionMode] = useState(false);
@@ -342,6 +343,7 @@ function BuilderInner() {
             onPresetApplied={() => setCameraPreset(null)}
             showMeasurements={showMeasurements || activeTool === "measure"}
             cutawayMode={cutawayMode}
+            cutawayOffset={cutawayOffset}
             lighting={lighting}
             showcaseMode={showcaseMode}
             inspectionMode={inspectionMode}
@@ -383,25 +385,49 @@ function BuilderInner() {
 
           {/* View controls — top-right, grouped (simplified on mobile) */}
           <div className="absolute top-2 right-2 z-10 flex flex-col gap-1.5 items-end">
-            {/* Cutaway row — desktop only */}
-            {!isMobile && (
-              <div className="flex gap-1">
-                {(["normal", "inside", "cross-section"] as CutawayMode[]).map((mode) => {
-                  const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section" };
-                  return (
-                    <button
-                      key={mode}
-                      onClick={() => setCutawayMode(mode)}
-                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                        ${cutawayMode === mode
-                          ? "bg-primary/30 text-primary border border-primary/40"
-                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                        }`}
-                    >
-                      {labels[mode]}
-                    </button>
-                  );
-                })}
+            {/* Cutaway row */}
+            <div className="flex gap-1">
+              {(["normal", "inside", "cross-section", "quarter-cut"] as CutawayMode[]).map((mode) => {
+                const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section", "quarter-cut": "¼ Cut" };
+                const icons: Record<CutawayMode, string> = { normal: "◉", inside: "◔", "cross-section": "◑", "quarter-cut": "◕" };
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setCutawayMode(mode);
+                      setCutawayOffset(0);
+                    }}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
+                      ${cutawayMode === mode
+                        ? "bg-primary/30 text-primary border border-primary/40"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title={labels[mode]}
+                  >
+                    {isMobile ? icons[mode] : labels[mode]}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Clip offset slider — shown when a cutaway mode is active */}
+            {cutawayMode !== "normal" && (
+              <div className="flex items-center gap-2 bg-card/80 backdrop-blur-sm border border-border/50 rounded-md px-2.5 py-1.5">
+                <span className="text-[9px] text-muted-foreground whitespace-nowrap">Clip</span>
+                <input
+                  type="range"
+                  min={-100}
+                  max={100}
+                  value={cutawayOffset * 100}
+                  onChange={(e) => setCutawayOffset(Number(e.target.value) / 100)}
+                  className="w-20 h-1 accent-primary cursor-pointer"
+                />
+                <button
+                  onClick={() => setCutawayOffset(0)}
+                  className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                  title="Reset clip position"
+                >
+                  ↺
+                </button>
               </div>
             )}
             {/* Tools row — icon-only, compact */}
