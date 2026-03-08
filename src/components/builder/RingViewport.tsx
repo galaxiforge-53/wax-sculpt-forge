@@ -143,6 +143,7 @@ interface RingMeshProps {
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   stampSettings?: StampSettings;
   lunarTexture?: LunarTextureState;
+  imageTerrain?: ImageTerrainState;
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional polishing finish
   detailBoost?: number; // 0–100, exaggerates surface detail for inspection
