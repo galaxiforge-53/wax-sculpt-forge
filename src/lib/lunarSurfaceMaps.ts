@@ -1059,19 +1059,20 @@ function applyAsteroidRubble(
   const aspectCorr = physicalAspect / (w / h);
 
   // 1) Multi-scale rubble texture — chaotic, non-periodic bumps
+  const invW_rubble = 1 / w;
+  const invH_rubble = 1 / h;
   for (let y = 0; y < h; y++) {
-    const vn = y / h;
+    const vn10 = y * invH_rubble * 10 * aspectCorr;
+    const vn35 = y * invH_rubble * 35 * aspectCorr;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const un = x / w;
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const mask = edgeMask[idx];
       if (mask < 0.01) continue;
 
-      // Coarse rubble (large irregular lumps)
-      const coarse = fbm(rubbleNoise, un * 10, vn * 10 * aspectCorr, 4, 2.3, 0.55);
-      // Fine rubble (small angular fragments)
-      const fine = Math.abs(boulderNoise(un * 35, vn * 35 * aspectCorr));
-      // Combined — coarse shapes + sharp angular fragments
+      const un = x * invW_rubble;
+      const coarse = fbm(rubbleNoise, un * 10, vn10, 4, 2.3, 0.55);
+      const fine = Math.abs(boulderNoise(un * 35, vn35));
       const rubble = coarse * 0.6 + (fine - 0.3) * 0.4;
       hmap[idx] += rubble * rubbleAmp * mask;
     }
