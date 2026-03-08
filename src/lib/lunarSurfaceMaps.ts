@@ -935,6 +935,104 @@ function applyOrganicDunes(
   }
 }
 
+// ── Asteroid: Rubble-pile irregular pitting + boulder texture ──
+
+function applyAsteroidRubble(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+  rand: () => number, physicalAspect: number,
+) {
+  const rubbleNoise = makeNoise2D(seed + 17001);
+  const boulderNoise = makeNoise2D(seed + 17002);
+  const rubbleAmp = 0.07 * depthScale;
+  const aspectCorr = physicalAspect / (w / h);
+
+  // 1) Multi-scale rubble texture — chaotic, non-periodic bumps
+  for (let y = 0; y < h; y++) {
+    const vn = y / h;
+    for (let x = 0; x < w; x++) {
+      const un = x / w;
+      const idx = y * w + x;
+      const mask = edgeMask[idx];
+      if (mask < 0.01) continue;
+
+      // Coarse rubble (large irregular lumps)
+      const coarse = fbm(rubbleNoise, un * 10, vn * 10 * aspectCorr, 4, 2.3, 0.55);
+      // Fine rubble (small angular fragments)
+      const fine = Math.abs(boulderNoise(un * 35, vn * 35 * aspectCorr));
+      // Combined — coarse shapes + sharp angular fragments
+      const rubble = coarse * 0.6 + (fine - 0.3) * 0.4;
+      hmap[idx] += rubble * rubbleAmp * mask;
+    }
+  }
+
+  // 2) Scatter large "boulders" — isolated raised blobs
+  const boulderCount = 15 + Math.floor(rand() * 20);
+  for (let b = 0; b < boulderCount; b++) {
+    const bu = rand();
+    const bv = 0.15 + rand() * 0.7;
+    const br = 0.005 + rand() * 0.015;
+    const bh = 0.04 * depthScale * (0.5 + rand() * 0.5);
+    const pxR = br * w;
+    const pyR = br * h * physicalAspect;
+    const pxR2 = pxR * pxR;
+
+    const x0 = Math.floor((bu - br * 1.3) * w);
+    const x1 = Math.ceil((bu + br * 1.3) * w);
+    const y0 = Math.max(0, Math.floor((bv - br * 1.3 * physicalAspect) * h));
+    const y1 = Math.min(h - 1, Math.ceil((bv + br * 1.3 * physicalAspect) * h));
+
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        let wpx = px % w;
+        if (wpx < 0) wpx += w;
+        const du = px - bu * w;
+        const dv = (py - bv * h) * (pxR / pyR);
+        const d2 = du * du + dv * dv;
+        if (d2 > pxR2 * 1.69) continue;
+        const d = Math.sqrt(d2) / pxR;
+        if (d > 1.3) continue;
+        const falloff = Math.max(0, 1 - d * d);
+        const mask = edgeMask[py * w + wpx];
+        hmap[py * w + wpx] += bh * falloff * falloff * mask;
+      }
+    }
+  }
+
+  // 3) Extra irregular pitting — deeper than normal micro-pits
+  const pitCount = 30 + Math.floor(rand() * 40);
+  for (let p = 0; p < pitCount; p++) {
+    const pu = rand();
+    const pv = 0.1 + rand() * 0.8;
+    const pr = 0.003 + rand() * 0.01;
+    const pd = 0.05 * depthScale * (0.5 + rand() * 0.5);
+    const pxR = pr * w;
+    const pyR = pr * h * physicalAspect;
+    const pxR2 = pxR * pxR;
+
+    const x0 = Math.floor((pu - pr * 1.2) * w);
+    const x1 = Math.ceil((pu + pr * 1.2) * w);
+    const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * h));
+    const y1 = Math.min(h - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * h));
+
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        let wpx = px % w;
+        if (wpx < 0) wpx += w;
+        const du = px - pu * w;
+        const dv = (py - pv * h) * (pxR / pyR);
+        const d2 = du * du + dv * dv;
+        if (d2 > pxR2 * 1.44) continue;
+        const d = Math.sqrt(d2) / pxR;
+        if (d > 1.2) continue;
+        const falloff = Math.max(0, 1 - d * d);
+        const mask = edgeMask[py * w + wpx];
+        hmap[py * w + wpx] -= pd * falloff * mask;
+      }
+    }
+  }
+}
+
 // ── Apply symmetry to heightmap ───────────────────────────────────
 
 import { SymmetryMode } from "@/types/lunar";
