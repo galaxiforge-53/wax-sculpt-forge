@@ -1935,7 +1935,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     // Camera positioned further back so ring is fully visible
     const initialCamPos: [number, number, number] = insp
       ? [0, 1.8, 3.5]
-      : isMobile ? [1.0, 1.5, 4.0] : [0, 3, 6];
+      : isMobile ? [0.3, 1.8, 4.5] : [0, 3, 6];
 
       const activeBg = BG_PRESETS.find(b => b.id === bgPreset) ?? BG_PRESETS[0];
 
