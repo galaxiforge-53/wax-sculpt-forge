@@ -2487,9 +2487,9 @@ function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number)
     const rowSrc = y * w;
     const rowDst = yy * w;
     for (let x = 0; x < w; x++) {
-      // Branchless clamp: multiply then bitwise-or avoids Math.max/Math.min
+      // Simple clamp — JIT inlines ternaries better than bitwise tricks
       let v = hmap[rowSrc + x] * 255 + 0.5 | 0;
-      v = (v | -(v > 0 ? 1 : 0)) & 0xFF; // clamp 0-255 branchless
+      v = v < 0 ? 0 : v > 255 ? 255 : v;
       buf32[rowDst + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
