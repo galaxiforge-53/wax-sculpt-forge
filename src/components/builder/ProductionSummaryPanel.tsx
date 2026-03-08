@@ -143,6 +143,7 @@ export default function ProductionSummaryPanel({
   const engraving = craftState?.engraving ?? null;
 
   const weight = useMemo(() => estimateWeight(params, metalPreset), [params, metalPreset]);
+  const materialCost = useMemo(() => weight * METAL_DENSITY[metalPreset].pricePerGram, [weight, metalPreset]);
   const complexity = useMemo(() => computeSurfaceComplexity(params, lunar, engraving), [params, lunar, engraving]);
 
   const outerDiameter = params.innerDiameter + params.thickness * 2;
