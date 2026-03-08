@@ -2200,6 +2200,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               wearPreview={wearPreview}
               polishPreview={polishPreview}
               detailBoost={detailBoost}
+              thicknessHeatmap={thicknessHeatmap}
               onGenProgress={handleGenProgress}
             />
 
