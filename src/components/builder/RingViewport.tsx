@@ -1771,8 +1771,10 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       ? [0, 1.8, 3.5]
       : isMobile ? [1.0, 1.5, 4.0] : [0, 3, 6];
 
-    return (
-      <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none relative">
+      const activeBg = BG_PRESETS.find(b => b.id === bgPreset) ?? BG_PRESETS[0];
+
+      return (
+        <div className={`w-full h-full ${activeBg.bgClass} rounded-lg overflow-hidden touch-none relative`}>
         {/* Surface generation progress overlay */}
         {surfaceProgress && surfaceProgress.stage !== "done" && (
           <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
