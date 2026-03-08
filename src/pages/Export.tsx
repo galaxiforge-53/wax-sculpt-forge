@@ -369,6 +369,15 @@ export default function Export() {
           <SpecBadge icon={Box} label="Ring Size" value={`${pkg.parameters.size} US`} />
         </div>
 
+        {/* ── Production Summary ── */}
+        <ProductionSummaryPanel
+          params={pkg.parameters}
+          metalPreset={pkg.metalPreset}
+          finishPreset={pkg.finishPreset}
+          craftState={pkg.craftState}
+          castabilityReport={castReport}
+        />
+
         {/* ── Casting Shrinkage Compensation ── */}
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2">
