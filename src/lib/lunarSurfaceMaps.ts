@@ -1106,7 +1106,7 @@ export function buildHeightmap(
   // ─── 7) Regolith micro-texture ──
   if (microFactor > 0) {
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
-    const regolithStrength = microFactor * 0.05 * depthScale;
+    const regolithStrength = microFactor * 0.05 * depthScale * layerMicro;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 48;
