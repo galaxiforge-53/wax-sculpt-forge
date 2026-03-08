@@ -623,27 +623,27 @@ function BuilderInner() {
             cutawayOffset={cutawayOffset}
             setCutawayOffset={setCutawayOffset}
             showMeasurements={showMeasurements}
-            setShowMeasurements={(v) => setShowMeasurements(v)}
+            setShowMeasurements={setShowMeasurements}
             activeTool={activeTool}
             showcaseMode={showcaseMode}
-            setShowcaseMode={(v) => setShowcaseMode(v)}
+            setShowcaseMode={setShowcaseMode}
             bgPreset={bgPreset}
             setBgPreset={setBgPreset}
             inspectionMode={inspectionMode}
-            setInspectionMode={(v) => setInspectionMode(v)}
+            setInspectionMode={setInspectionMode}
             loupeActive={loupeActive}
-            setLoupeActive={(v) => setLoupeActive(v)}
+            setLoupeActive={setLoupeActive}
             detailBoost={detailBoost}
             setDetailBoost={setDetailBoost}
             thicknessHeatmap={thicknessHeatmap}
-            setThicknessHeatmap={(v) => setThicknessHeatmap(v)}
+            setThicknessHeatmap={setThicknessHeatmap}
             showPrinterBed={showPrinterBed}
-            setShowPrinterBed={(v) => setShowPrinterBed(v)}
+            setShowPrinterBed={setShowPrinterBed}
             setRingRotation={setRingRotation}
             turntableSpeed={turntableSpeed}
             setTurntableSpeed={setTurntableSpeed}
             rotationLocked={rotationLocked}
-            setRotationLocked={(v) => setRotationLocked(v)}
+            setRotationLocked={setRotationLocked}
             scaleReference={scaleReference}
             setScaleReference={setScaleReference}
             wearPreview={wearPreview}
@@ -651,11 +651,11 @@ function BuilderInner() {
             polishPreview={polishPreview}
             setPolishPreview={setPolishPreview}
             lunarTexture={lunarTexture}
-            setStudioRenderOpen={(v) => setStudioRenderOpen(v)}
-            setRenderGalleryOpen={(v) => setRenderGalleryOpen(v)}
+            setStudioRenderOpen={setStudioRenderOpen}
+            setRenderGalleryOpen={setRenderGalleryOpen}
             onCaptureSnapshot={handleCaptureSnapshot}
             compareSnapshot={compareSnapshot}
-            setPrefsOpen={(v) => setPrefsOpen(v)}
+            setPrefsOpen={setPrefsOpen}
             params={params}
             viewMode={viewMode}
             metalPreset={metalPreset}
