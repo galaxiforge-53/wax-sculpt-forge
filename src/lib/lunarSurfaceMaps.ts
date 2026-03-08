@@ -1850,7 +1850,7 @@ export function buildHeightmap(
   // Stamp secondary impact chains from ejecta
   for (const sec of secondaryStamps) {
     stampCrater(
-      hmap, MAP_W, MAP_H, sec, rimSharp, edgeMask, warpNoise, warpAmp,
+      hmap, MAP_W, MAP_H, sec, rimSharp, edgeRow, warpNoise, warpAmp,
       false, false, physicalAspect,
       shapeMode, ovalElong, floorNoise,
     );
