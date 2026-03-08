@@ -1832,30 +1832,23 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
 
-  // Compute at half resolution
   const hw = w >> 1;
   const hh = h >> 1;
 
-  // Downsample heightmap with 2×2 box filter
   const halfHmap = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
     const sy = y * 2;
+    const sy1 = Math.min(sy + 1, h - 1);
     for (let x = 0; x < hw; x++) {
       const sx = x * 2;
-      halfHmap[y * hw + x] = (
-        hmap[sy * w + sx] +
-        hmap[sy * w + sx + 1] +
-        hmap[Math.min(sy + 1, h - 1) * w + sx] +
-        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
-      ) * 0.25;
+      halfHmap[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
     }
   }
 
-  // Multi-scale AO at half resolution
   const kernels = [
-    { radius: 2, step: 1, weight: 0.5 },   // Fine detail AO (was 3)
-    { radius: 4, step: 1, weight: 0.35 },   // Medium-scale (was 8 step 2)
-    { radius: 8, step: 2, weight: 0.15 },   // Broad occlusion (was 16 step 4)
+    { radius: 2, step: 1, weight: 0.5 },
+    { radius: 4, step: 1, weight: 0.35 },
+    { radius: 8, step: 2, weight: 0.15 },
   ];
 
   const halfAO = new Float32Array(hw * hh);
@@ -1865,61 +1858,53 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
       let totalAO = 0;
 
       for (const kernel of kernels) {
-        let higher = 0, samples = 0;
-        let heightDiffSum = 0;
-
+        let higher = 0, samples = 0, heightDiffSum = 0;
         for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
+          const sy = Math.max(0, Math.min(hh - 1, y + ky));
           for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
-            const sy = Math.max(0, Math.min(hh - 1, y + ky));
             const sx = ((x + kx) % hw + hw) % hw;
             const sampleH = halfHmap[sy * hw + sx];
             if (sampleH > center) {
               higher++;
-              heightDiffSum += (sampleH - center);
+              heightDiffSum += sampleH - center;
             }
             samples++;
           }
         }
-
-        const countAO = higher / samples;
-        const heightAO = Math.min(1, heightDiffSum / samples * 8);
-        const kernelAO = countAO * 0.6 + heightAO * 0.4;
+        const invSamples = 1 / samples;
+        const kernelAO = (higher * invSamples) * 0.6 + Math.min(1, heightDiffSum * invSamples * 8) * 0.4;
         totalAO += kernelAO * kernel.weight;
       }
-
       halfAO[y * hw + x] = 1.0 - totalAO * 0.7;
     }
   }
 
-  // Bilinear upscale to full resolution
   const img = ctx.createImageData(w, h);
+  const buf32 = new Uint32Array(img.data.buffer);
   for (let y = 0; y < h; y++) {
     const fy = (y / h) * (hh - 1);
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
     const iy0 = Math.min(iy, hh - 1);
-    const iy1 = Math.min(iy + 1, hh - 1);
+    const iy1c = Math.min(iy + 1, hh - 1);
+    const yy = (h - 1 - y);
+    const outRow = yy * w;
     for (let x = 0; x < w; x++) {
       const fx = (x / w) * (hw - 1);
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
       const ix0 = ((ix) % hw + hw) % hw;
-      const ix1 = ((ix + 1) % hw + hw) % hw;
+      const ix1c = ((ix + 1) % hw + hw) % hw;
 
-      const ao = (
-        halfAO[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfAO[iy0 * hw + ix1] * fx1 * (1 - fy1) +
-        halfAO[iy1 * hw + ix0] * (1 - fx1) * fy1 +
-        halfAO[iy1 * hw + ix1] * fx1 * fy1
-      );
+      const ao = halfAO[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
+        halfAO[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
+        halfAO[iy1c * hw + ix0] * (1 - fx1) * fy1 +
+        halfAO[iy1c * hw + ix1c] * fx1 * fy1;
 
-      const v = Math.round(Math.max(0.2, Math.min(1.0, ao)) * 255);
-      const yy = (h - 1 - y);
-      const idx = (yy * w + x) * 4;
-      img.data[idx] = v;
-      img.data[idx + 1] = v;
-      img.data[idx + 2] = v;
-      img.data[idx + 3] = 255;
+      let v = ao * 255 + 0.5 | 0;
+      if (v < 51) v = 51; // clamp to 0.2 min
+      if (v > 255) v = 255;
+      buf32[outRow + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
   ctx.putImageData(img, 0, 0);
