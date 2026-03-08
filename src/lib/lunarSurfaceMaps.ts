@@ -1075,8 +1075,8 @@ function applyValhallaConcentric(
     const dv = y * invH - centerV;
     const dv2 = dv * dv;
     const rowOff = y * w;
-    const valhallaRowMask = edgeMask[rowOff]; // row-constant
-    if (valhallaRowMask < 0.001) continue; // skip edge rows
+    const valhallaRowMask = edgeRow[y];
+    if (valhallaRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
