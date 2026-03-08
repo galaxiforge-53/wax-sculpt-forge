@@ -135,4 +135,6 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   frozen: false,
   symmetry: "none",
   symmetryBlend: 30,
+  zonesEnabled: false,
+  zones: [],
 };
