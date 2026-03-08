@@ -199,6 +199,12 @@ export default function ProductionSummaryPanel({
           value={`${weight.toFixed(1)}g`}
           sub={METAL_DENSITY[metalPreset].label}
         />
+        <StatRow
+          icon={DollarSign}
+          label="Est. Material Cost"
+          value={materialCost < 1 ? `~$${materialCost.toFixed(2)}` : `~$${materialCost.toFixed(0)}`}
+          sub={`$${METAL_DENSITY[metalPreset].pricePerGram}/g`}
+        />
 
         {/* ── Surface Complexity ── */}
         <div className="border-t border-border/40 mt-2 pt-2">
