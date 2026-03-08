@@ -650,8 +650,6 @@ function applyTerrainType(
       break;
 
     case "lunar":
-      // Moon is well-served by the base engine + maria fill + ejecta
-      // Add subtle ray brightening around the map center for realism
       applyLunarRayBrightening(hmap, w, h, edgeMask, seed, depthScale);
       break;
 
@@ -668,8 +666,11 @@ function applyTerrainType(
       break;
 
     case "deimos":
-      // Extra smoothing pass to bury features
       applyErosion(hmap, w, h, 0.6);
+      break;
+
+    case "asteroid":
+      applyAsteroidRubble(hmap, w, h, edgeMask, seed, depthScale, rand, physicalAspect);
       break;
   }
 }
