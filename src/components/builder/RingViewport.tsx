@@ -1409,6 +1409,21 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </div>
           </div>
         )}
+        {/* Quality tier indicator — subtle badge */}
+        {qualityTier === "preview" && !surfaceProgress && (
+          <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in duration-150">
+            <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-muted-foreground/70 bg-muted/40 border border-border/30 rounded-full backdrop-blur-sm">
+              Preview
+            </span>
+          </div>
+        )}
+        {qualityTier === "high" && !surfaceProgress && !insp && !sc && (
+          <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in duration-500">
+            <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-primary/60 bg-primary/5 border border-primary/15 rounded-full backdrop-blur-sm">
+              HD
+            </span>
+          </div>
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
