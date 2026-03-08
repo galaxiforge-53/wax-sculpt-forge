@@ -101,7 +101,7 @@ export default function MeasurementOverlay({ params, visible, sizeStandard = "US
         anchorX="center"
         anchorY="top"
       >
-        {`Ø${params.innerDiameter.toFixed(1)}mm (ID)`}
+        {`Ø${formatDimension(params.innerDiameter, dimensionUnit)} (ID)`}
       </Text>
 
       {/* ── Width ── */}
