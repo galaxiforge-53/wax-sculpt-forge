@@ -1230,7 +1230,7 @@ function applyAsteroidRubble(
         const falloff = 1 - d2 * invPxR2;
         if (falloff <= 0) continue;
         const idx = rowOff + wpx;
-        hmap[idx] -= pd * falloff * edgeMask[idx];
+        hmap[idx] -= pd * falloff * edgeRow[py];
       }
     }
   }
