@@ -646,15 +646,16 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH6;
+    const mariaRowMask = edgeMask[rowOff]; // row-constant
+    if (mariaRowMask < 0.001) continue; // skip edge rows entirely
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       const hVal = hmap[idx];
-      if (hVal >= threshold) continue; // branch: skip above-threshold pixels early
+      if (hVal >= threshold) continue;
       const depth = (threshold - hVal) * invThreshold;
       const noise = mariaNoise(x * invW6, vCoord) * 0.3 + 0.5;
       const fill = depth * mariaStrength * noise;
-      const mask = edgeMask[idx];
-      hmap[idx] = hVal + (fillTarget - hVal) * fill * mask;
+      hmap[idx] = hVal + (fillTarget - hVal) * fill * mariaRowMask;
     }
   }
 }
