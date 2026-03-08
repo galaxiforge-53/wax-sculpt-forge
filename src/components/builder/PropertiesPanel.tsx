@@ -406,17 +406,49 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         />
       </div>
 
-      {/* ── Bevel ── */}
+      {/* ── Edge Style ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Bevel: {params.bevelSize.toFixed(1)}mm</Label>
-        <Slider
-          value={[params.bevelSize]}
-          onValueChange={([v]) => onUpdate({ bevelSize: v })}
-          min={0}
-          max={2}
-          step={0.1}
-        />
+        <Label className="text-xs text-secondary-foreground">Edge Style</Label>
+        <div className="grid grid-cols-4 gap-1.5">
+          {([
+            { value: "sharp" as EdgeStyle, label: "Sharp", desc: "Hard 90° edge" },
+            { value: "soft-bevel" as EdgeStyle, label: "Bevel", desc: "Gentle quarter-round" },
+            { value: "rounded" as EdgeStyle, label: "Round", desc: "Full smooth radius" },
+            { value: "chamfer" as EdgeStyle, label: "Chamfer", desc: "Straight 45° cut" },
+          ]).map(es => {
+            const active = (params.edgeStyle ?? "soft-bevel") === es.value;
+            return (
+              <button
+                key={es.value}
+                onClick={() => onUpdate({ edgeStyle: es.value })}
+                className={`flex flex-col items-center gap-1 p-2 rounded-md border transition-all text-center ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary shadow-sm"
+                    : "border-border bg-secondary/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={es.desc}
+              >
+                <EdgeStyleIcon style={es.value} active={active} />
+                <span className="text-[9px] font-medium leading-tight">{es.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ── Bevel Size ── */}
+      {(params.edgeStyle ?? "soft-bevel") !== "sharp" && (
+        <div className="space-y-2">
+          <Label className="text-xs text-secondary-foreground">Bevel Size: {params.bevelSize.toFixed(1)}mm</Label>
+          <Slider
+            value={[params.bevelSize]}
+            onValueChange={([v]) => onUpdate({ bevelSize: v })}
+            min={0}
+            max={2}
+            step={0.1}
+          />
+        </div>
+      )}
 
       {/* ── Weight Estimate ── */}
       <div className="mt-1 p-3 rounded-lg bg-secondary/60 border border-border space-y-2">
