@@ -1714,6 +1714,7 @@ interface RingViewportProps {
   stampSettings?: StampSettings;
   inlays?: InlayChannel[];
   lunarTexture?: LunarTextureState;
+  imageTerrain?: ImageTerrainState;
   cameraPreset?: SnapshotAngle | null;
   onPresetApplied?: () => void;
   showMeasurements?: boolean;
