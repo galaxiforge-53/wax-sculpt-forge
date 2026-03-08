@@ -1034,15 +1034,28 @@ function applyValhallaConcentric(
   const invW = 1 / w;
   const invH = 1 / h;
 
+  // Fast exp approximation: exp(x) ≈ (1 + x/256)^256 for small |x|
+  // Avoids Math.exp per pixel (~4× faster for this use case)
+  function fastExpNeg4(dist: number): number {
+    const x = -dist * 4;
+    // Clamp to avoid overflow for large negative x
+    if (x < -5) return 0;
+    let e = 1 + x * 0.00390625; // x/256
+    e *= e; e *= e; e *= e; e *= e; // ^16
+    e *= e; e *= e; e *= e; e *= e; // ^256
+    return e;
+  }
+
   for (let y = 0; y < h; y++) {
     const dv = y * invH - centerV;
+    const dv2 = dv * dv;
     const rowOff = y * w;
     for (let x = 0; x < w; x++) {
       let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
       if (du < -0.5) du += 1;
-      const dist = Math.sqrt(du * du + dv * dv);
-      const ringVal = Math.sin(dist * ringPhaseScale) * Math.exp(-dist * 4);
+      const dist = Math.sqrt(du * du + dv2);
+      const ringVal = Math.sin(dist * ringPhaseScale) * fastExpNeg4(dist);
       const idx = rowOff + x;
       hmap[idx] += ringVal * ringAmp * edgeMask[idx];
     }
