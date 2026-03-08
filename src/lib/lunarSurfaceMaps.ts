@@ -1023,20 +1023,24 @@ function applyOrganicDunes(
   const duneNoise = makeNoise2D(seed + 16001);
   const duneNoise2 = makeNoise2D(seed + 16002);
   const duneAmp = 0.05 * depthScale;
+  const invW = 1 / w;
+  const invH = 1 / h;
 
   for (let y = 0; y < h; y++) {
+    const v = y * invH;
+    const v25 = v * 25;
+    const v3 = v * 3;
+    const v5 = v * 5;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const u = x / w;
-      const v = y / h;
-
-      // Long parallel dunes with meandering — primarily u-direction
-      const dunePhase = v * 25 + duneNoise(u * 8, v * 3) * 3;
+      const u = x * invW;
+      const u8 = u * 8;
+      const u5 = u * 5;
+      const dunePhase = v25 + duneNoise(u8, v3) * 3;
       const dune = Math.sin(dunePhase) * 0.5 + 0.5;
-      // Cross-pattern secondary dunes
-      const crossDune = Math.sin(u * 40 + duneNoise2(u * 5, v * 5) * 2) * 0.3 + 0.5;
-
+      const crossDune = Math.sin(u * 40 + duneNoise2(u5, v5) * 2) * 0.3 + 0.5;
       const combined = dune * 0.7 + crossDune * 0.3;
-      const idx = y * w + x;
+      const idx = rowOff + x;
       hmap[idx] += (combined - 0.5) * duneAmp * edgeMask[idx];
     }
   }
