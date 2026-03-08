@@ -2082,6 +2082,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               lunarTexture={lunarTexture}
               wearPreview={wearPreview}
               polishPreview={polishPreview}
+              detailBoost={detailBoost}
               onGenProgress={handleGenProgress}
             />
 
