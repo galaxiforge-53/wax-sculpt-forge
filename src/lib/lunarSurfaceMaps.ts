@@ -654,8 +654,8 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH6;
-    const mariaRowMask = edgeMask[rowOff]; // row-constant
-    if (mariaRowMask < 0.001) continue; // skip edge rows entirely
+    const mariaRowMask = edgeRow[y];
+    if (mariaRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       const hVal = hmap[idx];
