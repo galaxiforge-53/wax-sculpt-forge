@@ -505,9 +505,16 @@ function stampEjectaRays(
 function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeMask: Float32Array, seed: number) {
   if (mariaFactor <= 0) return;
 
-  // Find height threshold — maria fills below median
-  const sorted = Float32Array.from(hmap).sort();
-  const threshold = sorted[Math.floor(sorted.length * (0.35 + mariaFactor * 0.15))];
+  // Approximate percentile via random sampling (O(k) instead of O(n log n) full sort)
+  // Sampling 2000 points gives <2% error on 4M-pixel maps
+  const sampleCount = 2000;
+  const sampleRng = seededRng(seed + 6500);
+  const samples = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    samples[i] = hmap[Math.floor(sampleRng() * hmap.length)];
+  }
+  samples.sort();
+  const threshold = samples[Math.floor(sampleCount * (0.35 + mariaFactor * 0.15))];
 
   const mariaNoise = makeNoise2D(seed + 6000);
   const mariaStrength = mariaFactor * 0.7;
