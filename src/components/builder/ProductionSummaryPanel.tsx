@@ -65,9 +65,10 @@ function computeSurfaceComplexity(
   }
 
   if (lunar?.enabled) {
+    const densityVal = lunar.craterDensity === "high" ? 80 : lunar.craterDensity === "med" ? 50 : 25;
     const lunarScore = Math.round(
-      (lunar.craterDensity / 100) * 20 +
-      (lunar.roughness / 100) * 10 +
+      (densityVal / 100) * 20 +
+      (lunar.intensity / 100) * 10 +
       ((lunar.rimHeight ?? 50) / 100) * 5 +
       ((lunar.bowlDepth ?? 50) / 100) * 5
     );
