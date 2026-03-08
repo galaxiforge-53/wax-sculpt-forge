@@ -1884,7 +1884,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
 // The multi-kernel sampling is O(pixels × kernelSamples), so halving resolution
 // gives ~4× speedup with minimal visual difference on a curved ring surface.
 
-function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
+function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHalf?: Float32Array): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -1893,15 +1893,8 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   const hw = w >> 1;
   const hh = h >> 1;
 
-  const halfHmap = new Float32Array(hw * hh);
-  for (let y = 0; y < hh; y++) {
-    const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
-    for (let x = 0; x < hw; x++) {
-      const sx = x * 2;
-      halfHmap[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
-    }
-  }
+  // Use shared half-res if provided
+  const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
   const kernels = [
     { radius: 2, step: 1, weight: 0.5 },
