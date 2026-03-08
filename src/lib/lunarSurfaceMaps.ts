@@ -147,18 +147,30 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 
 function lerp(a: number, b: number, t: number) { return a + t * (b - a); }
 
-// ── Edge polish mask ──────────────────────────────────────────────
+// ── Edge polish mask (cached at module level) ─────────────────────
+// This mask is always MAP_W × MAP_H and only depends on dimensions,
+// so we build it once and reuse across all heightmap generations.
+
+let _cachedEdgeMask: Float32Array | null = null;
+let _cachedEdgeMaskW = 0;
+let _cachedEdgeMaskH = 0;
 
 function buildEdgeMask(w: number, h: number): Float32Array {
+  if (_cachedEdgeMask && _cachedEdgeMaskW === w && _cachedEdgeMaskH === h) {
+    return _cachedEdgeMask;
+  }
   const mask = new Float32Array(w * h);
   for (let y = 0; y < h; y++) {
     const v = y / (h - 1);
     const edgeDist = Math.min(v, 1 - v);
     const m = smoothstep(0.0, 0.18, edgeDist);
-    for (let x = 0; x < w; x++) {
-      mask[y * w + x] = m;
-    }
+    // Fill entire row with same value (row-constant mask)
+    const rowStart = y * w;
+    mask.fill(m, rowStart, rowStart + w);
   }
+  _cachedEdgeMask = mask;
+  _cachedEdgeMaskW = w;
+  _cachedEdgeMaskH = h;
   return mask;
 }
 
@@ -1847,7 +1859,9 @@ function buildMapsFromHeightmap(
   aspect: number,
   craterCount: number,
 ): LunarSurfaceMapSet {
-  const normalCanvas = heightmapToNormalCanvas(hmap, w, h, 2.5, aspect);
+  // Normal map strength scales with intensity: low intensity → subtle normals, high → sharp
+  const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
+  const normalCanvas = heightmapToNormalCanvas(hmap, w, h, normalStrength, aspect);
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, w, h);
   const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed);
@@ -1930,7 +1944,8 @@ export function generateLunarSurfaceMapsAsync(
 
       setTimeout(() => {
         onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 55 });
-        const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
+        const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
+        const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, normalStrength, aspect);
         const normalMap = new THREE.CanvasTexture(normalCanvas);
         setupDataTexture(normalMap);
 
