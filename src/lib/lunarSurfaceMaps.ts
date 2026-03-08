@@ -344,8 +344,20 @@ function stampCrater(
       if (dist < bowlEnd) {
         const t = slumpDist / bowlEnd;
         const tClamped = Math.min(t, 1.0);
-        const parabola = tClamped * tClamped;
-        delta = -c.depth * (1.0 - parabola * 0.92);
+        // Realistic crater bowl: flat floor in center transitioning to steep walls
+        // Real craters have flat floors from melt pooling, with concave walls rising to rim
+        const flatFloorEnd = 0.35; // inner 35% is nearly flat
+        let bowlProfile: number;
+        if (tClamped < flatFloorEnd) {
+          // Flat floor with very subtle dish
+          bowlProfile = 1.0 - tClamped * tClamped * 0.15;
+        } else {
+          // Steep concave wall rising to rim — cubic ease-out for realistic curvature
+          const wallT = (tClamped - flatFloorEnd) / (1.0 - flatFloorEnd);
+          const wallCurve = wallT * wallT * (3.0 - 2.0 * wallT); // smoothstep
+          bowlProfile = (1.0 - flatFloorEnd * flatFloorEnd * 0.15) * (1.0 - wallCurve * 0.95);
+        }
+        delta = -c.depth * bowlProfile;
 
         // Crater floor texture — add roughness inside the bowl
         if (floorNoise && c.floorTextureFactor > 0 && tClamped < 0.7) {
