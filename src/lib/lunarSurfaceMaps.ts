@@ -2595,8 +2595,23 @@ function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number)
     const yy = h - 1 - y;
     const rowSrc = y * w;
     const rowDst = yy * w;
-    for (let x = 0; x < w; x++) {
-      // Simple clamp — JIT inlines ternaries better than bitwise tricks
+    // 4-wide unrolled loop — reduces loop overhead by 75%
+    const w4 = w & ~3;
+    for (let x = 0; x < w4; x += 4) {
+      let v0 = hmap[rowSrc + x] * 255 + 0.5 | 0;
+      let v1 = hmap[rowSrc + x + 1] * 255 + 0.5 | 0;
+      let v2 = hmap[rowSrc + x + 2] * 255 + 0.5 | 0;
+      let v3 = hmap[rowSrc + x + 3] * 255 + 0.5 | 0;
+      v0 = v0 < 0 ? 0 : v0 > 255 ? 255 : v0;
+      v1 = v1 < 0 ? 0 : v1 > 255 ? 255 : v1;
+      v2 = v2 < 0 ? 0 : v2 > 255 ? 255 : v2;
+      v3 = v3 < 0 ? 0 : v3 > 255 ? 255 : v3;
+      buf32[rowDst + x] = 0xFF000000 | (v0 << 16) | (v0 << 8) | v0;
+      buf32[rowDst + x + 1] = 0xFF000000 | (v1 << 16) | (v1 << 8) | v1;
+      buf32[rowDst + x + 2] = 0xFF000000 | (v2 << 16) | (v2 << 8) | v2;
+      buf32[rowDst + x + 3] = 0xFF000000 | (v3 << 16) | (v3 << 8) | v3;
+    }
+    for (let x = w4; x < w; x++) {
       let v = hmap[rowSrc + x] * 255 + 0.5 | 0;
       v = v < 0 ? 0 : v > 255 ? 255 : v;
       buf32[rowDst + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
