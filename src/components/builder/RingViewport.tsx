@@ -383,11 +383,15 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
 }
 
 // ── Build solid ring geometry with separate outer, inner, and cap surfaces ──
-function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMobile: boolean = false, qualityTier: QualityTier = "high") {
+function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMobile: boolean = false, qualityTier: QualityTier = "high", wearAmount: number = 0) {
   const innerR = params.innerDiameter / 2 / 10;
   const outerR = innerR + params.thickness / 10;
   const halfW = params.width / 2 / 10;
-  const bevel = params.bevelSize / 10;
+  // Wear softens bevels: increases effective bevel size and rounds edges
+  const wearFactor = wearAmount / 100; // 0–1
+  const bevel = (params.bevelSize / 10) + wearFactor * (halfW * 0.15);
+  // Wear slightly reduces outer radius at edges (worn-down edges)
+  const wearEdgeLoss = wearFactor * (params.thickness / 10) * 0.04;
 
   // Adaptive segments: lower during preview tier and on mobile
   const isPreview = qualityTier === "preview";
