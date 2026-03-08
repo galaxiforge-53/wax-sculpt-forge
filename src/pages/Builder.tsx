@@ -597,451 +597,58 @@ function BuilderInner() {
             </div>
           )}
 
-          <div className={cn(
-            "absolute top-2 left-2 flex gap-1 z-10",
-            isMobile && "flex-wrap max-w-[60%]"
-          )}>
-            {CAMERA_BUTTONS.map((cam) => (
-              <button
-                key={cam.id}
-                onClick={() => setCameraPreset(cam.id)}
-                className={cn(
-                  "px-2.5 py-1 text-[10px] font-medium rounded-md backdrop-blur-xl transition-all touch-target",
-                  cameraPreset === cam.id
-                    ? "bg-primary/20 text-primary border border-primary/30 shadow-sm shadow-primary/10"
-                    : "bg-card/60 text-muted-foreground border border-builder-divider hover:bg-card/80 hover:text-foreground",
-                  isMobile && "px-3 py-1.5 text-[11px]"
-                )}
-              >
-                {cam.label}
-              </button>
-            ))}
-            {!isMobile && (
-              <AIGenerateOverlay
-                params={params}
-                lunarTexture={lunarTexture}
-                viewMode={viewMode}
-                metalPreset={metalPreset}
-                finishPreset={finishPreset}
-                onUpdateParams={updateParams}
-                onLunarChange={setLunarTexture}
-                onViewModeChange={setViewMode}
-                onMetalChange={setMetalPreset}
-                onFinishChange={setFinishPreset}
-              />
-            )}
-          </div>
-
-          {/* View controls — top-right, grouped (simplified on mobile) */}
-          <div className={cn(
-            "absolute top-2 right-2 z-10 flex flex-col gap-1.5 items-end",
-            isMobile && "max-w-[50%]"
-          )}>
-            {/* Cutaway row — simplified on mobile */}
-            <div className="flex gap-1 flex-wrap justify-end">
-              {(isMobile
-                ? (["normal", "inside"] as CutawayMode[])
-                : (["normal", "inside", "cross-section", "quarter-cut"] as CutawayMode[])
-              ).map((mode) => {
-                const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section", "quarter-cut": "¼ Cut" };
-                const icons: Record<CutawayMode, string> = { normal: "◉", inside: "◔", "cross-section": "◑", "quarter-cut": "◕" };
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      setCutawayMode(mode);
-                      setCutawayOffset(0);
-                    }}
-                    className={cn(
-                      "px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all touch-target",
-                      cutawayMode === mode
-                        ? "bg-primary/30 text-primary border border-primary/40"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground",
-                      isMobile && "px-2.5 py-1.5"
-                    )}
-                    title={labels[mode]}
-                  >
-                    {isMobile ? icons[mode] : labels[mode]}
-                  </button>
-                );
-              })}
-            </div>
-            {/* Clip offset slider — shown when a cutaway mode is active */}
-            {cutawayMode !== "normal" && (
-              <div className="flex items-center gap-2 bg-card/80 backdrop-blur-sm border border-border/50 rounded-md px-2.5 py-1.5">
-                <span className="text-[9px] text-muted-foreground whitespace-nowrap">Clip</span>
-                <input
-                  type="range"
-                  min={-100}
-                  max={100}
-                  value={cutawayOffset * 100}
-                  onChange={(e) => setCutawayOffset(Number(e.target.value) / 100)}
-                  className="w-20 h-1 accent-primary cursor-pointer"
-                />
-                <button
-                  onClick={() => setCutawayOffset(0)}
-                  className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
-                  title="Reset clip position"
-                >
-                  ↺
-                </button>
-              </div>
-            )}
-            {/* Tools row — icon-only, compact */}
-            <div className="flex gap-1">
-              {!isMobile && (
-                <button
-                  onClick={() => setShowMeasurements((v) => !v)}
-                  className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                    ${showMeasurements || activeTool === "measure"
-                      ? "bg-primary/30 text-primary border border-primary/40"
-                      : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                    }`}
-                  title="Toggle dimension guides"
-                >
-                  📐
-                </button>
-              )}
-              <button
-                onClick={() => setShowcaseMode((v) => !v)}
-                className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                  ${showcaseMode
-                    ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                    : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                  }`}
-                title="High-quality showcase render"
-              >
-                <Sparkles className="w-3 h-3" />
-              </button>
-              {/* Background picker */}
-              <div className="relative group">
-                <button
-                  className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                    bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                  title="Change background"
-                >
-                  <Eye className="w-3 h-3" />
-                </button>
-                <div className="absolute top-full left-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl py-1 min-w-[140px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  {BG_PRESETS.map((bg) => (
-                    <button
-                      key={bg.id}
-                      onClick={() => setBgPreset(bg.id)}
-                      className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${
-                        bgPreset === bg.id ? "text-primary" : "text-foreground"
-                      }`}
-                    >
-                      <span>{bg.icon}</span> {bg.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {!isMobile && (
-                <>
-                  <button
-                    onClick={() => setInspectionMode((v) => !v)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      ${inspectionMode
-                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
-                    title="Inspection mode"
-                  >
-                    <Search className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => setLoupeActive((v) => !v)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      ${loupeActive
-                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
-                    title="Magnifier loupe — scroll to zoom"
-                  >
-                    <ZoomIn className="w-3 h-3" />
-                  </button>
-                  {/* Detail Boost dropdown */}
-                  <div className="relative group">
-                    <button
-                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                        ${detailBoost > 0
-                          ? "bg-secondary/30 text-secondary-foreground border border-secondary/40 shadow-[0_0_8px_hsl(var(--secondary)/0.2)]"
-                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                        }`}
-                      title="Exaggerate surface detail for inspection"
-                      onClick={() => setDetailBoost(v => v > 0 ? 0 : 50)}
-                    >
-                      🔬
-                    </button>
-                    <div className="absolute top-full right-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-3 min-w-[170px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-2">
-                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Detail Boost</span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={detailBoost}
-                          onChange={(e) => setDetailBoost(Number(e.target.value))}
-                          className="flex-1 h-1 accent-primary"
-                        />
-                        <span className="text-[10px] font-mono text-primary w-8 text-right">×{(1 + detailBoost / 100 * 1.8).toFixed(1)}</span>
-                      </div>
-                      <div className="flex gap-1">
-                        {[0, 25, 50, 75, 100].map((v) => (
-                          <button
-                            key={v}
-                            onClick={() => setDetailBoost(v)}
-                            className={`flex-1 px-1 py-0.5 text-[8px] rounded transition-colors ${detailBoost === v ? "bg-primary/20 text-primary" : "bg-secondary/30 text-muted-foreground hover:text-foreground"}`}
-                          >
-                            {v === 0 ? "Off" : v === 25 ? "Low" : v === 50 ? "Med" : v === 75 ? "High" : "Max"}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[7px] text-muted-foreground/50">
-                        Exaggerates crater depth, rim sharpness, and engraving clarity for inspection
-                      </p>
-                    </div>
-                  </div>
-                  {/* Thickness heatmap toggle */}
-                  <button
-                    onClick={() => setThicknessHeatmap(v => !v)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      ${thicknessHeatmap
-                        ? "bg-destructive/20 text-destructive border border-destructive/40 shadow-[0_0_8px_hsl(var(--destructive)/0.2)]"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
-                    title="Thickness heatmap — shows thin/thick areas for casting safety"
-                  >
-                    <Thermometer className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowPrinterBed((v) => !v);
-                      if (!showPrinterBed) setRingRotation([Math.PI / 2, 0, 0]);
-                    }}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      ${showPrinterBed
-                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
-                    title="Print bed"
-                  >
-                    <Printer className="w-3 h-3" />
-                  </button>
-                  {/* Turntable */}
-                  <div className="relative group">
-                    <button
-                      onClick={() => setTurntableSpeed((v) => v > 0 ? 0 : 2)}
-                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                        ${turntableSpeed > 0
-                          ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                        }`}
-                      title={turntableSpeed > 0 ? "Stop turntable" : "Start turntable rotation"}
-                    >
-                      <RotateCw className={`w-3 h-3 ${turntableSpeed > 0 ? "animate-spin" : ""}`} style={turntableSpeed > 0 ? { animationDuration: "3s" } : undefined} />
-                    </button>
-                    {turntableSpeed > 0 && (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-2 min-w-[120px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                        <p className="text-[8px] text-muted-foreground/60 uppercase tracking-wider mb-1.5 text-center">Speed</p>
-                        <div className="flex gap-1 justify-center">
-                          {[1, 2, 4, 8].map((spd) => (
-                            <button
-                              key={spd}
-                              onClick={(e) => { e.stopPropagation(); setTurntableSpeed(spd); }}
-                              className={`px-2 py-1 text-[9px] rounded transition-all ${
-                                turntableSpeed === spd
-                                  ? "bg-primary/20 text-primary border border-primary/30"
-                                  : "bg-secondary/40 text-muted-foreground border border-border/30 hover:text-foreground"
-                              }`}
-                            >
-                              {spd === 1 ? "Slow" : spd === 2 ? "Med" : spd === 4 ? "Fast" : "Spin"}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setRotationLocked((v) => !v)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      ${rotationLocked
-                        ? "bg-warning/30 text-warning border border-warning/40 shadow-[0_0_8px_hsl(var(--warning)/0.3)]"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
-                    title={rotationLocked ? "Unlock rotation" : "Lock rotation to inspect area"}
-                  >
-                    {rotationLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                  </button>
-                  {/* Scale Reference dropdown */}
-                  <div className="relative group">
-                    <button
-                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                        ${scaleReference !== "none"
-                          ? "bg-secondary/30 text-secondary-foreground border border-secondary/40 shadow-[0_0_8px_hsl(var(--secondary)/0.3)]"
-                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                        }`}
-                      title="Show scale reference"
-                    >
-                      <Ruler className="w-3 h-3" />
-                    </button>
-                    <div className="absolute top-full left-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl py-1 min-w-[120px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                      <button
-                        onClick={() => setScaleReference("none")}
-                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "none" ? "text-primary" : "text-foreground"}`}
-                      >
-                        None
-                      </button>
-                      <button
-                        onClick={() => setScaleReference("quarter")}
-                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "quarter" ? "text-primary" : "text-foreground"}`}
-                      >
-                        <Circle className="w-3 h-3" /> US Quarter
-                      </button>
-                      <button
-                        onClick={() => setScaleReference("ruler")}
-                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "ruler" ? "text-primary" : "text-foreground"}`}
-                      >
-                        <Ruler className="w-3 h-3" /> Ruler (mm)
-                      </button>
-                      <button
-                        onClick={() => setScaleReference("finger")}
-                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "finger" ? "text-primary" : "text-foreground"}`}
-                      >
-                        <Hand className="w-3 h-3" /> Ring Finger
-                      </button>
-                    </div>
-                  </div>
-                  {/* Wear Preview dropdown */}
-                  <div className="relative group">
-                    <button
-                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                        ${wearPreview > 0
-                          ? "bg-accent/30 text-accent-foreground border border-accent/40 shadow-[0_0_8px_hsl(var(--accent)/0.3)]"
-                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                        }`}
-                      title="Wear & aging preview"
-                    >
-                      <Clock className="w-3 h-3" />
-                    </button>
-                    <div className="absolute top-full right-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-3 min-w-[160px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-2">
-                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Wear Preview</span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={wearPreview}
-                          onChange={(e) => setWearPreview(Number(e.target.value))}
-                          className="flex-1 h-1 accent-primary"
-                        />
-                        <span className="text-[10px] font-mono text-primary w-8 text-right">{wearPreview}%</span>
-                      </div>
-                      <div className="flex gap-1">
-                        {[0, 25, 50, 75, 100].map((v) => (
-                          <button
-                            key={v}
-                            onClick={() => setWearPreview(v)}
-                            className={`flex-1 px-1 py-0.5 text-[8px] rounded transition-colors ${wearPreview === v ? "bg-primary/20 text-primary" : "bg-secondary/30 text-muted-foreground hover:text-foreground"}`}
-                          >
-                            {v === 0 ? "New" : v === 25 ? "1yr" : v === 50 ? "5yr" : v === 75 ? "10yr" : "20yr"}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[7px] text-muted-foreground/50">
-                        {lunarTexture?.enabled
-                          ? "Simulates crater erosion, rim flattening, and surface wear"
-                          : "Simulates edge softening and surface wear over time"}
-                      </p>
-                    </div>
-                  </div>
-                  {/* Polish Preview dropdown */}
-                  <div className="relative group">
-                    <button
-                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                        ${polishPreview > 0
-                          ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_8px_hsl(var(--primary)/0.2)]"
-                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                        }`}
-                      title="Polishing simulation"
-                    >
-                      ✨
-                    </button>
-                    <div className="absolute top-full right-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-3 min-w-[170px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-2">
-                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Polish Preview</span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={polishPreview}
-                          onChange={(e) => setPolishPreview(Number(e.target.value))}
-                          className="flex-1 h-1 accent-primary"
-                        />
-                        <span className="text-[10px] font-mono text-primary w-8 text-right">{polishPreview}%</span>
-                      </div>
-                      <div className="flex gap-1">
-                        {[0, 25, 50, 75, 100].map((v) => (
-                          <button
-                            key={v}
-                            onClick={() => setPolishPreview(v)}
-                            className={`flex-1 px-1 py-0.5 text-[8px] rounded transition-colors ${polishPreview === v ? "bg-primary/20 text-primary" : "bg-secondary/30 text-muted-foreground hover:text-foreground"}`}
-                          >
-                            {v === 0 ? "Raw" : v === 25 ? "Buff" : v === 50 ? "Std" : v === 75 ? "Mirror" : "Max"}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[7px] text-muted-foreground/50">
-                        {lunarTexture?.enabled
-                          ? "Softens crater rims and sharpens reflections like hand polishing"
-                          : "Simulates jeweller's polishing — smoother, shinier finish"}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setStudioRenderOpen(true)}
-                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                    title="Studio render mode"
-                  >
-                    <Aperture className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => setRenderGalleryOpen(true)}
-                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                    title="Generate beauty renders"
-                  >
-                    <Camera className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={handleCaptureSnapshot}
-                    className={cn(
-                      "px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1",
-                      compareSnapshot
-                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                    )}
-                    title={compareSnapshot ? "Re-capture snapshot for comparison" : "Capture snapshot to compare"}
-                  >
-                    <ArrowLeftRight className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => setPrefsOpen(true)}
-                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
-                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                    title="Designer preferences"
-                  >
-                    <Settings2 className="w-3 h-3" />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
+          <ViewportControls
+            isMobile={isMobile}
+            cameraPreset={cameraPreset}
+            setCameraPreset={setCameraPreset}
+            cutawayMode={cutawayMode}
+            setCutawayMode={setCutawayMode}
+            cutawayOffset={cutawayOffset}
+            setCutawayOffset={setCutawayOffset}
+            showMeasurements={showMeasurements}
+            setShowMeasurements={(v) => setShowMeasurements(v)}
+            activeTool={activeTool}
+            showcaseMode={showcaseMode}
+            setShowcaseMode={(v) => setShowcaseMode(v)}
+            bgPreset={bgPreset}
+            setBgPreset={setBgPreset}
+            inspectionMode={inspectionMode}
+            setInspectionMode={(v) => setInspectionMode(v)}
+            loupeActive={loupeActive}
+            setLoupeActive={(v) => setLoupeActive(v)}
+            detailBoost={detailBoost}
+            setDetailBoost={setDetailBoost}
+            thicknessHeatmap={thicknessHeatmap}
+            setThicknessHeatmap={(v) => setThicknessHeatmap(v)}
+            showPrinterBed={showPrinterBed}
+            setShowPrinterBed={(v) => setShowPrinterBed(v)}
+            setRingRotation={setRingRotation}
+            turntableSpeed={turntableSpeed}
+            setTurntableSpeed={setTurntableSpeed}
+            rotationLocked={rotationLocked}
+            setRotationLocked={(v) => setRotationLocked(v)}
+            scaleReference={scaleReference}
+            setScaleReference={setScaleReference}
+            wearPreview={wearPreview}
+            setWearPreview={setWearPreview}
+            polishPreview={polishPreview}
+            setPolishPreview={setPolishPreview}
+            lunarTexture={lunarTexture}
+            setStudioRenderOpen={(v) => setStudioRenderOpen(v)}
+            setRenderGalleryOpen={(v) => setRenderGalleryOpen(v)}
+            onCaptureSnapshot={handleCaptureSnapshot}
+            compareSnapshot={compareSnapshot}
+            setPrefsOpen={(v) => setPrefsOpen(v)}
+            params={params}
+            viewMode={viewMode}
+            metalPreset={metalPreset}
+            finishPreset={finishPreset}
+            onUpdateParams={updateParams}
+            onLunarChange={setLunarTexture}
+            onViewModeChange={setViewMode}
+            onMetalChange={setMetalPreset}
+            onFinishChange={setFinishPreset}
+          />
           {/* XYZ Position & Rotation controls — bottom-right overlay (desktop) */}
           {!isMobile && (
             <div className="absolute bottom-3 right-3 z-10 bg-card/90 backdrop-blur-xl border border-builder-divider rounded-xl p-2.5 space-y-2 min-w-[180px] shadow-lg shadow-black/30">
