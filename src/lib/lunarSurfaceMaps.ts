@@ -390,19 +390,34 @@ function stampCrater(
   // Squared radius for cheap early rejection (before expensive shapedDistance)
   const rejectR2 = (c.radius * 1.7) * (c.radius * 1.7);
 
+  // Hoist per-crater constants outside the pixel loop
+  const cuW = c.cu * w;
+  const cvH = c.cv * h;
+  const invVStretch2 = 1 / (vStretch * vStretch);
+  const invW = 1 / w;
+  const invH = 1 / h;
+  // Circular fast-path constants (hoisted from inner loop)
+  const circ_coarseScale = sp.noiseScale * 0.5;
+  const circ_fineScale = sp.noiseScale * 2.0;
+  const circ_warpFactor = sp.warpAmp * 0.22;
+  // Pre-compute slump trig if needed
+  const slumpCos = hasSlump ? Math.cos(c.slumpAngle) : 0;
+  const slumpSin = hasSlump ? Math.sin(c.slumpAngle) : 0;
+  const slumpShift = hasSlump ? c.slumpStrength * 0.08 : 0;
+
   for (let py = y0; py <= y1; py++) {
+    const rowOff = py * w;
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
 
-      const rawDu = px - c.cu * w;
-      const rawDv = py - c.cv * h;
+      const rawDu = px - cuW;
+      const rawDv = py - cvH;
 
       // Cheap squared-distance early rejection in UV space
-      // Avoids calling shapedDistance for pixels clearly outside crater influence
-      const rawU = rawDu / w;
-      const rawV = rawDv / h;
-      if (rawU * rawU + rawV * rawV * (1 / (vStretch * vStretch)) > rejectR2) continue;
+      const rawU = rawDu * invW;
+      const rawV = rawDv * invH;
+      if (rawU * rawU + rawV * rawV * invVStretch2 > rejectR2) continue;
 
       const du = rawDu * invPxR;
       const dv = rawDv * invPyR;
@@ -411,18 +426,14 @@ function stampCrater(
 
       if (isCircular) {
         // Fast path for circular craters: skip shape transformation, only do domain warp
-        const coarseScale = sp.noiseScale * 0.5;
-        const fineScale = sp.noiseScale * 2.0;
-        const invW = 1 / w;
-        const invH = 1 / h;
         const pxInvW = px * invW;
         const pyInvH = py * invH;
-        const wU = sp.warpNoise(pxInvW * coarseScale, pyInvH * coarseScale) * 0.7
-                  + sp.warpNoise(pxInvW * fineScale + 50, pyInvH * fineScale + 50) * 0.3;
-        const wV = sp.warpNoise(pyInvH * coarseScale + 100, pxInvW * coarseScale + 100) * 0.7
-                  + sp.warpNoise(pyInvH * fineScale + 150, pxInvW * fineScale + 150) * 0.3;
-        wdu = du + sp.warpAmp * 0.22 * wU;
-        wdv = dv + sp.warpAmp * 0.22 * wV;
+        const wU = sp.warpNoise(pxInvW * circ_coarseScale, pyInvH * circ_coarseScale) * 0.7
+                  + sp.warpNoise(pxInvW * circ_fineScale + 50, pyInvH * circ_fineScale + 50) * 0.3;
+        const wV = sp.warpNoise(pyInvH * circ_coarseScale + 100, pxInvW * circ_coarseScale + 100) * 0.7
+                  + sp.warpNoise(pyInvH * circ_fineScale + 150, pxInvW * circ_fineScale + 150) * 0.3;
+        wdu = du + circ_warpFactor * wU;
+        wdv = dv + circ_warpFactor * wV;
         dist = Math.sqrt(wdu * wdu + wdv * wdv);
       } else {
         const result = shapedDistance(du, dv, sp, px, py, w, h);
