@@ -1751,6 +1751,63 @@ export function buildHeightmap(
 
   const totalCraterCount = stamps.length + secondaryStamps.length + microPitCount;
 
+  // ─── 3b) Impact melt pooling — smooth flat floors inside large craters ──
+  // Real large craters develop melt sheets that pool on the floor, creating
+  // ultra-smooth patches. We blur the heightmap ONLY inside mega/hero crater bowls.
+  if (stamps.length > 0) {
+    const meltStamps = stamps.filter(s => s.tier <= 1 && s.radius > 0.08);
+    if (meltStamps.length > 0) {
+      const len = MAP_W * MAP_H;
+      if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
+      const meltBlurred = _erosionBuf1;
+
+      // Quick 3×3 blur for melt smoothing
+      for (let y = 0; y < MAP_H; y++) {
+        const yA = y > 0 ? y - 1 : 0;
+        const yB = y < MAP_H - 1 ? y + 1 : MAP_H - 1;
+        const rowA = yA * MAP_W, rowM = y * MAP_W, rowB = yB * MAP_W;
+        for (let x = 0; x < MAP_W; x++) {
+          const xL = x === 0 ? MAP_W - 1 : x - 1;
+          const xR = x === MAP_W - 1 ? 0 : x + 1;
+          meltBlurred[rowM + x] = (
+            hmap[rowA + xL] + hmap[rowA + x] + hmap[rowA + xR] +
+            hmap[rowM + xL] + hmap[rowM + x] + hmap[rowM + xR] +
+            hmap[rowB + xL] + hmap[rowB + x] + hmap[rowB + xR]
+          ) * 0.111111111;
+        }
+      }
+
+      // Apply melt smoothing only inside crater floor regions
+      for (const s of meltStamps) {
+        const floorR = s.radius * 0.55; // inner 55% of crater is the floor
+        const pxR = floorR * MAP_W;
+        const pyR = floorR * MAP_H * physicalAspect;
+        const pxR2 = pxR * pxR;
+        const x0 = Math.floor((s.cu - floorR) * MAP_W);
+        const x1 = Math.ceil((s.cu + floorR) * MAP_W);
+        const y0 = Math.max(0, Math.floor((s.cv - floorR * physicalAspect) * MAP_H));
+        const y1 = Math.min(MAP_H - 1, Math.ceil((s.cv + floorR * physicalAspect) * MAP_H));
+
+        for (let py = y0; py <= y1; py++) {
+          const rowOff = py * MAP_W;
+          for (let px = x0; px <= x1; px++) {
+            let wpx = px % MAP_W;
+            if (wpx < 0) wpx += MAP_W;
+            const du = px - s.cu * MAP_W;
+            const dv = (py - s.cv * MAP_H) * (pxR / pyR);
+            const d2 = du * du + dv * dv;
+            if (d2 > pxR2) continue;
+            const t = Math.sqrt(d2) / pxR;
+            // Smoothstep falloff: full melt in center, fade at edges
+            const meltBlend = (1 - t) * (1 - t) * 0.7;
+            const idx = rowOff + wpx;
+            hmap[idx] = hmap[idx] * (1 - meltBlend) + meltBlurred[idx] * meltBlend;
+          }
+        }
+      }
+    }
+  }
+
   // ─── 4) Maria fill pass ──
   applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeMask, lunar.seed);
 
