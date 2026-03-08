@@ -1625,14 +1625,11 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
       let ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * strength * yScale * 0.25;
       const nz = 1.0;
       const invLen = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz);
-      nx *= invLen;
-      ny *= invLen;
 
       const idx = outRowOff + x * 4;
-      img.data[idx]     = (nx * 0.5 + 0.5) * 255 + 0.5 | 0;
-      img.data[idx + 1] = (ny * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
-      // nz is always close to 1 after normalization — use cheaper path
-      img.data[idx + 2] = (nz * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
+      img.data[idx]     = ((nx * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      img.data[idx + 1] = ((ny * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      img.data[idx + 2] = ((nz * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
       img.data[idx + 3] = 255;
     }
   }
