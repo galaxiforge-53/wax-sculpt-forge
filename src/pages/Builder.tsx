@@ -773,7 +773,11 @@ function BuilderInner() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-[7px] text-muted-foreground/50">Simulates edge softening and surface wear over time</p>
+                      <p className="text-[7px] text-muted-foreground/50">
+                        {lunarTexture?.enabled
+                          ? "Simulates crater erosion, rim flattening, and surface wear"
+                          : "Simulates edge softening and surface wear over time"}
+                      </p>
                     </div>
                   </div>
                   <button
