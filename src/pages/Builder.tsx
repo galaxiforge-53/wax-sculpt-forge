@@ -589,6 +589,29 @@ function BuilderInner() {
               >
                 <Sparkles className="w-3 h-3" />
               </button>
+              {/* Background picker */}
+              <div className="relative group">
+                <button
+                  className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                    bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                  title="Change background"
+                >
+                  <Eye className="w-3 h-3" />
+                </button>
+                <div className="absolute top-full left-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl py-1 min-w-[140px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  {BG_PRESETS.map((bg) => (
+                    <button
+                      key={bg.id}
+                      onClick={() => setBgPreset(bg.id)}
+                      className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${
+                        bgPreset === bg.id ? "text-primary" : "text-foreground"
+                      }`}
+                    >
+                      <span>{bg.icon}</span> {bg.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {!isMobile && (
                 <>
                   <button
