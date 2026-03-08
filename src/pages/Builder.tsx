@@ -413,6 +413,7 @@ function BuilderInner() {
               showPrinterBed={showPrinterBed}
               rotationLocked={rotationLocked}
               scaleReference={scaleReference}
+              wearPreview={wearPreview}
             />
           </ViewportErrorBoundary>
 
