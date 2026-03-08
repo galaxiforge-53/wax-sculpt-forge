@@ -226,6 +226,43 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         </p>
       </div>
 
+      {/* ── Quick Profile Presets ── */}
+      <div className="space-y-2">
+        <Label className="text-xs text-secondary-foreground">Quick Presets</Label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {([
+            { label: "Flat Band", desc: "Classic flat, sharp edges", params: { profile: "flat" as RingProfile, width: 6, thickness: 2, bevelSize: 0.2, edgeStyle: "sharp" as EdgeStyle, comfortFit: false } },
+            { label: "Comfort Fit", desc: "Rounded, easy all-day wear", params: { profile: "comfort" as RingProfile, width: 6, thickness: 2, bevelSize: 0.3, edgeStyle: "rounded" as EdgeStyle, comfortFit: true, interiorProfile: "comfort-dome" as InteriorProfile, interiorCurvature: 50, comfortFitDepth: 60 } },
+            { label: "Domed Band", desc: "Gently curved exterior", params: { profile: "dome" as RingProfile, width: 5, thickness: 1.8, bevelSize: 0.3, edgeStyle: "soft-bevel" as EdgeStyle, comfortFit: true } },
+            { label: "Knife-Edge", desc: "Dramatic peaked ridge", params: { profile: "knife-edge" as RingProfile, width: 5, thickness: 2.2, bevelSize: 0.1, edgeStyle: "sharp" as EdgeStyle, comfortFit: true } },
+            { label: "Wide Flat", desc: "Bold 10mm flat band", params: { profile: "flat" as RingProfile, width: 10, thickness: 2.5, bevelSize: 0.5, edgeStyle: "chamfer" as EdgeStyle, comfortFit: true } },
+            { label: "Slim Round", desc: "Delicate 3mm rounded", params: { profile: "dome" as RingProfile, width: 3, thickness: 1.5, bevelSize: 0.2, edgeStyle: "rounded" as EdgeStyle, comfortFit: true } },
+          ]).map((preset) => {
+            // Check if current params roughly match this preset
+            const isActive = params.profile === preset.params.profile
+              && Math.abs(params.width - preset.params.width) < 0.5
+              && Math.abs(params.thickness - preset.params.thickness) < 0.3;
+            return (
+              <button
+                key={preset.label}
+                onClick={() => onUpdate(preset.params)}
+                className={`flex flex-col items-start gap-0.5 px-2.5 py-2 rounded-lg border transition-all text-left
+                  ${isActive
+                    ? "bg-primary/10 border-primary/40 ring-1 ring-primary/20"
+                    : "bg-card border-border hover:bg-secondary hover:border-primary/30"
+                  }`}
+                title={preset.desc}
+              >
+                <span className={`text-[10px] font-semibold leading-tight ${isActive ? "text-primary" : "text-foreground"}`}>
+                  {preset.label}
+                </span>
+                <span className="text-[8px] text-muted-foreground leading-tight">{preset.desc}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── Width ── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
