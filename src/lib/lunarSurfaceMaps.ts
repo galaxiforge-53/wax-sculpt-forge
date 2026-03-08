@@ -671,7 +671,7 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
 // ── Highland ridges pass ─────────────────────────────────────────
 // Adds raised ridge networks using directional fBm
 
-function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeMask: Float32Array, seed: number, depthScale: number, physicalAspect: number = 1) {
+function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeRow: Float32Array, seed: number, depthScale: number, physicalAspect: number = 1) {
   if (ridgeFactor <= 0) return;
 
   const ridgeNoise = makeNoise2D(seed + 7500);
