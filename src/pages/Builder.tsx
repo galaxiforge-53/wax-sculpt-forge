@@ -63,6 +63,7 @@ function BuilderInner() {
   const [scaleReference, setScaleReference] = useState<ScaleReferenceType>("none");
   const [wearPreview, setWearPreview] = useState(0);
   const [polishPreview, setPolishPreview] = useState(0);
+  const [detailBoost, setDetailBoost] = useState(0);
   const [turntableSpeed, setTurntableSpeed] = useState(0);
   const [bgPreset, setBgPreset] = useState<BackgroundPreset>("dark-studio");
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
