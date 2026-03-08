@@ -194,6 +194,7 @@ export default function Export() {
       if (stlErr) throw new Error(`STL upload failed: ${stlErr.message}`);
 
       // 3. Upload preview images
+      setSubmitStep("uploading-previews");
       const previewUrls: string[] = [];
       const previews = pkg.previews ?? [];
       for (const preview of previews) {
