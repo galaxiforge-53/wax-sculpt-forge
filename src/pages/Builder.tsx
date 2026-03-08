@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useRingDesign } from "@/hooks/useRingDesign";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect, useRef, useState } from "react";
 import RingViewport, { RingViewportHandle, SnapshotAngle, CutawayMode } from "@/components/builder/RingViewport";
 import { ScaleReferenceType } from "@/components/builder/ScaleReference";
@@ -27,7 +28,8 @@ import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
 import { Button } from "@/components/ui/button";
 import SEOHead from "@/components/SEOHead";
-import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
+import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
+import PreferencesPanel from "@/components/builder/PreferencesPanel";
 
 function BuilderInner() {
   const navigate = useNavigate();
@@ -93,6 +95,27 @@ function BuilderInner() {
     balanceAnalysis,
     autoBalance,
   } = useRingDesign();
+
+  const { prefs, updatePrefs } = useUserPreferences();
+  const [prefsOpen, setPrefsOpen] = useState(false);
+
+  // Apply user preferences as initial defaults (only once on mount, before any template/project override)
+  const prefsAppliedRef = useRef(false);
+  useEffect(() => {
+    if (prefsAppliedRef.current) return;
+    const hasTemplate = !!sessionStorage.getItem("applyTemplate");
+    const hasProject = !!sessionStorage.getItem("openProjectId");
+    if (hasTemplate || hasProject) {
+      prefsAppliedRef.current = true;
+      return; // Don't override if loading a template/project
+    }
+    prefsAppliedRef.current = true;
+    setMetalPreset(prefs.defaultMetal);
+    setFinishPreset(prefs.defaultFinish);
+    if (prefs.showMeasurements) setShowMeasurements(true);
+    const lightPreset = LIGHTING_PRESETS.find(p => p.id === prefs.lightingPreset);
+    if (lightPreset?.settings) setLighting({ ...DEFAULT_LIGHTING, ...lightPreset.settings });
+  }, []);
 
   const [isEnhancing, setIsEnhancing] = useState(false);
 
@@ -665,6 +688,14 @@ function BuilderInner() {
                   >
                     <Camera className="w-3 h-3" />
                   </button>
+                  <button
+                    onClick={() => setPrefsOpen(true)}
+                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    title="Designer preferences"
+                  >
+                    <Settings2 className="w-3 h-3" />
+                  </button>
                 </>
               )}
             </div>
@@ -858,6 +889,18 @@ function BuilderInner() {
         finishPreset={finishPreset}
         params={params}
       />
+
+      {/* Preferences Sheet */}
+      <Sheet open={prefsOpen} onOpenChange={setPrefsOpen}>
+        <SheetContent side="right" className="w-[320px] sm:w-[360px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-display text-primary">Preferences</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <PreferencesPanel prefs={prefs} onUpdate={updatePrefs} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

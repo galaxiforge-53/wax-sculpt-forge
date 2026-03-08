@@ -293,6 +293,57 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          auto_save: boolean
+          camera_view: string
+          comfort_fit_default: boolean
+          created_at: string
+          default_finish: string
+          default_metal: string
+          default_profile: string
+          dimension_unit: string
+          id: string
+          lighting_preset: string
+          show_measurements: boolean
+          size_standard: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_save?: boolean
+          camera_view?: string
+          comfort_fit_default?: boolean
+          created_at?: string
+          default_finish?: string
+          default_metal?: string
+          default_profile?: string
+          dimension_unit?: string
+          id?: string
+          lighting_preset?: string
+          show_measurements?: boolean
+          size_standard?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_save?: boolean
+          camera_view?: string
+          comfort_fit_default?: boolean
+          created_at?: string
+          default_finish?: string
+          default_metal?: string
+          default_profile?: string
+          dimension_unit?: string
+          id?: string
+          lighting_preset?: string
+          show_measurements?: boolean
+          size_standard?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
