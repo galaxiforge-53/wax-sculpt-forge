@@ -703,6 +703,17 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const lunarWearDispReduction = wearFactor * 0.45;     // displacement softens — craters shallow out
   const lunarWearRoughnessUniformity = wearFactor * 0.3; // roughness map becomes more uniform
 
+  // ── Polishing simulation: jeweller's finishing pass ──
+  // Polishing is the inverse of wear — it makes surfaces smoother, shinier,
+  // and softens sharp crater rims/edges like tumble or hand polishing
+  const polishFactor = debouncedPolish / 100;
+  const polishRoughnessReduction = polishFactor * 0.18;    // surface gets smoother
+  const polishClearcoatBoost = polishFactor * 0.6;         // fresh clearcoat layer
+  const polishReflectivityBoost = polishFactor * 0.25;     // sharper reflections
+  const polishNormalSoften = polishFactor * 0.35;          // crater rims soften from buffing
+  const polishDispSoften = polishFactor * 0.2;             // high points get filed down
+  const polishEnvBoost = polishFactor * 0.4;               // mirror-like environment reflection
+
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
     const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
