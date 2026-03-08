@@ -75,9 +75,36 @@ function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
       // Drop DPR during interaction for responsiveness
       gl.setPixelRatio(isMobile ? 1 : 1);
     } else {
-      gl.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
+      gl.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.25) : Math.min(window.devicePixelRatio, 2));
     }
   }, [tier, isMobile, isShowcase, isInspection, gl]);
+
+  return null;
+}
+
+// ── Damping invalidator — keeps rendering during orbit deceleration ──
+// With frameloop="demand", OrbitControls damping needs continuous invalidation
+// until the camera stops moving. This component tracks orbit activity and
+// calls invalidate() each frame while damping is still settling.
+function DampingInvalidator() {
+  const { invalidate } = useThree();
+  const isInteractingRef = useRef(false);
+  const dampingActiveRef = useRef(false);
+  const lastCamPosRef = useRef(new THREE.Vector3());
+
+  useFrame(({ camera }) => {
+    const pos = camera.position;
+    const moved = pos.distanceToSquared(lastCamPosRef.current) > 1e-8;
+    lastCamPosRef.current.copy(pos);
+
+    if (moved) {
+      dampingActiveRef.current = true;
+      invalidate();
+    } else if (dampingActiveRef.current) {
+      // Camera settled — stop invalidating
+      dampingActiveRef.current = false;
+    }
+  });
 
   return null;
 }
