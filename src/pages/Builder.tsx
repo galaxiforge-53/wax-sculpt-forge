@@ -14,6 +14,7 @@ import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
 import { getProject, saveProject } from "@/lib/projectsStore";
 import { saveCloudDesign, getCloudDesign } from "@/lib/cloudDesignsStore";
+import { createShareLink } from "@/lib/shareStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -33,6 +34,7 @@ function BuilderInner() {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [forgeModalOpen, setForgeModalOpen] = useState(false);
   const [livePreviews, setLivePreviews] = useState<DesignPreview[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
@@ -145,6 +147,22 @@ function BuilderInner() {
         setCurrentProjectId(project.id);
         setCurrentProjectName(project.name);
       }
+      return;
+    }
+
+    // Shared design via link
+    const sharedPkg = sessionStorage.getItem("sharedDesignPackage");
+    if (sharedPkg) {
+      const sharedName = sessionStorage.getItem("sharedDesignName");
+      sessionStorage.removeItem("sharedDesignPackage");
+      sessionStorage.removeItem("sharedDesignName");
+      try {
+        restoreDesign(JSON.parse(sharedPkg));
+        setCurrentProjectName(sharedName || "Shared Design");
+        toast({ title: "Shared Design Loaded", description: `"${sharedName}" is ready to customize.` });
+      } catch (e) {
+        console.error("Failed to load shared design:", e);
+      }
     }
   }, []);
 
@@ -236,6 +254,37 @@ function BuilderInner() {
     setForgeModalOpen(true);
   };
 
+  const handleShare = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please sign in to share designs.", variant: "destructive" });
+      return;
+    }
+    setIsSharing(true);
+    try {
+      const castStages = ["POUR", "QUENCH", "FINISH"];
+      const captureMode: ViewMode = castStages.includes(pipelineState.currentStage) ? "cast" : viewMode;
+      const previews = await capturePreviewsAsync(captureMode);
+      const pkg = generateDesignPackage();
+      pkg.previews = previews;
+      const anglePrev = previews.find((p) => p.id === "angle");
+      const thumbnail = anglePrev?.dataUrl ?? previews[0]?.dataUrl ?? null;
+      const name = currentProjectName || "Shared Ring Design";
+
+      const { shareUrl } = await createShareLink(user.id, name, pkg, thumbnail);
+
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Share Link Copied! 🔗",
+        description: "Anyone with this link can view and customize your design.",
+      });
+    } catch (err: any) {
+      console.error("Share error:", err);
+      toast({ title: "Share Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const guidedContent = (
     <GuidedWorkflow
       params={params}
@@ -315,6 +364,8 @@ function BuilderInner() {
         onForgeNow={handleForgeNow}
         onEnhance={handleEnhance}
         isEnhancing={isEnhancing}
+        onShare={handleShare}
+        isSharing={isSharing}
       />
 
       <div className="flex flex-1 min-h-0 relative">

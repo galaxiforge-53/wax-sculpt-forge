@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { ViewMode, MetalPreset, FinishPreset } from "@/types/ring";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Undo2, Redo2, Save, Send, Flame, MoreVertical, Wand2 } from "lucide-react";
+import { Undo2, Redo2, Save, Send, Flame, MoreVertical, Wand2, Share2 } from "lucide-react";
 import { isEmbedMode, getReturnUrl } from "@/config/galaxiforge";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -29,6 +29,8 @@ interface TopBarProps {
   onForgeNow: () => void;
   onEnhance?: () => void;
   isEnhancing?: boolean;
+  onShare?: () => void;
+  isSharing?: boolean;
 }
 
 const METALS: { value: MetalPreset; label: string; gradient: string }[] = [
@@ -50,7 +52,7 @@ const FINISHES: { value: FinishPreset; label: string }[] = [
 export default function TopBar({
   viewMode, onViewModeChange, metalPreset, onMetalChange,
   finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving, onForgeNow,
-  onEnhance, isEnhancing,
+  onEnhance, isEnhancing, onShare, isSharing,
 }: TopBarProps) {
   const embed = isEmbedMode();
   const isMobile = useIsMobile();
@@ -173,6 +175,11 @@ export default function TopBar({
             <Button variant="ghost" size="sm" onClick={onSave} disabled={isSaving} className="text-muted-foreground hover:text-foreground">
               <Save className="h-4 w-4 mr-1" /> {isSaving ? "Saving…" : "Save"}
             </Button>
+            {onShare && (
+              <Button variant="ghost" size="sm" onClick={onShare} disabled={isSharing} className="text-muted-foreground hover:text-foreground">
+                <Share2 className="h-4 w-4 mr-1" /> {isSharing ? "Sharing…" : "Share"}
+              </Button>
+            )}
             <Button size="sm" onClick={onExport} className="bg-primary text-primary-foreground hover:bg-ember-glow">
               <Send className="h-4 w-4 mr-1" /> Send to GalaxiForge
             </Button>
@@ -232,6 +239,11 @@ export default function TopBar({
                 <DropdownMenuItem onClick={onSave} disabled={isSaving} className="text-xs">
                   <Save className="h-3.5 w-3.5 mr-2" /> {isSaving ? "Saving…" : "Save"}
                 </DropdownMenuItem>
+                {onShare && (
+                  <DropdownMenuItem onClick={onShare} disabled={isSharing} className="text-xs">
+                    <Share2 className="h-3.5 w-3.5 mr-2" /> {isSharing ? "Sharing…" : "Share"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={onExport} className="text-xs">
                   <Send className="h-3.5 w-3.5 mr-2" /> Send to GalaxiForge
                 </DropdownMenuItem>

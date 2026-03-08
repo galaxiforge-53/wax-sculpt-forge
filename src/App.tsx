@@ -20,6 +20,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const AccessCode = lazy(() => import("./pages/AccessCode"));
 const Admin = lazy(() => import("./pages/Admin"));
 const DesignLibrary = lazy(() => import("./pages/DesignLibrary"));
+const SharedDesign = lazy(() => import("./pages/SharedDesign"));
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="/access" element={<AccessCode />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/library" element={<DesignLibrary />} />
+              <Route path="/share/:code" element={<SharedDesign />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
