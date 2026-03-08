@@ -327,31 +327,33 @@ function BuilderInner() {
 
         {/* Viewport */}
         <div className="flex-1 p-0 sm:p-1 relative builder-viewport-bg">
-          <RingViewport
-            ref={viewportRef}
-            params={params}
-            viewMode={viewMode}
-            metalPreset={metalPreset}
-            finishPreset={finishPreset}
-            activeTool={activeTool}
-            onAddWaxMark={addWaxMark}
-            waxMarks={waxMarks}
-            stampSettings={stampSettings}
-            inlays={inlays}
-            lunarTexture={lunarTexture}
-            engraving={engraving}
-            cameraPreset={cameraPreset}
-            onPresetApplied={() => setCameraPreset(null)}
-            showMeasurements={showMeasurements || activeTool === "measure"}
-            cutawayMode={cutawayMode}
-            cutawayOffset={cutawayOffset}
-            lighting={lighting}
-            showcaseMode={showcaseMode}
-            inspectionMode={inspectionMode}
-            ringPosition={ringPosition}
-            ringRotation={ringRotation}
-            showPrinterBed={showPrinterBed}
-          />
+          <ViewportErrorBoundary>
+            <RingViewport
+              ref={viewportRef}
+              params={params}
+              viewMode={viewMode}
+              metalPreset={metalPreset}
+              finishPreset={finishPreset}
+              activeTool={activeTool}
+              onAddWaxMark={addWaxMark}
+              waxMarks={waxMarks}
+              stampSettings={stampSettings}
+              inlays={inlays}
+              lunarTexture={lunarTexture}
+              engraving={engraving}
+              cameraPreset={cameraPreset}
+              onPresetApplied={() => setCameraPreset(null)}
+              showMeasurements={showMeasurements || activeTool === "measure"}
+              cutawayMode={cutawayMode}
+              cutawayOffset={cutawayOffset}
+              lighting={lighting}
+              showcaseMode={showcaseMode}
+              inspectionMode={inspectionMode}
+              ringPosition={ringPosition}
+              ringRotation={ringRotation}
+              showPrinterBed={showPrinterBed}
+            />
+          </ViewportErrorBoundary>
 
           {/* Camera presets — top-left */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
