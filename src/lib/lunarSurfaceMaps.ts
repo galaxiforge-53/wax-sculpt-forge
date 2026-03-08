@@ -1262,19 +1262,45 @@ export function buildHeightmap(
 
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
-  // ─── 1) fBm base terrain layer ──
-  // Scale V coordinate by aspect correction so noise features stay circular
-  // physicalAspect = circumference/width, pixel ratio = MAP_W/MAP_H = 4
+  // ─── 1) fBm base terrain layer (computed at half-res, then upscaled) ──
+  // 6-octave fBm is the most expensive per-pixel operation. Since it produces
+  // low-frequency terrain, half-res gives identical visual results.
   const aspectCorrection = physicalAspect / (MAP_W / MAP_H);
   const baseNoise = makeNoise2D(lunar.seed + 500);
   const baseAmp = (0.04 + terrainRough * 0.12) * depthScale;
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const u = x / MAP_W * 8;
-      const v = y / MAP_H * 8 * aspectCorrection;
-      const n = fbm(baseNoise, u, v, 6, 2.0, 0.5);
-      const mask = edgeMask[y * MAP_W + x];
-      hmap[y * MAP_W + x] += n * baseAmp * mask;
+  {
+    const halfW = MAP_W >> 1;
+    const halfH = MAP_H >> 1;
+    const halfBase = new Float32Array(halfW * halfH);
+    for (let y = 0; y < halfH; y++) {
+      const v = (y / halfH) * 8 * aspectCorrection;
+      for (let x = 0; x < halfW; x++) {
+        const u = (x / halfW) * 8;
+        halfBase[y * halfW + x] = fbm(baseNoise, u, v, 6, 2.0, 0.5) * baseAmp;
+      }
+    }
+    // Bilinear upscale to full resolution and add to heightmap
+    for (let y = 0; y < MAP_H; y++) {
+      const fy = (y / MAP_H) * (halfH - 1);
+      const iy = Math.floor(fy);
+      const fy1 = fy - iy;
+      const iy0 = Math.min(iy, halfH - 1);
+      const iy1 = Math.min(iy + 1, halfH - 1);
+      for (let x = 0; x < MAP_W; x++) {
+        const fx = (x / MAP_W) * (halfW - 1);
+        const ix = Math.floor(fx);
+        const fx1 = fx - ix;
+        const ix0 = ((ix) % halfW + halfW) % halfW;
+        const ix1 = ((ix + 1) % halfW + halfW) % halfW;
+        const val = (
+          halfBase[iy0 * halfW + ix0] * (1 - fx1) * (1 - fy1) +
+          halfBase[iy0 * halfW + ix1] * fx1 * (1 - fy1) +
+          halfBase[iy1 * halfW + ix0] * (1 - fx1) * fy1 +
+          halfBase[iy1 * halfW + ix1] * fx1 * fy1
+        );
+        const mask = edgeMask[y * MAP_W + x];
+        hmap[y * MAP_W + x] += val * mask;
+      }
     }
   }
 
@@ -1574,7 +1600,10 @@ export function buildHeightmap(
   return { hmap, craterCount: totalCraterCount };
 }
 
-// ── Normal map from heightmap (enhanced Sobel with 3×3 kernel) ────
+// ── Normal map from heightmap (optimized row-sliding Sobel) ───────
+// Instead of calling a sample() closure 8× per pixel (32M calls on 4K maps),
+// this uses a 3-row sliding window with direct array access and handles
+// U-axis wrapping via pre-computed wrap indices.
 
 function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, strength: number, physicalAspect: number = 1): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -1585,34 +1614,48 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
 
   const yScale = physicalAspect * (h / w);
 
-  const sample = (sx: number, sy: number) => {
-    const wx = ((sx % w) + w) % w;
-    const wy = Math.max(0, Math.min(h - 1, sy));
-    return hmap[wy * w + wx];
-  };
+  // Pre-compute U-axis wrap indices to avoid per-pixel modular arithmetic
+  const wrapL = new Int32Array(w);
+  const wrapR = new Int32Array(w);
+  for (let x = 0; x < w; x++) {
+    wrapL[x] = x === 0 ? w - 1 : x - 1;
+    wrapR[x] = x === w - 1 ? 0 : x + 1;
+  }
 
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const tl = sample(x - 1, y - 1);
-      const tc = sample(x,     y - 1);
-      const tr = sample(x + 1, y - 1);
-      const ml = sample(x - 1, y);
-      const mr = sample(x + 1, y);
-      const bl = sample(x - 1, y + 1);
-      const bc = sample(x,     y + 1);
-      const br = sample(x + 1, y + 1);
+    // Clamp row indices for V-axis (ring width edges)
+    const yAbove = Math.max(0, y - 1);
+    const yBelow = Math.min(h - 1, y + 1);
+    const rowT = yAbove * w;
+    const rowM = y * w;
+    const rowB = yBelow * w;
+    const yy = h - 1 - y;
+    const outRowOff = yy * w * 4;
 
+    for (let x = 0; x < w; x++) {
+      const xl = wrapL[x];
+      const xr = wrapR[x];
+
+      // 8 neighbors via direct array access (no closure calls)
+      const tl = hmap[rowT + xl];
+      const tc = hmap[rowT + x];
+      const tr = hmap[rowT + xr];
+      const ml = hmap[rowM + xl];
+      const mr = hmap[rowM + xr];
+      const bl = hmap[rowB + xl];
+      const bc = hmap[rowB + x];
+      const br = hmap[rowB + xr];
+
+      // Sobel gradient
       let nx = (tl - tr + 2 * (ml - mr) + bl - br) * strength * 0.25;
       let ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * strength * yScale * 0.25;
-      let nz = 1.0;
-      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
-      nx /= len; ny /= len; nz /= len;
+      const nz = 1.0;
+      const invLen = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz);
 
-      const yy = (h - 1 - y);
-      const idx = (yy * w + x) * 4;
-      img.data[idx] = Math.round((nx * 0.5 + 0.5) * 255);
-      img.data[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
-      img.data[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+      const idx = outRowOff + x * 4;
+      img.data[idx]     = ((nx * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      img.data[idx + 1] = ((ny * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
+      img.data[idx + 2] = ((nz * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
       img.data[idx + 3] = 255;
     }
   }
