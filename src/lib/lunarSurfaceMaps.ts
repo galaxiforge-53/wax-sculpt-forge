@@ -1607,25 +1607,46 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   return canvas;
 }
 
-// ── AO map (multi-scale for better occlusion quality) ─────────────
+// ── AO map (computed at half resolution for performance, then upscaled) ───
+// The multi-kernel sampling is O(pixels × kernelSamples), so halving resolution
+// gives ~4× speedup with minimal visual difference on a curved ring surface.
 
 function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(w, h);
 
-  // Multi-scale AO: small kernel for fine detail + large kernel for broad occlusion
+  // Compute at half resolution
+  const hw = w >> 1;
+  const hh = h >> 1;
+
+  // Downsample heightmap with 2×2 box filter
+  const halfHmap = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      halfHmap[y * hw + x] = (
+        hmap[sy * w + sx] +
+        hmap[sy * w + sx + 1] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
+      ) * 0.25;
+    }
+  }
+
+  // Multi-scale AO at half resolution
   const kernels = [
-    { radius: 3, step: 1, weight: 0.5 },   // Fine detail AO
-    { radius: 8, step: 2, weight: 0.35 },   // Medium-scale
-    { radius: 16, step: 4, weight: 0.15 },  // Broad occlusion
+    { radius: 2, step: 1, weight: 0.5 },   // Fine detail AO (was 3)
+    { radius: 4, step: 1, weight: 0.35 },   // Medium-scale (was 8 step 2)
+    { radius: 8, step: 2, weight: 0.15 },   // Broad occlusion (was 16 step 4)
   ];
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const center = hmap[y * w + x];
+  const halfAO = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    for (let x = 0; x < hw; x++) {
+      const center = halfHmap[y * hw + x];
       let totalAO = 0;
 
       for (const kernel of kernels) {
@@ -1634,28 +1655,50 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
 
         for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
           for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
-            const sy = Math.max(0, Math.min(h - 1, y + ky));
-            const sx = ((x + kx) % w + w) % w;
-            const sampleH = hmap[sy * w + sx];
+            const sy = Math.max(0, Math.min(hh - 1, y + ky));
+            const sx = ((x + kx) % hw + hw) % hw;
+            const sampleH = halfHmap[sy * hw + sx];
             if (sampleH > center) {
               higher++;
-              // Weight by how much higher the neighbor is (deeper bowls = more occlusion)
               heightDiffSum += (sampleH - center);
             }
             samples++;
           }
         }
 
-        // Combine occlusion count with height difference for more realistic AO
         const countAO = higher / samples;
         const heightAO = Math.min(1, heightDiffSum / samples * 8);
         const kernelAO = countAO * 0.6 + heightAO * 0.4;
         totalAO += kernelAO * kernel.weight;
       }
 
-      const ao = 1.0 - totalAO * 0.7;
-      const v = Math.round(Math.max(0.2, Math.min(1.0, ao)) * 255);
+      halfAO[y * hw + x] = 1.0 - totalAO * 0.7;
+    }
+  }
 
+  // Bilinear upscale to full resolution
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const fy = (y / h) * (hh - 1);
+    const iy = Math.floor(fy);
+    const fy1 = fy - iy;
+    const iy0 = Math.min(iy, hh - 1);
+    const iy1 = Math.min(iy + 1, hh - 1);
+    for (let x = 0; x < w; x++) {
+      const fx = (x / w) * (hw - 1);
+      const ix = Math.floor(fx);
+      const fx1 = fx - ix;
+      const ix0 = ((ix) % hw + hw) % hw;
+      const ix1 = ((ix + 1) % hw + hw) % hw;
+
+      const ao = (
+        halfAO[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
+        halfAO[iy0 * hw + ix1] * fx1 * (1 - fy1) +
+        halfAO[iy1 * hw + ix0] * (1 - fx1) * fy1 +
+        halfAO[iy1 * hw + ix1] * fx1 * fy1
+      );
+
+      const v = Math.round(Math.max(0.2, Math.min(1.0, ao)) * 255);
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
       img.data[idx] = v;
