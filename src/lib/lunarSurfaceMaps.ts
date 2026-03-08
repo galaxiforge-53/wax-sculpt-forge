@@ -683,8 +683,8 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   for (let y = 0; y < h; y++) {
     const v = y * invH;
     const rowOff = y * w;
-    const ridgeRowMask = edgeMask[rowOff]; // row-constant
-    if (ridgeRowMask < 0.01) continue; // skip entire edge rows — eliminates ~4096 iterations per skipped row
+    const ridgeRowMask = edgeRow[y];
+    if (ridgeRowMask < 0.01) continue;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       const u = x * invW;
