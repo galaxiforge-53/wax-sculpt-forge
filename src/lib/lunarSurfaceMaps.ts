@@ -839,8 +839,15 @@ function applyDustFill(
 ) {
   // Wind-driven dust fills craters unevenly
   const dustNoise = makeNoise2D(seed + 14001);
-  const sorted = Float32Array.from(hmap).sort();
-  const fillLevel = sorted[Math.floor(sorted.length * 0.45)];
+  // Approximate percentile via random sampling (O(k) instead of O(n log n))
+  const sampleCount = 2000;
+  const sampleRng = seededRng(seed + 14500);
+  const samples = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    samples[i] = hmap[Math.floor(sampleRng() * hmap.length)];
+  }
+  samples.sort();
+  const fillLevel = samples[Math.floor(sampleCount * 0.45)];
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
