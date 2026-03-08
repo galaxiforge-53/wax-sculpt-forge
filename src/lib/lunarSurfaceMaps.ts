@@ -966,11 +966,12 @@ function applyIceFractures(
         const idx = py * w + wpx;
         const dist = Math.abs(dy) * invWidthPx;
 
+        const eFrac = edgeRow[py];
         if (dist < 1.0) {
-          hmap[idx] -= depth * (1 - dist * dist) * edgeMask[idx];
+          hmap[idx] -= depth * (1 - dist * dist) * eFrac;
         } else if (dist < 2.0) {
           const ridgeDist = dist - 1.0;
-          hmap[idx] += ridgeHeight * (1 - ridgeDist) * (1 - ridgeDist) * edgeMask[idx];
+          hmap[idx] += ridgeHeight * (1 - ridgeDist) * (1 - ridgeDist) * eFrac;
         }
       }
     }
