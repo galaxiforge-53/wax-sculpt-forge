@@ -895,18 +895,33 @@ function EngravingText3D({ params, engraving }: { params: RingParameters; engrav
   const textR = innerR - depthOffset * 0.5;
   const fontSize = engraving.sizeMm / 10;
   const letterSpacing = engraving.spacingMm / 10;
+  const halfW = params.width / 2 / 10;
+
+  // Vertical offset based on placement
+  const placement = engraving.placement ?? "center";
+  let yOffset = 0;
+  if (placement === "top-edge") {
+    yOffset = halfW * 0.6;
+  } else if (placement === "bottom-edge") {
+    yOffset = -halfW * 0.6;
+  } else if (placement === "custom") {
+    yOffset = (engraving.verticalOffsetMm ?? 0) / 10;
+  }
+
+  // Start angle offset (degrees → radians)
+  const startAngleOffset = ((engraving.startAngleDeg ?? 0) * Math.PI) / 180;
 
   const chars = engraving.text.split("");
   const charWidth = fontSize * 0.6 + letterSpacing;
   const totalArc = chars.length * charWidth;
   const circumference = 2 * Math.PI * textR;
   const arcFraction = totalArc / circumference;
-  const startAngle = -arcFraction * Math.PI;
+  const baseStartAngle = -arcFraction * Math.PI + startAngleOffset;
 
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
       {chars.map((char, i) => {
-        const angle = startAngle + (i + 0.5) * (charWidth / textR);
+        const angle = baseStartAngle + (i + 0.5) * (charWidth / textR);
         const x = Math.cos(angle) * textR;
         const z = Math.sin(angle) * textR;
         const rotY = -angle - Math.PI / 2;
@@ -914,7 +929,7 @@ function EngravingText3D({ params, engraving }: { params: RingParameters; engrav
         return (
           <Text
             key={`${i}-${char}`}
-            position={[x, 0, z]}
+            position={[x, yOffset, z]}
             rotation={[0, rotY, 0]}
             fontSize={fontSize}
             color="#555555"
