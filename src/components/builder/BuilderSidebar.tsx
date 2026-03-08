@@ -27,7 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flame } from "lucide-react";
+import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flame, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useAccess } from "@/hooks/useAccess";
