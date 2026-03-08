@@ -637,10 +637,11 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
   const wearAmount = wearPreview;
+  const polishAmount = polishPreview;
 
   // Debounce params for geometry builds to avoid thrashing during slider drags
   const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
