@@ -625,6 +625,40 @@ function BuilderInner() {
                   >
                     <Printer className="w-3 h-3" />
                   </button>
+                  {/* Turntable */}
+                  <div className="relative group">
+                    <button
+                      onClick={() => setTurntableSpeed((v) => v > 0 ? 0 : 2)}
+                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                        ${turntableSpeed > 0
+                          ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                        }`}
+                      title={turntableSpeed > 0 ? "Stop turntable" : "Start turntable rotation"}
+                    >
+                      <RotateCw className={`w-3 h-3 ${turntableSpeed > 0 ? "animate-spin" : ""}`} style={turntableSpeed > 0 ? { animationDuration: "3s" } : undefined} />
+                    </button>
+                    {turntableSpeed > 0 && (
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-2 min-w-[120px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <p className="text-[8px] text-muted-foreground/60 uppercase tracking-wider mb-1.5 text-center">Speed</p>
+                        <div className="flex gap-1 justify-center">
+                          {[1, 2, 4, 8].map((spd) => (
+                            <button
+                              key={spd}
+                              onClick={(e) => { e.stopPropagation(); setTurntableSpeed(spd); }}
+                              className={`px-2 py-1 text-[9px] rounded transition-all ${
+                                turntableSpeed === spd
+                                  ? "bg-primary/20 text-primary border border-primary/30"
+                                  : "bg-secondary/40 text-muted-foreground border border-border/30 hover:text-foreground"
+                              }`}
+                            >
+                              {spd === 1 ? "Slow" : spd === 2 ? "Med" : spd === 4 ? "Fast" : "Spin"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() => setRotationLocked((v) => !v)}
                     className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
