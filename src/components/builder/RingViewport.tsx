@@ -75,9 +75,36 @@ function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
       // Drop DPR during interaction for responsiveness
       gl.setPixelRatio(isMobile ? 1 : 1);
     } else {
-      gl.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
+      gl.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.25) : Math.min(window.devicePixelRatio, 2));
     }
   }, [tier, isMobile, isShowcase, isInspection, gl]);
+
+  return null;
+}
+
+// ── Damping invalidator — keeps rendering during orbit deceleration ──
+// With frameloop="demand", OrbitControls damping needs continuous invalidation
+// until the camera stops moving. This component tracks orbit activity and
+// calls invalidate() each frame while damping is still settling.
+function DampingInvalidator() {
+  const { invalidate } = useThree();
+  const isInteractingRef = useRef(false);
+  const dampingActiveRef = useRef(false);
+  const lastCamPosRef = useRef(new THREE.Vector3());
+
+  useFrame(({ camera }) => {
+    const pos = camera.position;
+    const moved = pos.distanceToSquared(lastCamPosRef.current) > 1e-8;
+    lastCamPosRef.current.copy(pos);
+
+    if (moved) {
+      dampingActiveRef.current = true;
+      invalidate();
+    } else if (dampingActiveRef.current) {
+      // Camera settled — stop invalidating
+      dampingActiveRef.current = false;
+    }
+  });
 
   return null;
 }
@@ -401,11 +428,11 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
   // Production tuning: reduced max segments for better frame rates without visible quality loss
   const isPreview = qualityTier === "preview";
   const radSegs = hasLunar
-    ? (isMobile ? (isPreview ? 96 : 192) : (isPreview ? 192 : 512))
-    : (isMobile ? (isPreview ? 32 : 48) : (isPreview ? 48 : 96));
+    ? (isMobile ? (isPreview ? 64 : 128) : (isPreview ? 128 : 384))
+    : (isMobile ? (isPreview ? 24 : 48) : (isPreview ? 48 : 96));
   const profileSteps = hasLunar
-    ? (isMobile ? (isPreview ? 24 : 48) : (isPreview ? 48 : 128))
-    : (isMobile ? (isPreview ? 8 : 12) : (isPreview ? 12 : 24));
+    ? (isMobile ? (isPreview ? 16 : 32) : (isPreview ? 32 : 96))
+    : (isMobile ? (isPreview ? 6 : 12) : (isPreview ? 12 : 24));
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];
@@ -1908,7 +1935,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     // Camera positioned further back so ring is fully visible
     const initialCamPos: [number, number, number] = insp
       ? [0, 1.8, 3.5]
-      : isMobile ? [1.0, 1.5, 4.0] : [0, 3, 6];
+      : isMobile ? [0.3, 1.8, 4.5] : [0, 3, 6];
 
       const activeBg = BG_PRESETS.find(b => b.id === bgPreset) ?? BG_PRESETS[0];
 
@@ -2064,6 +2091,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.25] : [1, 2]))}
         >
           <AdaptiveDprController tier={qualityTier} isMobile={isMobile} isShowcase={sc} isInspection={insp} />
+          <DampingInvalidator />
           <ClipPlaneManager mode={cutawayMode} offset={cutawayOffset} params={params} />
 
           {/* Dynamic lighting from Lighting Studio */}
