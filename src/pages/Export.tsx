@@ -317,10 +317,58 @@ export default function Export() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-8">
-      <div className="max-w-3xl w-full space-y-6">
-        <h1 className="font-display text-xl sm:text-2xl text-primary ember-text">Manufacturing Export</h1>
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-8">
+        <div className="max-w-4xl w-full space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="font-display text-xl sm:text-2xl text-primary ember-text">Export &amp; Production</h1>
+              <p className="text-xs text-muted-foreground mt-1">Save, export, or send your design for manufacturing</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/builder")} className="gap-1.5 text-muted-foreground">
+              <ArrowLeft className="h-4 w-4" /> Builder
+            </Button>
+          </div>
+
+          {/* ── Three Action Cards ─────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Save Design */}
+            <ActionCard
+              icon={Save}
+              title="Save Design"
+              description="Save to your library for later editing"
+              buttonLabel={user ? "Save to Cloud" : "Save Locally"}
+              onClick={handleSaveDesign}
+              disabled={savingDesign}
+              loading={savingDesign}
+              variant="secondary"
+            />
+
+            {/* Export STL */}
+            <ActionCard
+              icon={Download}
+              title="Export STL"
+              description={canExport ? "Download the 3D model for printing or casting" : "Requires Premium access code"}
+              buttonLabel={canExport ? `Download STL${stlResult ? ` (${stlResult.fileSizeKB} KB)` : ""}` : "Premium Required"}
+              onClick={handleDownloadSTL}
+              disabled={!stlResult || generating || !canExport}
+              locked={!canExport}
+              variant="outline"
+            />
+
+            {/* Send to Galaxy Forge */}
+            <ActionCard
+              icon={Send}
+              title="Send to Galaxy Forge"
+              description="Submit for professional production with full manufacturing package"
+              buttonLabel="Configure &amp; Submit"
+              onClick={handleSend}
+              disabled={sent}
+              variant="primary"
+              highlight
+            />
+          </div>
 
         {/* 3D STL Preview */}
         <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-forge-dark via-card to-forge-dark">
