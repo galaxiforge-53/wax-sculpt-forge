@@ -99,10 +99,15 @@ export function useRingDesign() {
     (newParams: RingParameters) => {
       const history = historyRef.current;
       const idx = historyIndexRef.current;
+
+      // Skip duplicate entries to avoid polluting history with identical snapshots
+      const last = history[idx];
+      if (last && JSON.stringify(last) === JSON.stringify(newParams)) return;
+
       const newHistory = history.slice(0, idx + 1);
       newHistory.push(newParams);
-      // Cap history to 100 entries to prevent memory bloat
-      if (newHistory.length > 100) newHistory.shift();
+      // Cap history to 60 entries to reduce memory footprint
+      if (newHistory.length > 60) newHistory.shift();
       historyRef.current = newHistory;
       historyIndexRef.current = newHistory.length - 1;
       setHistoryVersion((v) => v + 1);

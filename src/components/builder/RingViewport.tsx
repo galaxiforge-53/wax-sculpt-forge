@@ -380,15 +380,20 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
 }
 
 // ── Build solid ring geometry with separate outer, inner, and cap surfaces ──
-function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMobile: boolean = false) {
+function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMobile: boolean = false, qualityTier: QualityTier = "high") {
   const innerR = params.innerDiameter / 2 / 10;
   const outerR = innerR + params.thickness / 10;
   const halfW = params.width / 2 / 10;
   const bevel = params.bevelSize / 10;
 
-  // Adaptive segments: lower on mobile to keep frame rates smooth
-  const radSegs = hasLunar ? (isMobile ? 256 : 768) : (isMobile ? 64 : 128);
-  const profileSteps = hasLunar ? (isMobile ? 64 : 192) : (isMobile ? 16 : 32);
+  // Adaptive segments: lower during preview tier and on mobile
+  const isPreview = qualityTier === "preview";
+  const radSegs = hasLunar
+    ? (isMobile ? (isPreview ? 128 : 256) : (isPreview ? 256 : 768))
+    : (isMobile ? (isPreview ? 32 : 64) : (isPreview ? 64 : 128));
+  const profileSteps = hasLunar
+    ? (isMobile ? (isPreview ? 32 : 64) : (isPreview ? 64 : 192))
+    : (isMobile ? (isPreview ? 8 : 16) : (isPreview ? 16 : 32));
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];
@@ -522,6 +527,15 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
 
+  // Debounce params for geometry builds to avoid thrashing during slider drags
+  const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
+
+  // Adaptive quality for geometry detail
+  const geoQuality = useAdaptiveQuality(
+    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar],
+    isMobile ? 1200 : 600,
+  );
+
   // Build geometry and dispose previous on param changes
   const geoRef = useRef<{ outerGeo: THREE.LatheGeometry; innerGeo: THREE.LatheGeometry; capGeoTop: THREE.RingGeometry; capGeoBot: THREE.RingGeometry } | null>(null);
 
@@ -533,10 +547,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       geoRef.current.capGeoTop.dispose();
       geoRef.current.capGeoBot.dispose();
     }
-    const result = buildSolidRingGeometry(params, hasLunar, isMobile);
+    const result = buildSolidRingGeometry(debouncedParams, hasLunar, isMobile, geoQuality);
     geoRef.current = result;
     return result;
-  }, [params, hasLunar, isMobile]);
+  }, [debouncedParams, hasLunar, isMobile, geoQuality]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -558,18 +572,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
-    const outerDiam = params.innerDiameter + 2 * params.thickness;
+    const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
     const circumference = Math.PI * outerDiam;
-    const width = params.width;
+    const width = debouncedParams.width;
     return width > 0 ? circumference / width : 1;
-  }, [params.innerDiameter, params.thickness, params.width]);
+  }, [debouncedParams.innerDiameter, debouncedParams.thickness, debouncedParams.width]);
 
   // Ring dimensions for surface-area-aware texture scaling
   const ringDims = useMemo(() => ({
-    innerDiameterMm: params.innerDiameter,
-    widthMm: params.width,
-    thicknessMm: params.thickness,
-  }), [params.innerDiameter, params.width, params.thickness]);
+    innerDiameterMm: debouncedParams.innerDiameter,
+    widthMm: debouncedParams.width,
+    thicknessMm: debouncedParams.thickness,
+  }), [debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness]);
 
   // Async texture generation with progress tracking + debounce
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
@@ -624,12 +638,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   // Smaller rings → stronger normals per-texel; larger rings → softer
   const dimScale = useMemo(() => {
     const refOuterR = 18.1 / 2 + 2; // reference outer radius for size 8
-    const outerR = params.innerDiameter / 2 + params.thickness;
+    const outerR = debouncedParams.innerDiameter / 2 + debouncedParams.thickness;
     const refWidth = 6;
     // Geometric mean so both radius and width contribute
-    const sizeRatio = Math.sqrt((outerR / refOuterR) * (params.width / refWidth));
+    const sizeRatio = Math.sqrt((outerR / refOuterR) * (debouncedParams.width / refWidth));
     return Math.max(0.5, Math.min(2.0, 1 / sizeRatio));
-  }, [params.innerDiameter, params.thickness, params.width]);
+  }, [debouncedParams.innerDiameter, debouncedParams.thickness, debouncedParams.width]);
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
@@ -640,11 +654,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
-    const outerR = params.innerDiameter / 2 / 10 + params.thickness / 10;
+    const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
     // Base displacement scales with intensity and ring radius, modulated by dimScale
     // so that craters maintain proportional physical depth
     return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
-  }, [hasLunar, lunarTexture?.intensity, params.innerDiameter, params.thickness, dimScale]);
+  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {

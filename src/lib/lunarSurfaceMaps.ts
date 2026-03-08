@@ -26,9 +26,22 @@ export const MAP_W_PREVIEW = 2048;
 export const MAP_H_PREVIEW = 512;
 export const MAP_DIMENSIONS = { width: MAP_W, height: MAP_H } as const;
 
+const MAX_CACHE_SIZE = 4;
 const cache = new Map<string, LunarSurfaceMapSet>();
 
-function cacheKey(lunar: LunarTextureState): string {
+function evictCache() {
+  if (cache.size >= MAX_CACHE_SIZE) {
+    // Remove oldest entry (first inserted)
+    const firstKey = cache.keys().next().value;
+    if (firstKey) {
+      const old = cache.get(firstKey);
+      if (old) disposeLunarMaps(old);
+      cache.delete(firstKey);
+    }
+  }
+}
+
+function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
   return [
     lunar.seed, lunar.craterDensity, lunar.craterSize, lunar.intensity,
     lunar.microDetail, lunar.rimSharpness, lunar.overlapIntensity,
@@ -43,6 +56,8 @@ function cacheKey(lunar: LunarTextureState): string {
     lunar.layerLargeCraters ?? 50,
     lunar.layerMediumImpacts ?? 50,
     lunar.layerMicroPitting ?? 50,
+    // Include ring aspect ratio so different ring sizes get distinct textures
+    ringAspect !== undefined ? ringAspect.toFixed(2) : "1.00",
   ].join("-");
 }
 
@@ -1402,6 +1417,7 @@ export function generateLunarSurfaceMaps(
 
   const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
   const maps = buildMapsFromHeightmap(hmap, MAP_W, MAP_H, lunar, aspect, craterCount);
+  evictCache();
   cache.set(key, maps);
   return maps;
 }
@@ -1418,6 +1434,7 @@ export function generateLunarPreviewMaps(
 
   const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
   const maps = buildMapsFromHeightmap(hmap, MAP_W, MAP_H, lunar, aspect, craterCount);
+  evictCache();
   cache.set(previewKey, maps);
   return maps;
 }
@@ -1479,6 +1496,7 @@ export function generateLunarSurfaceMapsAsync(
                 setupDataTexture(displacementMap);
 
                 const maps: LunarSurfaceMapSet = { normalMap, roughnessMap, aoMap, albedoMap, displacementMap, craterCount };
+                evictCache();
                 cache.set(key, maps);
                 onProgress({ stage: "done", label: "Surface complete ✓", craterCount, percent: 100 });
                 resolve(maps);
