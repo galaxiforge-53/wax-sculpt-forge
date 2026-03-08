@@ -143,7 +143,7 @@ export default function MeasurementOverlay({ params, visible, sizeStandard = "US
         anchorX="center"
         anchorY="bottom"
       >
-        {`${params.thickness.toFixed(1)}mm T`}
+        {`${formatDimension(params.thickness, dimensionUnit)} T`}
       </Text>
 
       {/* ── Inner bore circle ── */}
