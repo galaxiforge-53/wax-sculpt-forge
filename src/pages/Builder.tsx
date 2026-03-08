@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { useRingDesign } from "@/hooks/useRingDesign";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect, useRef, useState } from "react";
