@@ -1549,6 +1549,7 @@ interface RingViewportProps {
   rotationLocked?: boolean; // When true, disables orbit rotation but keeps zoom
   scaleReference?: ScaleReferenceType; // Show real-world scale reference objects
   wearPreview?: number; // 0–100, simulates polishing/wear softening
+  turntableSpeed?: number; // 0 = off, positive = RPM (e.g. 4 for slow spin)
 }
 
 // ── Clipping plane manager with interactive offset ─────────────────
