@@ -103,7 +103,7 @@ export function useViewportState() {
   }, []);
 
   const toggle = useCallback((field: keyof ViewportState) => {
-    dispatch({ type: "SET", field, value: !(state as Record<string, unknown>)[field] });
+    dispatch({ type: "SET", field, value: !(state[field] as boolean) });
   }, [state]);
 
   return { vp: state, vpDispatch: dispatch, vpSet: set, vpToggle: toggle };
