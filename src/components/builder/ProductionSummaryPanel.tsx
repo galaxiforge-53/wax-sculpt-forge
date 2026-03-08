@@ -15,17 +15,18 @@ import {
   AlertTriangle,
   CheckCircle2,
   Shield,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ── Metal density constants (matches PropertiesPanel) ─────────── */
 
-const METAL_DENSITY: Record<MetalPreset, { density: number; label: string }> = {
-  silver:    { density: 10.36, label: "Sterling Silver" },
-  gold:      { density: 13.07, label: "14K Gold" },
-  "rose-gold": { density: 12.8, label: "14K Rose Gold" },
-  titanium:  { density: 4.51,  label: "Titanium" },
-  tungsten:  { density: 15.63, label: "Tungsten Carbide" },
+const METAL_DENSITY: Record<MetalPreset, { density: number; label: string; pricePerGram: number }> = {
+  silver:      { density: 10.36, label: "Sterling Silver",   pricePerGram: 1.05 },
+  gold:        { density: 13.07, label: "14K Gold",          pricePerGram: 45.0 },
+  "rose-gold": { density: 12.8,  label: "14K Rose Gold",    pricePerGram: 43.0 },
+  titanium:    { density: 4.51,  label: "Titanium",          pricePerGram: 0.35 },
+  tungsten:    { density: 15.63, label: "Tungsten Carbide",  pricePerGram: 0.12 },
 };
 
 function estimateWeight(params: RingParameters, metal: MetalPreset): number {
@@ -142,6 +143,7 @@ export default function ProductionSummaryPanel({
   const engraving = craftState?.engraving ?? null;
 
   const weight = useMemo(() => estimateWeight(params, metalPreset), [params, metalPreset]);
+  const materialCost = useMemo(() => weight * METAL_DENSITY[metalPreset].pricePerGram, [weight, metalPreset]);
   const complexity = useMemo(() => computeSurfaceComplexity(params, lunar, engraving), [params, lunar, engraving]);
 
   const outerDiameter = params.innerDiameter + params.thickness * 2;
@@ -196,6 +198,12 @@ export default function ProductionSummaryPanel({
           label="Est. Weight"
           value={`${weight.toFixed(1)}g`}
           sub={METAL_DENSITY[metalPreset].label}
+        />
+        <StatRow
+          icon={DollarSign}
+          label="Est. Material Cost"
+          value={materialCost < 1 ? `~$${materialCost.toFixed(2)}` : `~$${materialCost.toFixed(0)}`}
+          sub={`$${METAL_DENSITY[metalPreset].pricePerGram}/g`}
         />
 
         {/* ── Surface Complexity ── */}
