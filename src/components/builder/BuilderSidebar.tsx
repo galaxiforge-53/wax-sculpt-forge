@@ -3,6 +3,7 @@ import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
+import { ImageTerrainState } from "@/types/imageTerrain";
 import { CastabilityReport } from "@/types/castability";
 import { BalanceAnalysis } from "@/lib/surfaceBalancer";
 import { ForgePipelineState } from "@/types/pipeline";
