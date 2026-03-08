@@ -183,6 +183,8 @@ function EdgeStyleIcon({ style, active }: { style: EdgeStyle; active: boolean })
 
 export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange, metalPreset = "silver" }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
+  const [sizeStandard, setSizeStandard] = useState<RingSizeStandard>("US");
+  const [dimUnit, setDimUnit] = useState<DimensionUnit>("mm");
 
   // Weight calculation for all metals
   const weightEstimates = useMemo(() => {
