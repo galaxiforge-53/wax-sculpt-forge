@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +6,10 @@ import {
   listCloudDesigns, deleteCloudDesign, duplicateCloudDesign,
   renameCloudDesign, updateDesignStatus, CloudDesign,
 } from "@/lib/cloudDesignsStore";
+import {
+  listVersions, restoreVersion, branchFromVersion,
+  deleteVersion, DesignVersion,
+} from "@/lib/designVersionStore";
 import { listProjects, deleteProject, duplicateProject, renameProject } from "@/lib/projectsStore";
 import { DesignProject } from "@/types/projects";
 import { Button } from "@/components/ui/button";
@@ -13,7 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Trash2, ExternalLink, Copy, Pencil, Check, X, Plus,
-  Send, Cloud, HardDrive, LogIn, Loader2,
+  Send, Cloud, HardDrive, LogIn, Loader2, History, GitBranch,
+  RotateCcw, ChevronDown,
 } from "lucide-react";
 import { STAGES } from "@/config/pipeline";
 import { useToast } from "@/hooks/use-toast";
