@@ -104,10 +104,14 @@ function makeNoise2D(seed: number) {
   for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
 
   return (x: number, y: number): number => {
-    const xi = Math.floor(x) & 255;
-    const yi = Math.floor(y) & 255;
-    const xf = x - Math.floor(x);
-    const yf = y - Math.floor(y);
+    // Cache Math.floor results — eliminates 2 redundant calls per invocation
+    // (was called twice each for x and y). On 50M+ calls this saves ~100M Math.floor ops.
+    const fx = Math.floor(x);
+    const fy = Math.floor(y);
+    const xi = fx & 255;
+    const yi = fy & 255;
+    const xf = x - fx;
+    const yf = y - fy;
     // Inline fade: t³(6t²-15t+10)
     const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
     const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
@@ -118,10 +122,12 @@ function makeNoise2D(seed: number) {
     const bb = (perm[perm[xi + 1] + yi + 1] & 255) * 2;
 
     // Inline dot products with flat gradient array
+    const xf1 = xf - 1;
+    const yf1 = yf - 1;
     const d00 = gradFlat[aa] * xf + gradFlat[aa + 1] * yf;
-    const d10 = gradFlat[ba] * (xf - 1) + gradFlat[ba + 1] * yf;
-    const d01 = gradFlat[ab] * xf + gradFlat[ab + 1] * (yf - 1);
-    const d11 = gradFlat[bb] * (xf - 1) + gradFlat[bb + 1] * (yf - 1);
+    const d10 = gradFlat[ba] * xf1 + gradFlat[ba + 1] * yf;
+    const d01 = gradFlat[ab] * xf + gradFlat[ab + 1] * yf1;
+    const d11 = gradFlat[bb] * xf1 + gradFlat[bb + 1] * yf1;
 
     // Inline bilinear interpolation
     const x0 = d00 + u * (d10 - d00);
