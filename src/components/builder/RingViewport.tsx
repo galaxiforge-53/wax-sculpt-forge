@@ -1550,7 +1550,17 @@ interface RingViewportProps {
   scaleReference?: ScaleReferenceType; // Show real-world scale reference objects
   wearPreview?: number; // 0–100, simulates polishing/wear softening
   turntableSpeed?: number; // 0 = off, positive = RPM (e.g. 4 for slow spin)
+  bgPreset?: BackgroundPreset;
 }
+
+export type BackgroundPreset = "dark-studio" | "light-studio" | "cosmic" | "neutral";
+
+export const BG_PRESETS: { id: BackgroundPreset; label: string; icon: string; bgClass: string; envPreset: LightingSettings["envPreset"]; envIntensityMul: number; toneMappingExposure: number }[] = [
+  { id: "dark-studio", label: "Dark Studio", icon: "🌑", bgClass: "bg-forge-dark", envPreset: "studio", envIntensityMul: 1, toneMappingExposure: 0.95 },
+  { id: "light-studio", label: "Light Studio", icon: "☀️", bgClass: "bg-[hsl(220,10%,88%)]", envPreset: "warehouse", envIntensityMul: 1.3, toneMappingExposure: 1.15 },
+  { id: "cosmic", label: "Cosmic", icon: "🌌", bgClass: "bg-[hsl(240,30%,6%)]", envPreset: "night", envIntensityMul: 0.8, toneMappingExposure: 0.85 },
+  { id: "neutral", label: "Neutral", icon: "📦", bgClass: "bg-[hsl(0,0%,75%)]", envPreset: "lobby", envIntensityMul: 1.5, toneMappingExposure: 1.1 },
+];
 
 // ── Clipping plane manager with interactive offset ─────────────────
 function ClipPlaneManager({ mode, offset = 0, params }: { mode: CutawayMode; offset: number; params: RingParameters }) {
@@ -1718,7 +1728,7 @@ function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, turntableSpeed = 0 }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const insp = inspectionMode;
@@ -1761,8 +1771,10 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
       ? [0, 1.8, 3.5]
       : isMobile ? [1.0, 1.5, 4.0] : [0, 3, 6];
 
-    return (
-      <div className="w-full h-full bg-forge-dark rounded-lg overflow-hidden touch-none relative">
+      const activeBg = BG_PRESETS.find(b => b.id === bgPreset) ?? BG_PRESETS[0];
+
+      return (
+        <div className={`w-full h-full ${activeBg.bgClass} rounded-lg overflow-hidden touch-none relative`}>
         {/* Surface generation progress overlay */}
         {surfaceProgress && surfaceProgress.stage !== "done" && (
           <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
@@ -1854,7 +1866,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             preserveDrawingBuffer: true,
             antialias: !isMobile,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : 0.95),
+            toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : activeBg.toneMappingExposure),
             powerPreference: isMobile ? "low-power" : "high-performance",
           }}
           dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
@@ -2057,7 +2069,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             );
           })()}
 
-          <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
+          <Environment preset={activeBg.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity * activeBg.envIntensityMul)} />
           <OrbitControls
             enablePan={false}
             enableRotate={!isRotationLocked && turntableSpeed === 0}
