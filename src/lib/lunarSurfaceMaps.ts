@@ -2016,7 +2016,7 @@ function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed:
   return canvas;
 }
 
-// ── Displacement map ──────────────────────────────────────────────
+// ── Displacement map (uses Uint32Array for 4× fewer writes) ───────
 
 function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -2024,17 +2024,16 @@ function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number)
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
+  const buf32 = new Uint32Array(img.data.buffer);
 
   for (let y = 0; y < h; y++) {
+    const yy = h - 1 - y;
+    const rowSrc = y * w;
+    const rowDst = yy * w;
     for (let x = 0; x < w; x++) {
-      const hVal = hmap[y * w + x];
-      const v = Math.round(Math.max(0, Math.min(1, hVal)) * 255);
-      const yy = (h - 1 - y);
-      const idx = (yy * w + x) * 4;
-      img.data[idx] = v;
-      img.data[idx + 1] = v;
-      img.data[idx + 2] = v;
-      img.data[idx + 3] = 255;
+      const v = Math.max(0, Math.min(255, hmap[rowSrc + x] * 255 + 0.5)) | 0;
+      // Pack RGBA as single 32-bit write (little-endian: ABGR)
+      buf32[rowDst + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
   ctx.putImageData(img, 0, 0);
