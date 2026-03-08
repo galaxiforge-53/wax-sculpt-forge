@@ -2674,7 +2674,16 @@ function getSharedHalfHmap(hmap: Float32Array, w: number, h: number): Float32Arr
     const rowSy = sy * w;
     const rowSy1 = sy1 * w;
     const dstRow = y * hw;
-    for (let x = 0; x < hw; x++) {
+    // 4-wide unrolled downsample — reduces loop overhead by 75%
+    const hw4 = hw & ~3;
+    for (let x = 0; x < hw4; x += 4) {
+      const sx0 = x * 2, sx1 = sx0 + 2, sx2 = sx0 + 4, sx3 = sx0 + 6;
+      half[dstRow + x]     = (hmap[rowSy + sx0] + hmap[rowSy + sx0 + 1] + hmap[rowSy1 + sx0] + hmap[rowSy1 + sx0 + 1]) * 0.25;
+      half[dstRow + x + 1] = (hmap[rowSy + sx1] + hmap[rowSy + sx1 + 1] + hmap[rowSy1 + sx1] + hmap[rowSy1 + sx1 + 1]) * 0.25;
+      half[dstRow + x + 2] = (hmap[rowSy + sx2] + hmap[rowSy + sx2 + 1] + hmap[rowSy1 + sx2] + hmap[rowSy1 + sx2 + 1]) * 0.25;
+      half[dstRow + x + 3] = (hmap[rowSy + sx3] + hmap[rowSy + sx3 + 1] + hmap[rowSy1 + sx3] + hmap[rowSy1 + sx3 + 1]) * 0.25;
+    }
+    for (let x = hw4; x < hw; x++) {
       const sx = x * 2;
       half[dstRow + x] = (hmap[rowSy + sx] + hmap[rowSy + sx + 1] + hmap[rowSy1 + sx] + hmap[rowSy1 + sx + 1]) * 0.25;
     }
