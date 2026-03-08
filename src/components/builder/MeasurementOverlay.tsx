@@ -211,7 +211,7 @@ export default function MeasurementOverlay({ params, visible, sizeStandard = "US
         anchorX="center"
         anchorY="bottom"
       >
-        {`OD ${(params.innerDiameter + 2 * params.thickness).toFixed(1)}mm`}
+        {`OD ${formatDimension(params.innerDiameter + 2 * params.thickness, dimensionUnit)}`}
       </Text>
     </group>
   );
