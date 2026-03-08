@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageTerrainState, ImageTerrainMode, DEFAULT_IMAGE_TERRAIN, IMAGE_TERRAIN_PRESETS } from "@/types/imageTerrain";
-import { generateHeightmapPreview } from "@/lib/imageTerrainEngine";
+import { generateTerrainPreviews } from "@/lib/imageTerrainEngine";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 const NativeImage = globalThis.Image;
 import {
   Upload, Layers, ArrowDown, ArrowUp, RotateCcw, FlipVertical,
-  Moon, Flame, Zap, Eye, EyeOff, Sparkles, SlidersHorizontal,
+  Moon, Flame, Zap, Sparkles, SlidersHorizontal, Shield, Gauge, Minimize2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,15 +33,19 @@ const PRESET_ICONS: Record<string, React.ReactNode> = {
 };
 
 function ParamRow({
-  label, value, onChange, min = 0, max = 100, step = 1, unit = "%",
+  label, value, onChange, min = 0, max = 100, step = 1, unit = "%", icon,
 }: {
   label: string; value: number; onChange: (v: number) => void;
   min?: number; max?: number; step?: number; unit?: string;
+  icon?: React.ReactNode;
 }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-muted-foreground">{label}</span>
+        <div className="flex items-center gap-1">
+          {icon}
+          <span className="text-[10px] text-muted-foreground">{label}</span>
+        </div>
         <span className="text-[10px] font-mono text-foreground/70">{value}{unit}</span>
       </div>
       <Slider
@@ -56,43 +60,66 @@ function ParamRow({
   );
 }
 
-function BeforeAfterPreview({ originalUrl, processedUrl }: { originalUrl: string; processedUrl: string | null }) {
-  const [showProcessed, setShowProcessed] = useState(true);
+// ── 3-Panel Terrain Preview ──
+type PreviewTab = "original" | "heightmap" | "normal";
+
+function TerrainPreviewPanel({
+  originalUrl,
+  heightmapUrl,
+  normalUrl,
+}: {
+  originalUrl: string;
+  heightmapUrl: string | null;
+  normalUrl: string | null;
+}) {
+  const [tab, setTab] = useState<PreviewTab>("heightmap");
+
+  const tabs: { id: PreviewTab; label: string }[] = [
+    { id: "original", label: "Source" },
+    { id: "heightmap", label: "Height" },
+    { id: "normal", label: "Surface" },
+  ];
+
+  const currentSrc =
+    tab === "heightmap" && heightmapUrl ? heightmapUrl :
+    tab === "normal" && normalUrl ? normalUrl :
+    originalUrl;
+
+  const currentLabel =
+    tab === "heightmap" ? "Processed heightmap" :
+    tab === "normal" ? "Normal / surface map" :
+    "Original source image";
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-border/50">
-      <img
-        src={showProcessed && processedUrl ? processedUrl : originalUrl}
-        alt={showProcessed ? "Processed terrain" : "Original image"}
-        className="w-full h-16 object-cover"
-      />
-      <div className="absolute top-1 right-1 flex gap-1">
-        <button
-          onClick={() => setShowProcessed(false)}
-          className={cn(
-            "px-1.5 py-0.5 rounded text-[8px] font-medium transition-colors",
-            !showProcessed
-              ? "bg-primary text-primary-foreground"
-              : "bg-black/40 text-white/70 hover:bg-black/60"
-          )}
-        >
-          Original
-        </button>
-        <button
-          onClick={() => setShowProcessed(true)}
-          className={cn(
-            "px-1.5 py-0.5 rounded text-[8px] font-medium transition-colors",
-            showProcessed
-              ? "bg-primary text-primary-foreground"
-              : "bg-black/40 text-white/70 hover:bg-black/60"
-          )}
-        >
-          Terrain
-        </button>
+    <div className="space-y-1.5">
+      {/* Tab bar */}
+      <div className="flex rounded-lg overflow-hidden border border-border/40">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "flex-1 py-1 text-[8px] font-medium transition-colors",
+              tab === t.id
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary/30 text-muted-foreground hover:bg-secondary/60"
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
-      <span className="absolute bottom-1 left-1 text-[7px] text-white/60 bg-black/30 px-1 rounded">
-        {showProcessed ? "Processed heightmap" : "Source image"}
-      </span>
+      {/* Preview image */}
+      <div className="relative rounded-lg overflow-hidden border border-border/50 bg-black/20">
+        <img
+          src={currentSrc}
+          alt={currentLabel}
+          className="w-full h-20 object-cover"
+        />
+        <span className="absolute bottom-0.5 left-1 text-[7px] text-white/60 bg-black/40 px-1 rounded">
+          {currentLabel}
+        </span>
+      </div>
     </div>
   );
 }
@@ -101,7 +128,8 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(state.imageDataUrl);
-  const [processedPreview, setProcessedPreview] = useState<string | null>(null);
+  const [heightmapPreview, setHeightmapPreview] = useState<string | null>(null);
+  const [normalPreview, setNormalPreview] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const previewTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -110,16 +138,20 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
     [state, onChange],
   );
 
-  // Generate processed preview with debounce
+  // Generate processed previews with debounce
   useEffect(() => {
     if (!state.imageDataUrl || !state.enabled) {
-      setProcessedPreview(null);
+      setHeightmapPreview(null);
+      setNormalPreview(null);
       return;
     }
     clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(async () => {
-      const url = await generateHeightmapPreview(state);
-      setProcessedPreview(url);
+      const result = await generateTerrainPreviews(state);
+      if (result) {
+        setHeightmapPreview(result.heightmap);
+        setNormalPreview(result.normalMap);
+      }
     }, 400);
     return () => clearTimeout(previewTimer.current);
   }, [state]);
@@ -167,7 +199,8 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
 
   const handleClear = useCallback(() => {
     setPreviewUrl(null);
-    setProcessedPreview(null);
+    setHeightmapPreview(null);
+    setNormalPreview(null);
     onChange({ ...DEFAULT_IMAGE_TERRAIN });
   }, [onChange]);
 
@@ -207,8 +240,12 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
 
       {previewUrl ? (
         <div className="space-y-2">
-          {/* Before/After preview */}
-          <BeforeAfterPreview originalUrl={previewUrl} processedUrl={processedPreview} />
+          {/* 3-Panel terrain preview */}
+          <TerrainPreviewPanel
+            originalUrl={previewUrl}
+            heightmapUrl={heightmapPreview}
+            normalUrl={normalPreview}
+          />
           {/* Replace / Remove */}
           <div className="flex gap-1">
             <Button
@@ -297,14 +334,38 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
             </div>
           </div>
 
-          {/* Core parameters */}
+          {/* Core terrain controls */}
           <div className="space-y-2">
+            <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 block">Terrain Shape</span>
             <ParamRow label="Depth" value={state.depth} onChange={(v) => patch({ depth: v })} />
-            <ParamRow label="Scale" value={state.scale} onChange={(v) => patch({ scale: v })} min={10} max={400} />
+            <ParamRow
+              label="Strength"
+              value={state.strength}
+              onChange={(v) => patch({ strength: v })}
+              icon={<Gauge className="w-2.5 h-2.5 text-muted-foreground/40" />}
+            />
+            <ParamRow
+              label="Compression"
+              value={state.compression}
+              onChange={(v) => patch({ compression: v })}
+              icon={<Minimize2 className="w-2.5 h-2.5 text-muted-foreground/40" />}
+            />
+            <ParamRow
+              label="Edge Protection"
+              value={state.edgeProtection}
+              onChange={(v) => patch({ edgeProtection: v })}
+              icon={<Shield className="w-2.5 h-2.5 text-muted-foreground/40" />}
+            />
+          </div>
+
+          {/* Image processing controls */}
+          <div className="space-y-2">
+            <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 block">Image Processing</span>
             <ParamRow label="Contrast" value={state.contrast} onChange={(v) => patch({ contrast: v })} min={0} max={200} />
-            <ParamRow label="Smoothing" value={state.smoothing} onChange={(v) => patch({ smoothing: v })} min={0} max={20} />
             <ParamRow label="Sharpness" value={state.sharpness} onChange={(v) => patch({ sharpness: v })} min={0} max={100} />
+            <ParamRow label="Smoothing" value={state.smoothing} onChange={(v) => patch({ smoothing: v })} min={0} max={20} />
             <ParamRow label="Wrap Correction" value={state.wrapCorrection} onChange={(v) => patch({ wrapCorrection: v })} min={0} max={100} />
+            <ParamRow label="Scale" value={state.scale} onChange={(v) => patch({ scale: v })} min={10} max={400} />
             {(state.mode === "engraved" || state.mode === "raised") && (
               <ParamRow label="Threshold" value={state.threshold} onChange={(v) => patch({ threshold: v })} />
             )}
@@ -339,7 +400,6 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
                 <ParamRow label="Offset V" value={state.offsetV} onChange={(v) => patch({ offsetV: v })} />
               </div>
 
-              {/* Invert toggle */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <FlipVertical className="w-3 h-3 text-muted-foreground/60" />
