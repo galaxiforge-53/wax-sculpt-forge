@@ -1290,6 +1290,254 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             )}
           </SubSection>
 
+          {/* ── Surface Masks ── */}
+          <SubSection title="Surface Masks" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-2">
+              <Grid3x3 className="w-3 h-3 inline mr-1" />
+              Mask areas of the ring so terrain only applies to selected regions
+            </p>
+
+            <div className="flex items-center justify-between mb-2 p-2 rounded-md bg-secondary/20">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Enable Masks</Label>
+                <p className="text-[8px] text-muted-foreground/40">Control where texture appears on the surface</p>
+              </div>
+              <Switch
+                checked={state.masksEnabled ?? false}
+                onCheckedChange={(v) => patch({ masksEnabled: v })}
+              />
+            </div>
+
+            {(state.masksEnabled ?? false) && (
+              <div className="space-y-3">
+                {/* Mask mode toggle */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground">Mask Mode</Label>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([
+                      { value: "include" as MaskMode, label: "Include", desc: "Texture only inside masks" },
+                      { value: "exclude" as MaskMode, label: "Exclude", desc: "Texture everywhere except masks" },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => patch({ maskMode: opt.value })}
+                        className={cn(
+                          "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-md text-center transition-all border",
+                          (state.maskMode ?? "include") === opt.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                        )}
+                      >
+                        <span className="text-[10px] font-medium">{opt.label}</span>
+                        <span className="text-[7px] opacity-60">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mask presets */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground">Quick Presets</Label>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([
+                      { key: "center-spot", label: "Center Spot", desc: "Round masked area" },
+                      { key: "horizontal-band", label: "Band", desc: "Horizontal strip" },
+                      { key: "vertical-stripes", label: "Stripes", desc: "Repeating columns" },
+                      { key: "organic-patches", label: "Organic", desc: "Noise-based patches" },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.key}
+                        onClick={() => patch({ masks: MASK_PRESETS[opt.key] })}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-md text-left transition-all border",
+                          "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 hover:border-primary/30"
+                        )}
+                      >
+                        <span className="text-[10px] font-medium">{opt.label}</span>
+                        <span className="text-[7px] opacity-60">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mask list */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">Masks ({(state.masks ?? []).length})</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => {
+                        const newMask: SurfaceMask = {
+                          ...DEFAULT_MASK,
+                          id: `mask-${Date.now()}`,
+                          name: `Mask ${(state.masks ?? []).length + 1}`,
+                        };
+                        patch({ masks: [...(state.masks ?? []), newMask] });
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add Mask
+                    </Button>
+                  </div>
+
+                  {(state.masks ?? []).map((mask, idx) => {
+                    const updateMask = (updates: Partial<SurfaceMask>) => {
+                      const newMasks = [...(state.masks ?? [])];
+                      newMasks[idx] = { ...mask, ...updates };
+                      patch({ masks: newMasks });
+                    };
+
+                    return (
+                      <div key={mask.id} className={cn(
+                        "p-2 rounded-lg border space-y-2",
+                        mask.enabled
+                          ? "bg-secondary/30 border-border/40"
+                          : "bg-secondary/10 border-border/20 opacity-60"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => updateMask({ enabled: !mask.enabled })}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              title={mask.enabled ? "Disable mask" : "Enable mask"}
+                            >
+                              {mask.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            </button>
+                            <input
+                              type="text"
+                              value={mask.name}
+                              onChange={(e) => updateMask({ name: e.target.value })}
+                              className="bg-transparent border-none text-[10px] font-medium text-foreground focus:outline-none w-20"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => updateMask({ invert: !mask.invert })}
+                              className={cn(
+                                "p-0.5 rounded transition-colors",
+                                mask.invert ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                              )}
+                              title="Invert mask"
+                            >
+                              <FlipHorizontal className="w-3 h-3" />
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0 text-destructive/60 hover:text-destructive"
+                              onClick={() => {
+                                const newMasks = (state.masks ?? []).filter((_, i) => i !== idx);
+                                patch({ masks: newMasks });
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {mask.enabled && (
+                          <>
+                            {/* Shape selector */}
+                            <div className="space-y-1">
+                              <Label className="text-[9px] text-muted-foreground">Shape</Label>
+                              <Select value={mask.shape} onValueChange={(v) => updateMask({ shape: v as MaskShape })}>
+                                <SelectTrigger className="h-6 text-[10px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="circle">Circle</SelectItem>
+                                  <SelectItem value="rectangle">Rectangle</SelectItem>
+                                  <SelectItem value="stripe-h">Horizontal Stripes</SelectItem>
+                                  <SelectItem value="stripe-v">Vertical Stripes</SelectItem>
+                                  <SelectItem value="noise">Organic Noise</SelectItem>
+                                  <SelectItem value="gradient-h">Horizontal Gradient</SelectItem>
+                                  <SelectItem value="gradient-v">Vertical Gradient</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Position — only for positioned shapes */}
+                            {(mask.shape === "circle" || mask.shape === "rectangle" || mask.shape === "gradient-h" || mask.shape === "gradient-v") && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">U Pos: {(mask.centerU * 100).toFixed(0)}%</Label>
+                                  <Slider value={[mask.centerU * 100]} onValueChange={([v]) => updateMask({ centerU: v / 100 })} min={0} max={100} step={1} />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">V Pos: {(mask.centerV * 100).toFixed(0)}%</Label>
+                                  <Slider value={[mask.centerV * 100]} onValueChange={([v]) => updateMask({ centerV: v / 100 })} min={0} max={100} step={1} />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Size */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-[9px] text-muted-foreground">Width: {(mask.width * 100).toFixed(0)}%</Label>
+                                <Slider value={[mask.width * 100]} onValueChange={([v]) => updateMask({ width: v / 100 })} min={5} max={100} step={1} />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[9px] text-muted-foreground">Height: {(mask.height * 100).toFixed(0)}%</Label>
+                                <Slider value={[mask.height * 100]} onValueChange={([v]) => updateMask({ height: v / 100 })} min={5} max={100} step={1} />
+                              </div>
+                            </div>
+
+                            {/* Feather & Rotation */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-[9px] text-muted-foreground">Feather: {mask.feather}%</Label>
+                                <Slider value={[mask.feather]} onValueChange={([v]) => updateMask({ feather: v })} min={0} max={100} step={1} />
+                              </div>
+                              {(mask.shape === "circle" || mask.shape === "rectangle") && (
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">Rotate: {mask.rotation}°</Label>
+                                  <Slider value={[mask.rotation]} onValueChange={([v]) => updateMask({ rotation: v })} min={0} max={360} step={1} />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Stripe-specific controls */}
+                            {(mask.shape === "stripe-h" || mask.shape === "stripe-v") && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">Count: {mask.stripeCount ?? 4}</Label>
+                                  <Slider value={[mask.stripeCount ?? 4]} onValueChange={([v]) => updateMask({ stripeCount: v })} min={1} max={16} step={1} />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">Gap: {mask.stripeGap ?? 50}%</Label>
+                                  <Slider value={[mask.stripeGap ?? 50]} onValueChange={([v]) => updateMask({ stripeGap: v })} min={10} max={90} step={1} />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Noise-specific controls */}
+                            {mask.shape === "noise" && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">Scale: {mask.noiseScale ?? 50}</Label>
+                                  <Slider value={[mask.noiseScale ?? 50]} onValueChange={([v]) => updateMask({ noiseScale: v })} min={5} max={100} step={1} />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[9px] text-muted-foreground">Threshold: {mask.noiseThreshold ?? 50}%</Label>
+                                  <Slider value={[mask.noiseThreshold ?? 50]} onValueChange={([v]) => updateMask({ noiseThreshold: v })} min={10} max={90} step={1} />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {(state.masks ?? []).length === 0 && (
+                    <p className="text-[9px] text-muted-foreground/50 text-center py-3">
+                      No masks defined. Add masks or select a preset above.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </SubSection>
+
           {/* ── Advanced Terrain Editor ── */}
           <SubSection title="Advanced Terrain Editor" defaultOpen={false}>
             <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5 flex items-center gap-1">
