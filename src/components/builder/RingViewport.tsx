@@ -1903,7 +1903,93 @@ function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
   );
 }
 
-const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
+// ── Memoized lighting rig — avoids recreating 15+ light elements on every render ──
+const LightingRig = React.memo(function LightingRig({
+  lighting, viewMode, isMobile, qualityTier, showcaseMode: sc, inspectionMode: insp,
+}: {
+  lighting: LightingSettings;
+  viewMode: ViewMode;
+  isMobile: boolean;
+  qualityTier: QualityTier;
+  showcaseMode: boolean;
+  inspectionMode: boolean;
+}) {
+  const azRad = (lighting.azimuth * Math.PI) / 180;
+  const elRad = (lighting.elevation * Math.PI) / 180;
+  const dist = 6;
+  const keyX = Math.sin(azRad) * Math.cos(elRad) * dist;
+  const keyY = Math.sin(elRad) * dist;
+  const keyZ = Math.cos(azRad) * Math.cos(elRad) * dist;
+  const fillX = -keyX * 0.7;
+  const fillY = keyY * 0.4;
+  const fillZ = -keyZ * 0.7;
+  const w = lighting.warmth / 100;
+  const keyR = Math.round(255 * (0.85 + 0.15 * w));
+  const keyG = Math.round(255 * (0.9 + 0.1 * w - 0.05 * (1 - w)));
+  const keyB = Math.round(255 * (0.75 + 0.25 * (1 - w)));
+  const keyColor = `rgb(${keyR},${keyG},${keyB})`;
+  const fillColor = viewMode === "wax" ? "#ffe8c0" : "#d8e0f8";
+
+  if (viewMode === "wax-print") {
+    return (
+      <>
+        <ambientLight intensity={lighting.ambientIntensity + 0.3} color="#f5f0e8" />
+        <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity * 0.6} castShadow={!isMobile} shadow-mapSize-width={isMobile ? 512 : 1024} shadow-mapSize-height={isMobile ? 512 : 1024} shadow-bias={-0.001} color="#ffffff" />
+        <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity + 0.2} color="#f0f0f0" />
+        <pointLight position={[0, -2, 3]} intensity={0.4} color="#ffffff" />
+      </>
+    );
+  }
+
+  const isCast = viewMode === "cast";
+  const rimX = -keyX * 1.1;
+  const rimZ = -keyZ * 1.1;
+
+  return (
+    <>
+      <ambientLight intensity={lighting.ambientIntensity} color="#f0f0f5" />
+      <directionalLight
+        position={[keyX, keyY, keyZ]}
+        intensity={sc ? lighting.keyIntensity * 1.3 : lighting.keyIntensity}
+        castShadow={!isMobile || qualityTier === "high"}
+        shadow-mapSize-width={qualityTier === "preview" ? 512 : (isMobile ? 512 : (sc || insp ? 2048 : 1024))}
+        shadow-mapSize-height={qualityTier === "preview" ? 512 : (isMobile ? 512 : (sc || insp ? 2048 : 1024))}
+        shadow-bias={-0.0003}
+        shadow-radius={4}
+        color={keyColor}
+      />
+      <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity} color={fillColor} />
+      {!isMobile && (
+        <rectAreaLight width={5} height={5} position={[0, 5, 0]} intensity={isCast ? 0.8 : 0.5} color="#ffffff" />
+      )}
+      <spotLight position={[rimX, keyY * 0.3, rimZ]} intensity={isCast ? 2.0 : 1.2} angle={0.45} penumbra={0.85} color="#e8eeff" />
+      <pointLight position={[0, -2.5, 3.5]} intensity={isCast ? 0.8 : 0.5} color="#ffffff" />
+      {!isMobile && (
+        <>
+          <pointLight position={[0, 4, -3]} intensity={isCast ? 0.6 : 0.3} color="#f0f0ff" />
+          <pointLight position={[-4, 0.5, 1]} intensity={isCast ? 0.5 : 0.3} color={isCast ? "#ffe0c0" : "#d0d0ff"} />
+        </>
+      )}
+      {sc && (
+        <>
+          <spotLight position={[rimX * 1.3, keyY * 0.5, rimZ * 1.3]} intensity={2.5} angle={0.3} penumbra={0.95} color="#e0e8ff" />
+          <pointLight position={[keyX * 0.5, -1, keyZ * 0.5]} intensity={0.8} color="#fff0d8" />
+          <rectAreaLight width={3} height={3} position={[0, 4.5, 1]} intensity={0.8} color="#ffffff" />
+        </>
+      )}
+      {insp && (
+        <>
+          <spotLight position={[3, 0.5, 2]} intensity={3.5} angle={0.4} penumbra={0.6} color="#ffffff" castShadow />
+          <spotLight position={[-3, 0.3, -1]} intensity={2.5} angle={0.5} penumbra={0.7} color="#f0f0ff" />
+          <rectAreaLight width={4} height={4} position={[0, 5, 0]} intensity={1.2} color="#ffffff" />
+          <pointLight position={[0, 0, -4]} intensity={1.5} color="#e8e0ff" />
+          <pointLight position={[0, -3, 2]} intensity={0.8} color="#fff8e0" />
+        </>
+      )}
+    </>
+  );
+});
+
   function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
