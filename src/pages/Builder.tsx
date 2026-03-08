@@ -51,30 +51,6 @@ function BuilderInner() {
   const [livePreviews, setLivePreviews] = useState<DesignPreview[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [currentProjectName, setCurrentProjectName] = useState<string | null>(null);
-  const [mobilePanel, setMobilePanel] = useState(false);
-  const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
-  const [showMeasurements, setShowMeasurements] = useState(false);
-  const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
-  const [cutawayOffset, setCutawayOffset] = useState(0);
-  const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
-  const [showcaseMode, setShowcaseMode] = useState(false);
-  const [inspectionMode, setInspectionMode] = useState(false);
-  const [ringPosition, setRingPosition] = useState<[number, number, number]>([0, 0, 0]);
-  const [ringRotation, setRingRotation] = useState<[number, number, number]>([0, 0, 0]);
-  const [showPrinterBed, setShowPrinterBed] = useState(false);
-  const [rotationLocked, setRotationLocked] = useState(false);
-  const [scaleReference, setScaleReference] = useState<ScaleReferenceType>("none");
-  const [wearPreview, setWearPreview] = useState(0);
-  const [polishPreview, setPolishPreview] = useState(0);
-  const [detailBoost, setDetailBoost] = useState(0);
-  const [thicknessHeatmap, setThicknessHeatmap] = useState(false);
-  const [turntableSpeed, setTurntableSpeed] = useState(0);
-  const [bgPreset, setBgPreset] = useState<BackgroundPreset>("dark-studio");
-  const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
-  const [studioRenderOpen, setStudioRenderOpen] = useState(false);
-  const [loupeActive, setLoupeActive] = useState(false);
-  const [loupeZoom, setLoupeZoom] = useState(3);
-  const viewportContainerRef = useRef<HTMLDivElement>(null);
   const [compareSnapshot, setCompareSnapshot] = useState<DesignSnapshot | null>(null);
   const [guidedMode, setGuidedMode] = useState(() => {
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
@@ -82,12 +58,10 @@ function BuilderInner() {
     return !hasTemplate && !hasProject;
   });
 
-  const CAMERA_BUTTONS: { id: SnapshotAngle; label: string }[] = [
-    { id: "front", label: "Front" },
-    { id: "angle", label: "45°" },
-    { id: "side", label: "Side" },
-    { id: "inside", label: "Inside" },
-  ];
+  // ── Consolidated viewport state (replaces 18 individual useState calls) ──
+  const { vp, vpSet } = useViewportState();
+  const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
+  const [studioRenderOpen, setStudioRenderOpen] = useState(false);
 
   const {
     params, updateParams, applyTemplate,
