@@ -163,7 +163,60 @@ export default function Export() {
     setSubmitStep("submitting");
 
     try {
-      // Build the full manufacturing package
+      const orderId = crypto.randomUUID();
+      const basePath = `${user.id}/${orderId}`;
+
+      // 1. Generate manufacturing STL with shrinkage compensation
+      const lunar: LunarTextureState = pkg.craftState?.lunarTexture ?? DEFAULT_LUNAR_TEXTURE;
+      const engravingState: EngravingState = pkg.craftState?.engraving ?? DEFAULT_ENGRAVING;
+
+      // Auto-select shrinkage based on confirmed metal
+      let autoShrinkage: ShrinkageMetal = "none";
+      if (confirmMetal === "gold" || confirmMetal === "rose-gold") autoShrinkage = "gold";
+      else if (confirmMetal === "silver") autoShrinkage = "silver";
+
+      const exportResult = generateExportSTL(
+        { ...pkg.parameters, size: confirmSize, innerDiameter: RING_SIZE_MAP[confirmSize] || pkg.parameters.innerDiameter },
+        lunar.enabled ? lunar : null,
+        engravingState.enabled ? engravingState : null,
+        autoShrinkage,
+      );
+
+      // 2. Upload STL to storage
+      const stlPath = `${basePath}/ring-${confirmSize}US-${pkg.parameters.width}mm.stl`;
+      const { error: stlErr } = await supabase.storage
+        .from("production-assets")
+        .upload(stlPath, exportResult.blob, {
+          contentType: "application/octet-stream",
+          upsert: true,
+        });
+      if (stlErr) throw new Error(`STL upload failed: ${stlErr.message}`);
+
+      // 3. Upload preview images
+      const previewUrls: string[] = [];
+      const previews = pkg.previews ?? [];
+      for (const preview of previews) {
+        if (!preview.dataUrl || preview.dataUrl.length < 100) continue;
+        try {
+          // Convert data URL to blob
+          const res = await fetch(preview.dataUrl);
+          const blob = await res.blob();
+          const ext = preview.dataUrl.startsWith("data:image/webp") ? "webp" : "png";
+          const imgPath = `${basePath}/preview-${preview.id}-${preview.viewMode}.${ext}`;
+
+          const { error: imgErr } = await supabase.storage
+            .from("production-assets")
+            .upload(imgPath, blob, {
+              contentType: `image/${ext}`,
+              upsert: true,
+            });
+          if (!imgErr) previewUrls.push(imgPath);
+        } catch (e) {
+          console.warn(`Preview upload failed for ${preview.id}:`, e);
+        }
+      }
+
+      // 4. Build the full manufacturing package
       const manufacturingPackage = {
         ...pkg,
         parameters: {
@@ -173,25 +226,39 @@ export default function Export() {
         },
         metalPreset: confirmMetal,
         finishPreset: confirmFinish,
+        manufacturing: {
+          shrinkageProfile: autoShrinkage,
+          shrinkageFactor: exportResult.scaleFactor,
+          stlTriangleCount: exportResult.triangleCount,
+          stlFileSizeKB: exportResult.fileSizeKB,
+          compensatedInnerDiameter: (RING_SIZE_MAP[confirmSize] || pkg.parameters.innerDiameter) * exportResult.scaleFactor,
+        },
       };
 
+      // 5. Insert production order with asset references
       const { error } = await supabase
         .from("production_orders")
         .insert({
+          id: orderId,
           user_id: user.id,
           ring_size: confirmSize,
           metal: confirmMetal,
           finish: confirmFinish,
           notes: notes.trim(),
           design_package: manufacturingPackage as any,
+          stl_path: stlPath,
+          preview_urls: previewUrls,
           status: "submitted",
-        });
+        } as any);
 
       if (error) throw error;
 
       setSubmitStep("done");
       setSent(true);
-      toast({ title: "Order Submitted! 🔥", description: "Your design has been sent to Galaxy Forge for production." });
+      toast({
+        title: "Order Submitted! 🔥",
+        description: `Complete package uploaded: STL (${exportResult.fileSizeKB} KB, ${exportResult.triangleCount.toLocaleString()} triangles) + ${previewUrls.length} preview image${previewUrls.length !== 1 ? "s" : ""}.`,
+      });
     } catch (err: any) {
       console.error("Submit error:", err);
       toast({ title: "Submission Failed", description: err.message, variant: "destructive" });
