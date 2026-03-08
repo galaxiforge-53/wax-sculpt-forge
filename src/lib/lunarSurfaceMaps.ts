@@ -1713,10 +1713,13 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
+  const buf32 = new Uint32Array(img.data.buffer);
 
   const yScale = physicalAspect * (h / w);
+  const sX = strength * 0.25;
+  const sY = strength * yScale * 0.25;
 
-  // Pre-compute U-axis wrap indices to avoid per-pixel modular arithmetic
+  // Pre-compute U-axis wrap indices
   const wrapL = new Int32Array(w);
   const wrapR = new Int32Array(w);
   for (let x = 0; x < w; x++) {
@@ -1725,20 +1728,18 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
   }
 
   for (let y = 0; y < h; y++) {
-    // Clamp row indices for V-axis (ring width edges)
     const yAbove = Math.max(0, y - 1);
     const yBelow = Math.min(h - 1, y + 1);
     const rowT = yAbove * w;
     const rowM = y * w;
     const rowB = yBelow * w;
     const yy = h - 1 - y;
-    const outRowOff = yy * w * 4;
+    const outRow = yy * w;
 
     for (let x = 0; x < w; x++) {
       const xl = wrapL[x];
       const xr = wrapR[x];
 
-      // 8 neighbors via direct array access (no closure calls)
       const tl = hmap[rowT + xl];
       const tc = hmap[rowT + x];
       const tr = hmap[rowT + xr];
@@ -1748,17 +1749,15 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
       const bc = hmap[rowB + x];
       const br = hmap[rowB + xr];
 
-      // Sobel gradient
-      let nx = (tl - tr + 2 * (ml - mr) + bl - br) * strength * 0.25;
-      let ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * strength * yScale * 0.25;
+      const nx = (tl - tr + 2 * (ml - mr) + bl - br) * sX;
+      const ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * sY;
       const nz = 1.0;
       const invLen = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz);
 
-      const idx = outRowOff + x * 4;
-      img.data[idx]     = ((nx * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
-      img.data[idx + 1] = ((ny * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
-      img.data[idx + 2] = ((nz * invLen) * 0.5 + 0.5) * 255 + 0.5 | 0;
-      img.data[idx + 3] = 255;
+      const r = (nx * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
+      const g = (ny * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
+      const b = (nz * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
+      buf32[outRow + x] = 0xFF000000 | (b << 16) | (g << 8) | r;
     }
   }
   ctx.putImageData(img, 0, 0);
