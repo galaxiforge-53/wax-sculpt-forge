@@ -7,10 +7,12 @@ export type ScaleReferenceType = "none" | "quarter" | "ruler" | "finger";
 interface ScaleReferenceProps {
   type: ScaleReferenceType;
   ringOuterDiameter: number; // in mm
+  ringInnerDiameter?: number; // in mm, used for finger sizing
+  ringWidth?: number; // in mm, used for finger ring placement
 }
 
 /** Real-world scale reference objects rendered in the 3D scene */
-export default function ScaleReference({ type, ringOuterDiameter }: ScaleReferenceProps) {
+export default function ScaleReference({ type, ringOuterDiameter, ringInnerDiameter, ringWidth }: ScaleReferenceProps) {
   // Convert mm to scene units (divided by 10)
   const scale = 0.1;
   const ringOuterR = (ringOuterDiameter / 2) * scale;
@@ -24,9 +26,11 @@ export default function ScaleReference({ type, ringOuterDiameter }: ScaleReferen
   const rulerWidth = 12 * scale;
   const rulerThickness = 2 * scale;
 
-  // Finger (average ring finger): ~17mm diameter, ~50mm length
-  const fingerRadius = 17 / 2 * scale;
-  const fingerLength = 50 * scale;
+  // Finger: sized to match the ring's inner diameter
+  const innerDiam = ringInnerDiameter ?? 17;
+  const fingerRadius = (innerDiam / 2) * scale * 0.97; // Slightly smaller so ring sits snugly
+  const fingerLength = 65 * scale; // ~65mm visible finger length
+  const bandW = (ringWidth ?? 6) * scale;
 
   const quarterGeometry = useMemo(() => {
     return new THREE.CylinderGeometry(quarterRadius, quarterRadius, quarterThickness, 64);
@@ -86,17 +90,64 @@ export default function ScaleReference({ type, ringOuterDiameter }: ScaleReferen
     return texture;
   }, []);
 
+  // Finger skin texture with subtle detail
+  const fingerSkinMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0.87, 0.72, 0.62),
+      roughness: 0.75,
+      metalness: 0.0,
+    });
+  }, []);
+
+  // Build a tapered finger geometry — wider at the base, narrower at the tip
   const fingerGeometry = useMemo(() => {
-    // Simple capsule-like finger
-    const geo = new THREE.CapsuleGeometry(fingerRadius, fingerLength - fingerRadius * 2, 16, 32);
+    const segments = 32;
+    const heightSegs = 24;
+    const baseR = fingerRadius;
+    const tipR = fingerRadius * 0.72; // Finger narrows toward tip
+
+    // Use lathe for natural taper
+    const points: THREE.Vector2[] = [];
+    const halfLen = fingerLength / 2;
+
+    for (let i = 0; i <= heightSegs; i++) {
+      const t = i / heightSegs; // 0 = bottom (base), 1 = top (tip)
+      const y = -halfLen + t * fingerLength;
+
+      let r: number;
+      if (t < 0.05) {
+        // Base flat cap
+        r = baseR * Math.sin(t / 0.05 * Math.PI / 2);
+      } else if (t > 0.88) {
+        // Fingertip rounding
+        const tipT = (t - 0.88) / 0.12;
+        r = tipR * Math.cos(tipT * Math.PI / 2);
+      } else {
+        // Natural taper from base to tip
+        const taperT = (t - 0.05) / 0.83;
+        r = baseR + (tipR - baseR) * taperT;
+        // Slight bulge around the knuckle area (~30% from base)
+        const knuckleT = Math.abs(taperT - 0.3) / 0.15;
+        if (knuckleT < 1) {
+          r += baseR * 0.06 * (1 - knuckleT * knuckleT);
+        }
+      }
+      points.push(new THREE.Vector2(Math.max(0.001, r), y));
+    }
+
+    const geo = new THREE.LatheGeometry(points, segments);
+    geo.computeVertexNormals();
     return geo;
   }, [fingerRadius, fingerLength]);
 
-  const fingerMaterial = useMemo(() => {
+  // Knuckle crease texture (subtle lines)
+  const knuckleCreaseMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0.87, 0.72, 0.62),
-      roughness: 0.7,
+      color: new THREE.Color(0.78, 0.62, 0.52),
+      roughness: 0.85,
       metalness: 0.0,
+      transparent: true,
+      opacity: 0.5,
     });
   }, []);
 
@@ -152,36 +203,88 @@ export default function ScaleReference({ type, ringOuterDiameter }: ScaleReferen
         </group>
       )}
 
-      {/* ── Finger ── */}
+      {/* ── Finger Visualizer ── */}
       {type === "finger" && (
-        <group position={[0, fingerLength / 2 - 0.15, 0]} rotation={[0, 0, 0]}>
-          <mesh geometry={fingerGeometry} material={fingerMaterial} castShadow receiveShadow />
-          {/* Fingernail hint */}
-          <mesh position={[0, fingerLength / 2 - fingerRadius * 0.8, -fingerRadius * 0.7]} rotation={[0.3, 0, 0]}>
-            <capsuleGeometry args={[fingerRadius * 0.6, fingerRadius * 0.4, 4, 16]} />
-            <meshStandardMaterial color="#f0e0d6" roughness={0.4} metalness={0.1} />
-          </mesh>
-          {/* Label */}
+        <group position={[0, 0, 0]}>
+          {/* Finger — positioned so ring sits naturally around it */}
+          {/* Ring is at y=0, finger extends up (tip) and down (base) */}
+          <group position={[0, fingerLength * 0.12, 0]}>
+            {/* Main finger body */}
+            <mesh geometry={fingerGeometry} material={fingerSkinMaterial} castShadow receiveShadow />
+
+            {/* Knuckle creases — thin torus rings at knuckle positions */}
+            {[-0.12, -0.1, -0.08].map((kPos, i) => (
+              <mesh
+                key={i}
+                position={[0, fingerLength * kPos, 0]}
+                rotation={[0, 0, 0]}
+              >
+                <torusGeometry args={[
+                  fingerRadius * (1 + 0.06 * (1 - Math.abs(kPos + 0.1) / 0.04)),
+                  0.003,
+                  4,
+                  32
+                ]} />
+                <primitive object={knuckleCreaseMaterial} attach="material" />
+              </mesh>
+            ))}
+
+            {/* Secondary creases between ring and knuckle */}
+            {[0.08, 0.1].map((kPos, i) => (
+              <mesh
+                key={`c${i}`}
+                position={[0, fingerLength * kPos, 0]}
+              >
+                <torusGeometry args={[fingerRadius * 0.88, 0.002, 4, 32]} />
+                <primitive object={knuckleCreaseMaterial} attach="material" />
+              </mesh>
+            ))}
+
+            {/* Fingernail */}
+            <group position={[0, fingerLength * 0.42, -fingerRadius * 0.72 * 0.55]} rotation={[0.2, 0, 0]}>
+              <mesh castShadow>
+                <capsuleGeometry args={[fingerRadius * 0.72 * 0.55, fingerRadius * 0.72 * 0.35, 4, 16]} />
+                <meshStandardMaterial color="#f2e4da" roughness={0.3} metalness={0.05} />
+              </mesh>
+              {/* Nail edge highlight */}
+              <mesh position={[0, fingerRadius * 0.72 * 0.2, -0.005]}>
+                <capsuleGeometry args={[fingerRadius * 0.72 * 0.45, fingerRadius * 0.72 * 0.1, 4, 16]} />
+                <meshStandardMaterial color="#faf0ea" roughness={0.2} metalness={0.05} transparent opacity={0.6} />
+              </mesh>
+            </group>
+          </group>
+
+          {/* Info labels */}
           <Text
-            position={[fingerRadius + 0.15, 0, 0]}
-            fontSize={0.055}
+            position={[fingerRadius + 0.25, -fingerLength * 0.2, 0]}
+            fontSize={0.05}
             color="hsl(var(--muted-foreground))"
             anchorX="left"
             anchorY="middle"
           >
-            Ring Finger
+            {`Size ${Math.round(innerDiam > 0 ? Object.entries(RING_SIZE_APPROX).reduce((best, [size, diam]) => 
+              Math.abs(diam - innerDiam) < Math.abs(best[1] - innerDiam) ? [size, diam] as [string, number] : best, 
+              ["8", 18.1] as [string, number]
+            )[0] : "8")} · Ø${innerDiam.toFixed(1)}mm`}
           </Text>
           <Text
-            position={[fingerRadius + 0.15, -0.08, 0]}
-            fontSize={0.04}
+            position={[fingerRadius + 0.25, -fingerLength * 0.2 - 0.07, 0]}
+            fontSize={0.038}
             color="hsl(var(--muted-foreground))"
             anchorX="left"
             anchorY="middle"
           >
-            (~17mm Ø)
+            {`Band: ${(ringWidth ?? 6).toFixed(1)}mm wide`}
           </Text>
         </group>
       )}
     </group>
   );
 }
+
+// Approximate size-to-diameter mapping for labels
+const RING_SIZE_APPROX: Record<string, number> = {
+  "3": 14.0, "4": 14.8, "5": 15.7, "6": 16.5, "7": 17.3, "8": 18.1,
+  "9": 19.0, "10": 19.8, "11": 20.6, "12": 21.4, "13": 22.2, "14": 23.0,
+  "15": 23.8, "16": 24.6,
+};
