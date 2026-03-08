@@ -32,14 +32,30 @@ function craftId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * Clamp ring parameters to safe ranges to prevent geometry errors.
+ */
+function clampParams(p: RingParameters): RingParameters {
+  return {
+    ...p,
+    size: Math.max(3, Math.min(16, p.size)),
+    innerDiameter: Math.max(14.0, Math.min(24.6, p.innerDiameter)),
+    width: Math.max(1, Math.min(20, p.width)),
+    thickness: Math.max(0.5, Math.min(8, p.thickness)),
+    grooveCount: Math.max(0, Math.min(12, Math.floor(p.grooveCount))),
+    grooveDepth: Math.max(0, Math.min(2, p.grooveDepth)),
+    bevelSize: Math.max(0, Math.min(3, p.bevelSize)),
+    interiorCurvature: Math.max(0, Math.min(100, p.interiorCurvature ?? 40)),
+    comfortFitDepth: Math.max(0, Math.min(100, p.comfortFitDepth ?? 50)),
+  };
+}
+
 export function useRingDesign() {
   const [params, setParams] = useState<RingParameters>(DEFAULT_RING);
   const [viewMode, setViewMode] = useState<ViewMode>("wax");
   const [metalPreset, setMetalPreset] = useState<MetalPreset>("silver");
   const [finishPreset, setFinishPreset] = useState<FinishPreset>("polished");
   const [activeTool, setActiveTool] = useState<ToolType | null>(null);
-  const [history, setHistory] = useState<RingParameters[]>([DEFAULT_RING]);
-  const [historyIndex, setHistoryIndex] = useState(0);
   const [toolHistory, setToolHistory] = useState<ToolHistoryEntry[]>([]);
   const [pipelineState, setPipelineState] = useState<ForgePipelineState>({
     currentStage: "WAX_SCULPT",
@@ -56,6 +72,13 @@ export function useRingDesign() {
     radiusMm: 1.2,
     intensity: 0.65,
   });
+
+  // ── History via refs to prevent stale closures ──
+  const historyRef = useRef<RingParameters[]>([DEFAULT_RING]);
+  const historyIndexRef = useRef(0);
+  // Trigger re-renders for undo/redo button state
+  const [historyVersion, setHistoryVersion] = useState(0);
+
   const craftStateRef = useRef<{
     baseRingParams: RingParameters;
     createdAt: string;
@@ -74,57 +97,73 @@ export function useRingDesign() {
 
   const pushHistory = useCallback(
     (newParams: RingParameters) => {
-      const newHistory = history.slice(0, historyIndex + 1);
+      const history = historyRef.current;
+      const idx = historyIndexRef.current;
+      const newHistory = history.slice(0, idx + 1);
       newHistory.push(newParams);
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+      // Cap history to 100 entries to prevent memory bloat
+      if (newHistory.length > 100) newHistory.shift();
+      historyRef.current = newHistory;
+      historyIndexRef.current = newHistory.length - 1;
+      setHistoryVersion((v) => v + 1);
     },
-    [history, historyIndex]
+    []
   );
 
   const updateParams = useCallback(
     (updates: Partial<RingParameters>) => {
-      const newParams = { ...params, ...updates };
-      if (updates.size !== undefined) {
-        newParams.innerDiameter = RING_SIZE_MAP[updates.size] || params.innerDiameter;
-      }
-      setParams(newParams);
-      pushHistory(newParams);
-      craftStateRef.current.baseRingParams = newParams;
-      logCraftAction("parameter_adjusted", { updates });
+      setParams((prev) => {
+        const merged = { ...prev, ...updates };
+        if (updates.size !== undefined) {
+          merged.innerDiameter = RING_SIZE_MAP[updates.size] || prev.innerDiameter;
+        }
+        const clamped = clampParams(merged);
+        pushHistory(clamped);
+        craftStateRef.current.baseRingParams = clamped;
+        logCraftAction("parameter_adjusted", { updates });
+        return clamped;
+      });
     },
-    [params, pushHistory, logCraftAction]
+    [pushHistory, logCraftAction]
   );
 
   const applyTemplate = useCallback(
     (updates: Partial<RingParameters>) => {
-      const newParams = { ...params, ...updates };
-      if (updates.size !== undefined) {
-        newParams.innerDiameter = RING_SIZE_MAP[updates.size] || params.innerDiameter;
-      }
-      setParams(newParams);
-      pushHistory(newParams);
-      craftStateRef.current.baseRingParams = newParams;
-      logCraftAction("template_applied", { updates });
+      setParams((prev) => {
+        const merged = { ...prev, ...updates };
+        if (updates.size !== undefined) {
+          merged.innerDiameter = RING_SIZE_MAP[updates.size] || prev.innerDiameter;
+        }
+        const clamped = clampParams(merged);
+        pushHistory(clamped);
+        craftStateRef.current.baseRingParams = clamped;
+        logCraftAction("template_applied", { updates });
+        return clamped;
+      });
     },
-    [params, pushHistory, logCraftAction]
+    [pushHistory, logCraftAction]
   );
 
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setParams(history[newIndex]);
+    const idx = historyIndexRef.current;
+    if (idx > 0) {
+      const newIndex = idx - 1;
+      historyIndexRef.current = newIndex;
+      setParams(historyRef.current[newIndex]);
+      setHistoryVersion((v) => v + 1);
     }
-  }, [history, historyIndex]);
+  }, []);
 
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
+    const idx = historyIndexRef.current;
+    const history = historyRef.current;
+    if (idx < history.length - 1) {
+      const newIndex = idx + 1;
+      historyIndexRef.current = newIndex;
       setParams(history[newIndex]);
+      setHistoryVersion((v) => v + 1);
     }
-  }, [history, historyIndex]);
+  }, []);
 
   const applyTool = useCallback(
     (tool: ToolType, toolParams: Record<string, number> = {}) => {
@@ -137,16 +176,16 @@ export function useRingDesign() {
 
       switch (tool) {
         case "smooth":
-          updateParams({ bevelSize: Math.min(params.bevelSize + 0.1, 1.5) });
+          updateParams({ bevelSize: Math.min((historyRef.current[historyIndexRef.current]?.bevelSize ?? 0.3) + 0.1, 1.5) });
           break;
         case "bevel":
-          updateParams({ bevelSize: Math.min(params.bevelSize + 0.2, 2.0) });
+          updateParams({ bevelSize: Math.min((historyRef.current[historyIndexRef.current]?.bevelSize ?? 0.3) + 0.2, 2.0) });
           break;
         case "groove":
-          updateParams({ grooveCount: params.grooveCount + 1 });
+          updateParams({ grooveCount: (historyRef.current[historyIndexRef.current]?.grooveCount ?? 0) + 1 });
           break;
         case "carve":
-          updateParams({ thickness: Math.max(params.thickness - 0.2, 1.0) });
+          updateParams({ thickness: Math.max((historyRef.current[historyIndexRef.current]?.thickness ?? 2) - 0.2, 1.0) });
           break;
         case "flatten":
           updateParams({ profile: "flat" });
@@ -158,7 +197,7 @@ export function useRingDesign() {
           break;
       }
     },
-    [params, updateParams, logCraftAction]
+    [updateParams, logCraftAction]
   );
 
   const setStage = useCallback((id: ForgeStageId) => {
@@ -299,16 +338,18 @@ export function useRingDesign() {
   const balanceAnalysis = useMemo(() => analyzeSurfaceBalance(params, lunarTexture, engraving, waxMarks, inlays), [params, lunarTexture, engraving, waxMarks, inlays]);
 
   const autoBalance = useCallback(() => {
-    const result = computeAutoBalance(params, lunarTexture, engraving, waxMarks, inlays);
+    const currentParams = historyRef.current[historyIndexRef.current] ?? params;
+    const result = computeAutoBalance(currentParams, lunarTexture, engraving, waxMarks, inlays);
 
     if (Object.keys(result.paramsPatch).length > 0) {
-      const newParams = { ...params, ...result.paramsPatch };
+      const merged = { ...currentParams, ...result.paramsPatch };
       if (result.paramsPatch.size !== undefined) {
-        newParams.innerDiameter = RING_SIZE_MAP[result.paramsPatch.size] || params.innerDiameter;
+        merged.innerDiameter = RING_SIZE_MAP[result.paramsPatch.size] || currentParams.innerDiameter;
       }
-      setParams(newParams);
-      pushHistory(newParams);
-      craftStateRef.current.baseRingParams = newParams;
+      const clamped = clampParams(merged);
+      setParams(clamped);
+      pushHistory(clamped);
+      craftStateRef.current.baseRingParams = clamped;
     }
     if (result.lunarPatch) {
       setLunarTextureRaw((prev) => ({ ...prev, ...result.lunarPatch! }));
@@ -327,9 +368,11 @@ export function useRingDesign() {
   }, [params, lunarTexture, engraving, waxMarks, inlays, pushHistory, logCraftAction]);
 
   const restoreDesign = useCallback((pkg: DesignPackage) => {
-    setParams(pkg.parameters);
-    setHistory([pkg.parameters]);
-    setHistoryIndex(0);
+    const clamped = clampParams(pkg.parameters);
+    setParams(clamped);
+    historyRef.current = [clamped];
+    historyIndexRef.current = 0;
+    setHistoryVersion((v) => v + 1);
     setViewMode(pkg.viewMode);
     setMetalPreset(pkg.metalPreset);
     setFinishPreset(pkg.finishPreset);
@@ -358,24 +401,26 @@ export function useRingDesign() {
     const savedEngraving = pkg.craftState?.engraving;
     setEngravingRaw(savedEngraving ? { ...DEFAULT_ENGRAVING, ...savedEngraving } : { ...DEFAULT_ENGRAVING });
     craftStateRef.current = {
-      baseRingParams: pkg.parameters,
+      baseRingParams: clamped,
       createdAt: pkg.craftState.createdAt,
       updatedAt: pkg.craftState.updatedAt,
     };
   }, []);
 
   const enhanceDesign = useCallback((): EnhancementResult => {
-    const result = computeEnhancements(params, lunarTexture, engraving);
+    const currentParams = historyRef.current[historyIndexRef.current] ?? params;
+    const result = computeEnhancements(currentParams, lunarTexture, engraving);
 
     // Apply parameter changes
     if (Object.keys(result.params).length > 0) {
-      const newParams = { ...params, ...result.params };
+      const merged = { ...currentParams, ...result.params };
       if (result.params.size !== undefined) {
-        newParams.innerDiameter = RING_SIZE_MAP[result.params.size] || params.innerDiameter;
+        merged.innerDiameter = RING_SIZE_MAP[result.params.size] || currentParams.innerDiameter;
       }
-      setParams(newParams);
-      pushHistory(newParams);
-      craftStateRef.current.baseRingParams = newParams;
+      const clamped = clampParams(merged);
+      setParams(clamped);
+      pushHistory(clamped);
+      craftStateRef.current.baseRingParams = clamped;
     }
 
     // Apply lunar changes
@@ -413,8 +458,8 @@ export function useRingDesign() {
     applyTool,
     undo,
     redo,
-    canUndo: historyIndex > 0,
-    canRedo: historyIndex < history.length - 1,
+    canUndo: historyIndexRef.current > 0,
+    canRedo: historyIndexRef.current < historyRef.current.length - 1,
     generateDesignPackage,
     toolHistory,
     pipelineState,
@@ -441,5 +486,7 @@ export function useRingDesign() {
     enhanceDesign,
     balanceAnalysis,
     autoBalance,
+    // expose for re-render on history changes
+    _historyVersion: historyVersion,
   };
 }

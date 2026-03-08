@@ -522,10 +522,34 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
 
-  const { outerGeo, innerGeo, capGeoTop, capGeoBot } = useMemo(
-    () => buildSolidRingGeometry(params, hasLunar, isMobile),
-    [params, hasLunar, isMobile]
-  );
+  // Build geometry and dispose previous on param changes
+  const geoRef = useRef<{ outerGeo: THREE.LatheGeometry; innerGeo: THREE.LatheGeometry; capGeoTop: THREE.RingGeometry; capGeoBot: THREE.RingGeometry } | null>(null);
+
+  const { outerGeo, innerGeo, capGeoTop, capGeoBot } = useMemo(() => {
+    // Dispose previous geometries to free GPU memory
+    if (geoRef.current) {
+      geoRef.current.outerGeo.dispose();
+      geoRef.current.innerGeo.dispose();
+      geoRef.current.capGeoTop.dispose();
+      geoRef.current.capGeoBot.dispose();
+    }
+    const result = buildSolidRingGeometry(params, hasLunar, isMobile);
+    geoRef.current = result;
+    return result;
+  }, [params, hasLunar, isMobile]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (geoRef.current) {
+        geoRef.current.outerGeo.dispose();
+        geoRef.current.innerGeo.dispose();
+        geoRef.current.capGeoTop.dispose();
+        geoRef.current.capGeoBot.dispose();
+        geoRef.current = null;
+      }
+    };
+  }, []);
 
   const isWax = viewMode === "wax";
   const isWaxPrint = viewMode === "wax-print";
