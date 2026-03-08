@@ -1543,32 +1543,31 @@ export function buildHeightmap(
   }
 
   // ─── 12) Smooth edges final pass ──
-  // When smoothEdges is enabled, apply a light blur to soften harsh crater boundaries
-  // and reduce aliasing artifacts — important for castability in wax printing
+  // Separable horizontal + vertical blur for better cache coherence
+  // Previous 3×3 non-separable kernel required diagonal reads; separable is ~2× faster
   if (lunar.smoothEdges) {
     const smoothTemp = new Float32Array(hmap.length);
+    // Horizontal pass — reads are contiguous in memory
     for (let y = 0; y < MAP_H; y++) {
+      const rowOff = y * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
-        const idx = y * MAP_W + x;
-        let sum = hmap[idx] * 4;
-        let count = 4;
         const xl = ((x - 1) % MAP_W + MAP_W) % MAP_W;
         const xr = ((x + 1) % MAP_W + MAP_W) % MAP_W;
-        sum += hmap[y * MAP_W + xl]; count++;
-        sum += hmap[y * MAP_W + xr]; count++;
-        if (y > 0) { sum += hmap[(y - 1) * MAP_W + x]; count++; }
-        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + x]; count++; }
-        // Diagonals for smoother result
-        if (y > 0) { sum += hmap[(y - 1) * MAP_W + xl] * 0.5; count += 0.5; }
-        if (y > 0) { sum += hmap[(y - 1) * MAP_W + xr] * 0.5; count += 0.5; }
-        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + xl] * 0.5; count += 0.5; }
-        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + xr] * 0.5; count += 0.5; }
-        smoothTemp[idx] = sum / count;
+        smoothTemp[rowOff + x] = hmap[rowOff + xl] * 0.25 + hmap[rowOff + x] * 0.5 + hmap[rowOff + xr] * 0.25;
+      }
+    }
+    // Vertical pass on horizontally-blurred data
+    const smoothResult = new Float32Array(hmap.length);
+    for (let y = 0; y < MAP_H; y++) {
+      const yAbove = Math.max(0, y - 1);
+      const yBelow = Math.min(MAP_H - 1, y + 1);
+      for (let x = 0; x < MAP_W; x++) {
+        smoothResult[y * MAP_W + x] = smoothTemp[yAbove * MAP_W + x] * 0.25 + smoothTemp[y * MAP_W + x] * 0.5 + smoothTemp[yBelow * MAP_W + x] * 0.25;
       }
     }
     // Blend 40% smoothed for subtle effect
     for (let i = 0; i < hmap.length; i++) {
-      hmap[i] = hmap[i] * 0.6 + smoothTemp[i] * 0.4;
+      hmap[i] = hmap[i] * 0.6 + smoothResult[i] * 0.4;
     }
   }
 
