@@ -114,6 +114,7 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("shape");
   const [panelHeight, setPanelHeight] = useState<PanelHeight>("collapsed");
   const { isPremium } = useAccess();
+  const { toast } = useToast();
 
   const togglePanel = (tab: MobileTab) => {
     if (activeTab === tab && panelHeight !== "collapsed") {
