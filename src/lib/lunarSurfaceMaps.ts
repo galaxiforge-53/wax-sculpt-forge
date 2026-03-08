@@ -2038,7 +2038,7 @@ export function buildHeightmap(
       const invPxR2 = 1 / pxR2;
       for (let py = y0; py <= y1; py++) {
         const rowOff_pit = py * MAP_W;
-        const pitRowMask = edgeMask[rowOff_pit]; // row-constant
+        const pitRowMask = edgeRow[py];
         const dv = (py - pvH) * aspectRatio;
         const dv2 = dv * dv;
         if (dv2 > pxR2) continue;
