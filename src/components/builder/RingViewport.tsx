@@ -1890,6 +1890,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             <CrossSectionAnnotations params={params} cutawayMode={cutawayMode} engraving={engraving} />
           </group>
 
+          {/* Real-world scale reference objects */}
+          {activeScaleRef !== "none" && (
+            <ScaleReference type={activeScaleRef} ringOuterDiameter={params.innerDiameter + 2 * params.thickness} />
+          )}
+
           {/* Environment bed — printer bed or workbench */}
           {showPrinterBed ? (
             <PrinterBedSimulation params={params} />
