@@ -375,25 +375,72 @@ function stampCrater(
     angularPhase: c.angularPhase,
   };
 
+  // Pre-compute whether we need expensive shape/asymmetry calculations
+  const isCircular = shapeMode === "circular";
+  const hasAsymmetry = c.rimAsymmetry > 0.01;
+  const hasSlump = c.slumpStrength > 0.01;
+  const invPxR = 1 / pxR;
+  const invPyR = 1 / pyR;
+  // Squared radius for cheap early rejection (before expensive shapedDistance)
+  const rejectR2 = (c.radius * 1.7) * (c.radius * 1.7);
+
   for (let py = y0; py <= y1; py++) {
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
 
-      const du = (px - c.cu * w) / pxR;
-      const dv = (py - c.cv * h) / pyR;
+      const rawDu = px - c.cu * w;
+      const rawDv = py - c.cv * h;
 
-      const { dist, wdu, wdv } = shapedDistance(du, dv, sp, px, py, w, h);
+      // Cheap squared-distance early rejection in UV space
+      // Avoids calling shapedDistance for pixels clearly outside crater influence
+      const rawU = rawDu / w;
+      const rawV = rawDv / h;
+      if (rawU * rawU + rawV * rawV * (1 / (vStretch * vStretch)) > rejectR2) continue;
+
+      const du = rawDu * invPxR;
+      const dv = rawDv * invPyR;
+
+      let dist: number, wdu: number, wdv: number;
+
+      if (isCircular) {
+        // Fast path for circular craters: skip shape transformation, only do domain warp
+        const coarseScale = sp.noiseScale * 0.5;
+        const fineScale = sp.noiseScale * 2.0;
+        const invW = 1 / w;
+        const invH = 1 / h;
+        const pxInvW = px * invW;
+        const pyInvH = py * invH;
+        const wU = sp.warpNoise(pxInvW * coarseScale, pyInvH * coarseScale) * 0.7
+                  + sp.warpNoise(pxInvW * fineScale + 50, pyInvH * fineScale + 50) * 0.3;
+        const wV = sp.warpNoise(pyInvH * coarseScale + 100, pxInvW * coarseScale + 100) * 0.7
+                  + sp.warpNoise(pyInvH * fineScale + 150, pxInvW * fineScale + 150) * 0.3;
+        wdu = du + sp.warpAmp * 0.22 * wU;
+        wdv = dv + sp.warpAmp * 0.22 * wV;
+        dist = Math.sqrt(wdu * wdu + wdv * wdv);
+      } else {
+        const result = shapedDistance(du, dv, sp, px, py, w, h);
+        dist = result.dist;
+        wdu = result.wdu;
+        wdv = result.wdv;
+      }
       if (dist > ejectaEnd) continue;
 
-      const angle = Math.atan2(wdv, wdu);
-      const angleDiff = Math.cos(angle - c.rimAsymAngle);
-      const rimAsymFactor = 1.0 + c.rimAsymmetry * 0.4 * angleDiff;
+      // Skip expensive atan2 for craters with no rim asymmetry
+      let rimAsymFactor = 1.0;
+      if (hasAsymmetry) {
+        const angle = Math.atan2(wdv, wdu);
+        rimAsymFactor = 1.0 + c.rimAsymmetry * 0.4 * Math.cos(angle - c.rimAsymAngle);
+      }
 
-      const slumpShift = c.slumpStrength * 0.08;
-      const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
-      const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
-      const slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
+      // Skip slump computation for craters with negligible slump
+      let slumpDist = dist;
+      if (hasSlump) {
+        const slumpShift = c.slumpStrength * 0.08;
+        const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
+        const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
+        slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
+      }
 
       let delta = 0;
       const effectiveRimH = c.rimHeight * rimAsymFactor;
@@ -556,7 +603,6 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   if (mariaFactor <= 0) return;
 
   // Approximate percentile via random sampling (O(k) instead of O(n log n) full sort)
-  // Sampling 2000 points gives <2% error on 4M-pixel maps
   const sampleCount = 2000;
   const sampleRng = seededRng(seed + 6500);
   const samples = new Float32Array(sampleCount);
@@ -565,22 +611,26 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   }
   samples.sort();
   const threshold = samples[Math.floor(sampleCount * (0.35 + mariaFactor * 0.15))];
+  const invThreshold = 1 / Math.max(0.01, threshold);
+  const fillTarget = threshold * 0.85;
 
   const mariaNoise = makeNoise2D(seed + 6000);
   const mariaStrength = mariaFactor * 0.7;
+  const invW6 = 6 / w;
+  const invH6 = 6 / h;
 
   for (let y = 0; y < h; y++) {
+    const rowOff = y * w;
+    const vCoord = y * invH6;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const hVal = hmap[idx];
-      if (hVal < threshold) {
-        const depth = (threshold - hVal) / Math.max(0.01, threshold);
-        const noise = mariaNoise(x / w * 6, y / h * 6) * 0.3 + 0.5;
-        const fill = depth * mariaStrength * noise;
-        const mask = edgeMask[idx];
-        // Raise low areas toward threshold (fill in)
-        hmap[idx] = lerp(hVal, threshold * 0.85, fill * mask);
-      }
+      if (hVal >= threshold) continue; // branch: skip above-threshold pixels early
+      const depth = (threshold - hVal) * invThreshold;
+      const noise = mariaNoise(x * invW6, vCoord) * 0.3 + 0.5;
+      const fill = depth * mariaStrength * noise;
+      const mask = edgeMask[idx];
+      hmap[idx] = hVal + (fillTarget - hVal) * fill * mask;
     }
   }
 }
@@ -883,15 +933,17 @@ function applyLunarRayBrightening(
 ) {
   const rayNoise = makeNoise2D(seed + 13001);
   const rayAmp = 0.015 * depthScale;
+  const invW = 6 / w;
+  const invH = 6 / h;
 
   for (let y = 0; y < h; y++) {
+    const v05 = y * invH * 0.5;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const u = x / w * 6;
-      const v = y / h * 6;
-      // Directional noise creating subtle linear brightening
-      const n = rayNoise(u * 3, v * 0.5);
+      const u3 = x * invW * 3;
+      const n = rayNoise(u3, v05);
       if (n > 0.3) {
-        const idx = y * w + x;
+        const idx = rowOff + x;
         hmap[idx] += (n - 0.3) * rayAmp * edgeMask[idx];
       }
     }
@@ -904,9 +956,7 @@ function applyDustFill(
   hmap: Float32Array, w: number, h: number,
   edgeMask: Float32Array, seed: number, depthScale: number,
 ) {
-  // Wind-driven dust fills craters unevenly
   const dustNoise = makeNoise2D(seed + 14001);
-  // Approximate percentile via random sampling (O(k) instead of O(n log n))
   const sampleCount = 2000;
   const sampleRng = seededRng(seed + 14500);
   const samples = new Float32Array(sampleCount);
@@ -915,17 +965,21 @@ function applyDustFill(
   }
   samples.sort();
   const fillLevel = samples[Math.floor(sampleCount * 0.45)];
+  const invFillLevel = 1 / Math.max(0.01, fillLevel);
+  const fillTarget = fillLevel * 0.9;
+  const invW4 = 4 / w;
+  const invH2 = 2 / h;
 
   for (let y = 0; y < h; y++) {
+    const rowOff = y * w;
+    const vCoord = y * invH2;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
-      if (hmap[idx] < fillLevel) {
-        const depth = (fillLevel - hmap[idx]) / Math.max(0.01, fillLevel);
-        // Wind direction bias — dust accumulates on one side
-        const windBias = 0.5 + 0.5 * dustNoise(x / w * 4, y / h * 2);
-        const fill = depth * 0.6 * windBias;
-        hmap[idx] = lerp(hmap[idx], fillLevel * 0.9, fill * edgeMask[idx]);
-      }
+      const idx = rowOff + x;
+      if (hmap[idx] >= fillLevel) continue;
+      const depth = (fillLevel - hmap[idx]) * invFillLevel;
+      const windBias = 0.5 + 0.5 * dustNoise(x * invW4, vCoord);
+      const fill = depth * 0.6 * windBias;
+      hmap[idx] = hmap[idx] + (fillTarget - hmap[idx]) * fill * edgeMask[idx];
     }
   }
 }
@@ -941,21 +995,20 @@ function applyValhallaConcentric(
   const centerV = 0.3 + rng() * 0.4;
   const ringCount = 4 + Math.floor(rng() * 4);
   const ringAmp = 0.03 * depthScale;
+  const ringPhaseScale = ringCount * Math.PI * 8;
+  const invW = 1 / w;
+  const invH = 1 / h;
 
   for (let y = 0; y < h; y++) {
+    const dv = y * invH - centerV;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      let du = (x / w - centerU);
-      // Wrap around circumference
+      let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
       if (du < -0.5) du += 1;
-      const dv = (y / h - centerV);
       const dist = Math.sqrt(du * du + dv * dv);
-
-      // Concentric sine waves
-      const ringPhase = dist * ringCount * Math.PI * 8;
-      const ringVal = Math.sin(ringPhase) * Math.exp(-dist * 4);
-
-      const idx = y * w + x;
+      const ringVal = Math.sin(dist * ringPhaseScale) * Math.exp(-dist * 4);
+      const idx = rowOff + x;
       hmap[idx] += ringVal * ringAmp * edgeMask[idx];
     }
   }
@@ -970,20 +1023,24 @@ function applyOrganicDunes(
   const duneNoise = makeNoise2D(seed + 16001);
   const duneNoise2 = makeNoise2D(seed + 16002);
   const duneAmp = 0.05 * depthScale;
+  const invW = 1 / w;
+  const invH = 1 / h;
 
   for (let y = 0; y < h; y++) {
+    const v = y * invH;
+    const v25 = v * 25;
+    const v3 = v * 3;
+    const v5 = v * 5;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const u = x / w;
-      const v = y / h;
-
-      // Long parallel dunes with meandering — primarily u-direction
-      const dunePhase = v * 25 + duneNoise(u * 8, v * 3) * 3;
+      const u = x * invW;
+      const u8 = u * 8;
+      const u5 = u * 5;
+      const dunePhase = v25 + duneNoise(u8, v3) * 3;
       const dune = Math.sin(dunePhase) * 0.5 + 0.5;
-      // Cross-pattern secondary dunes
-      const crossDune = Math.sin(u * 40 + duneNoise2(u * 5, v * 5) * 2) * 0.3 + 0.5;
-
+      const crossDune = Math.sin(u * 40 + duneNoise2(u5, v5) * 2) * 0.3 + 0.5;
       const combined = dune * 0.7 + crossDune * 0.3;
-      const idx = y * w + x;
+      const idx = rowOff + x;
       hmap[idx] += (combined - 0.5) * duneAmp * edgeMask[idx];
     }
   }
@@ -1338,27 +1395,95 @@ function applySurfaceMasks(
 
   const noiseFunc = makeNoise2D(seed + 77777);
 
+  // Pre-compute per-mask trig values to avoid recomputing cos/sin per pixel
+  const maskCosR = new Float64Array(activeMasks.length);
+  const maskSinR = new Float64Array(activeMasks.length);
+  for (let m = 0; m < activeMasks.length; m++) {
+    const rad = (activeMasks[m].rotation / 180) * Math.PI;
+    maskCosR[m] = Math.cos(rad);
+    maskSinR[m] = Math.sin(rad);
+  }
+
+  const isInclude = mode === "include";
+  const invW = 1 / w;
+  const invH = 1 / h;
+
   for (let y = 0; y < h; y++) {
-    const v = y / h;
+    const v = y * invH;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const u = x / w;
-      const idx = y * w + x;
+      const u = x * invW;
+      const idx = rowOff + x;
       const original = hmap[idx];
 
-      // Combine all mask values (union for include, intersection for exclude)
-      let combinedMask = mode === "include" ? 0 : 1;
-      for (const mask of activeMasks) {
-        const maskVal = computeMaskValue(u, v, mask, noiseFunc);
-        if (mode === "include") {
-          combinedMask = Math.max(combinedMask, maskVal);
+      let combinedMask = isInclude ? 0 : 1;
+      for (let m = 0; m < activeMasks.length; m++) {
+        const mask = activeMasks[m];
+        // Inline pre-computed trig into mask computation
+        const du = u - mask.centerU;
+        const dv = v - mask.centerV;
+        const ru = du * maskCosR[m] + dv * maskSinR[m];
+        const rv = -du * maskSinR[m] + dv * maskCosR[m];
+        const featherNorm = mask.feather / 100;
+
+        let value = 0;
+        // Inline shape computation (avoids function call overhead per pixel per mask)
+        switch (mask.shape) {
+          case "circle": {
+            const hw = mask.width / 2;
+            const hh = mask.height / 2;
+            const dist = Math.sqrt((ru / hw) * (ru / hw) + (rv / hh) * (rv / hh));
+            if (dist < 1 - featherNorm) value = 1;
+            else if (dist < 1) value = 1 - (dist - (1 - featherNorm)) / featherNorm;
+            break;
+          }
+          case "rectangle": {
+            const distU = Math.abs(ru) / (mask.width / 2);
+            const distV = Math.abs(rv) / (mask.height / 2);
+            const maxDist = distU > distV ? distU : distV;
+            if (maxDist < 1 - featherNorm) value = 1;
+            else if (maxDist < 1) value = 1 - (maxDist - (1 - featherNorm)) / featherNorm;
+            break;
+          }
+          case "noise": {
+            const scale = (mask.noiseScale ?? 50) / 10;
+            const threshold = (mask.noiseThreshold ?? 50) / 100;
+            const n = noiseFunc(u * scale, v * scale) * 0.5 + 0.5;
+            const fr = featherNorm * 0.3;
+            if (n > threshold + fr) value = 1;
+            else if (n > threshold - fr) value = (n - (threshold - fr)) / (fr * 2);
+            break;
+          }
+          case "gradient-h": {
+            const start = mask.centerU - mask.width / 2;
+            const end = mask.centerU + mask.width / 2;
+            if (u >= start && u <= end) value = (u - start) / (end - start);
+            else if (u > end) value = 1;
+            break;
+          }
+          case "gradient-v": {
+            const start = mask.centerV - mask.height / 2;
+            const end = mask.centerV + mask.height / 2;
+            if (v >= start && v <= end) value = (v - start) / (end - start);
+            else if (v > end) value = 1;
+            break;
+          }
+          default: {
+            value = computeMaskValue(u, v, mask, noiseFunc);
+            break;
+          }
+        }
+        if (mask.invert) value = 1 - value;
+
+        if (isInclude) {
+          if (value > combinedMask) combinedMask = value;
         } else {
-          combinedMask = Math.min(combinedMask, 1 - maskVal);
+          const inv = 1 - value;
+          if (inv < combinedMask) combinedMask = inv;
         }
       }
 
-      // Apply mask: blend between original texture and flat surface
-      const flat = 0.5;
-      hmap[idx] = flat + (original - flat) * combinedMask;
+      hmap[idx] = 0.5 + (original - 0.5) * combinedMask;
     }
   }
 }
