@@ -58,6 +58,8 @@ interface BuilderSidebarProps {
   onApplyTemplate: (params: Partial<RingParameters>) => void;
   engraving: EngravingState;
   onEngravingChange: (state: EngravingState) => void;
+  imageTerrain: ImageTerrainState;
+  onImageTerrainChange: (state: ImageTerrainState) => void;
   metalPreset: MetalPreset;
   finishPreset: FinishPreset;
   onViewModeChange: (mode: ViewMode) => void;
