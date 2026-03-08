@@ -1423,6 +1423,7 @@ interface RingViewportProps {
   ringPosition?: [number, number, number];
   ringRotation?: [number, number, number];
   showPrinterBed?: boolean;
+  rotationLocked?: boolean; // When true, disables orbit rotation but keeps zoom
 }
 
 // ── Clipping plane manager with interactive offset ─────────────────
@@ -1591,12 +1592,13 @@ function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const insp = inspectionMode;
     const rPos = ringPosition ?? [0, 0, 0];
     const rRot = ringRotation ?? [0, 0, 0];
+    const isRotationLocked = rotationLocked;
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
     const [surfaceProgress, setSurfaceProgress] = useState<GenerationProgress | null>(null);
@@ -1676,6 +1678,17 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-primary/60 bg-primary/5 border border-primary/15 rounded-full backdrop-blur-sm">
               HD
             </span>
+          </div>
+        )}
+        {/* Rotation lock indicator */}
+        {isRotationLocked && (
+          <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-warning/15 backdrop-blur-sm border border-warning/30 rounded-lg">
+              <svg className="w-3.5 h-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span className="text-[10px] font-medium text-warning/90">Rotation Locked</span>
+            </div>
           </div>
         )}
         {/* Inspection mode vignette overlay */}
@@ -1898,6 +1911,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
           <OrbitControls
             enablePan={false}
+            enableRotate={!isRotationLocked}
             minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
             maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
             autoRotate={false}
@@ -1905,10 +1919,15 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             dampingFactor={isMobile ? 0.12 : 0.08}
             rotateSpeed={isMobile ? 0.5 : 1.0}
             zoomSpeed={isMobile ? 0.7 : 1.0}
-            touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+            touches={{ ONE: isRotationLocked ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0}
             maxPolarAngle={Math.PI}
           />
+
+          {/* Rotation lock indicator */}
+          {isRotationLocked && (
+            <></> // Indicator rendered outside Canvas in the parent div
+          )}
 
           {/* Camera preset animator */}
           {cameraPreset && (
