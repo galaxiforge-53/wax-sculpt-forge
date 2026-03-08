@@ -1262,19 +1262,45 @@ export function buildHeightmap(
 
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
-  // ─── 1) fBm base terrain layer ──
-  // Scale V coordinate by aspect correction so noise features stay circular
-  // physicalAspect = circumference/width, pixel ratio = MAP_W/MAP_H = 4
+  // ─── 1) fBm base terrain layer (computed at half-res, then upscaled) ──
+  // 6-octave fBm is the most expensive per-pixel operation. Since it produces
+  // low-frequency terrain, half-res gives identical visual results.
   const aspectCorrection = physicalAspect / (MAP_W / MAP_H);
   const baseNoise = makeNoise2D(lunar.seed + 500);
   const baseAmp = (0.04 + terrainRough * 0.12) * depthScale;
-  for (let y = 0; y < MAP_H; y++) {
-    for (let x = 0; x < MAP_W; x++) {
-      const u = x / MAP_W * 8;
-      const v = y / MAP_H * 8 * aspectCorrection;
-      const n = fbm(baseNoise, u, v, 6, 2.0, 0.5);
-      const mask = edgeMask[y * MAP_W + x];
-      hmap[y * MAP_W + x] += n * baseAmp * mask;
+  {
+    const halfW = MAP_W >> 1;
+    const halfH = MAP_H >> 1;
+    const halfBase = new Float32Array(halfW * halfH);
+    for (let y = 0; y < halfH; y++) {
+      const v = (y / halfH) * 8 * aspectCorrection;
+      for (let x = 0; x < halfW; x++) {
+        const u = (x / halfW) * 8;
+        halfBase[y * halfW + x] = fbm(baseNoise, u, v, 6, 2.0, 0.5) * baseAmp;
+      }
+    }
+    // Bilinear upscale to full resolution and add to heightmap
+    for (let y = 0; y < MAP_H; y++) {
+      const fy = (y / MAP_H) * (halfH - 1);
+      const iy = Math.floor(fy);
+      const fy1 = fy - iy;
+      const iy0 = Math.min(iy, halfH - 1);
+      const iy1 = Math.min(iy + 1, halfH - 1);
+      for (let x = 0; x < MAP_W; x++) {
+        const fx = (x / MAP_W) * (halfW - 1);
+        const ix = Math.floor(fx);
+        const fx1 = fx - ix;
+        const ix0 = ((ix) % halfW + halfW) % halfW;
+        const ix1 = ((ix + 1) % halfW + halfW) % halfW;
+        const val = (
+          halfBase[iy0 * halfW + ix0] * (1 - fx1) * (1 - fy1) +
+          halfBase[iy0 * halfW + ix1] * fx1 * (1 - fy1) +
+          halfBase[iy1 * halfW + ix0] * (1 - fx1) * fy1 +
+          halfBase[iy1 * halfW + ix1] * fx1 * fy1
+        );
+        const mask = edgeMask[y * MAP_W + x];
+        hmap[y * MAP_W + x] += val * mask;
+      }
     }
   }
 
