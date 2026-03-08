@@ -1688,7 +1688,7 @@ export function buildHeightmap(
       const row0 = iy0 * halfW;
       const row1 = iy1 * halfW;
       const outRow = y * MAP_W;
-      const baseRowMask = edgeMask[outRow]; // row-constant — hoist to avoid 4096 lookups per row
+      const baseRowMask = edgeRow[y];
       for (let x = 0; x < MAP_W; x++) {
         const fx = x * invMapW_halfW;
         const ix = Math.floor(fx);
