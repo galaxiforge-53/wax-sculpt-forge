@@ -25,6 +25,60 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+// ── Adaptive quality tier ─────────────────────────────────────────
+// Tracks prop changes: while editing → "preview", after idle → "high"
+export type QualityTier = "preview" | "high";
+
+function useAdaptiveQuality(
+  deps: unknown[],
+  idleMs: number = 800,
+): QualityTier {
+  const [tier, setTier] = useState<QualityTier>("high");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
+
+  useEffect(() => {
+    // Skip the initial mount — start in high quality
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    // Props changed → drop to preview
+    setTier("preview");
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setTier("high"), idleMs);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return tier;
+}
+
+// ── DPR controller inside Canvas ──────────────────────────────────
+function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
+  tier: QualityTier;
+  isMobile: boolean;
+  isShowcase: boolean;
+  isInspection: boolean;
+}) {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    if (isShowcase || isInspection) {
+      gl.setPixelRatio(2);
+      return;
+    }
+    if (tier === "preview") {
+      gl.setPixelRatio(isMobile ? 1 : 1);
+    } else {
+      gl.setPixelRatio(isMobile ? 1.5 : Math.min(window.devicePixelRatio, 2));
+    }
+  }, [tier, isMobile, isShowcase, isInspection, gl]);
+
+  return null;
+}
+
 export type SnapshotAngle = "front" | "angle" | "side" | "inside";
 
 export interface RingViewportHandle {
@@ -1293,6 +1347,12 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     const isMobile = useIsMobile();
     const [surfaceProgress, setSurfaceProgress] = useState<GenerationProgress | null>(null);
 
+    // Adaptive quality: drops to preview during editing, upgrades after idle
+    const qualityTier = useAdaptiveQuality(
+      [params, viewMode, metalPreset, finishPreset, lunarTexture, engraving, lighting],
+      isMobile ? 1000 : 800,
+    );
+
     const handleGenProgress = useCallback((p: GenerationProgress | null) => {
       setSurfaceProgress(p);
     }, []);
@@ -1349,6 +1409,21 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </div>
           </div>
         )}
+        {/* Quality tier indicator — subtle badge */}
+        {qualityTier === "preview" && !surfaceProgress && (
+          <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in duration-150">
+            <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-muted-foreground/70 bg-muted/40 border border-border/30 rounded-full backdrop-blur-sm">
+              Preview
+            </span>
+          </div>
+        )}
+        {qualityTier === "high" && !surfaceProgress && !insp && !sc && (
+          <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in duration-500">
+            <span className="px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-primary/60 bg-primary/5 border border-primary/15 rounded-full backdrop-blur-sm">
+              HD
+            </span>
+          </div>
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
@@ -1379,6 +1454,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           }}
           dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1] : [1, 2]))}
         >
+          <AdaptiveDprController tier={qualityTier} isMobile={isMobile} isShowcase={sc} isInspection={insp} />
           <ClipPlaneManager mode={cutawayMode} />
 
           {/* Dynamic lighting from Lighting Studio */}
@@ -1429,9 +1505,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                 <directionalLight
                   position={[keyX, keyY, keyZ]}
                   intensity={sc ? lighting.keyIntensity * 1.3 : lighting.keyIntensity}
-                  castShadow={!isMobile}
-                  shadow-mapSize-width={isMobile ? 512 : (sc || insp ? 2048 : 1024)}
-                  shadow-mapSize-height={isMobile ? 512 : (sc || insp ? 2048 : 1024)}
+                  castShadow={!isMobile || qualityTier === "high"}
+                  shadow-mapSize-width={qualityTier === "preview" ? 512 : (isMobile ? 512 : (sc || insp ? 2048 : 1024))}
+                  shadow-mapSize-height={qualityTier === "preview" ? 512 : (isMobile ? 512 : (sc || insp ? 2048 : 1024))}
                   shadow-bias={-0.0003}
                   shadow-radius={4}
                   color={keyColor}
@@ -1553,11 +1629,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             return (
               <ContactShadows
                 position={[0, shadowY, 0]}
-                opacity={sc ? 0.65 : (isMobile ? 0.35 : 0.5)}
+                opacity={sc ? 0.65 : (qualityTier === "preview" ? 0.3 : (isMobile ? 0.35 : 0.5))}
                 scale={sc ? 8 : (isMobile ? 4 : 6)}
-                blur={sc ? 3 : (isMobile ? 1.5 : 2)}
+                blur={sc ? 3 : (qualityTier === "preview" ? 1 : (isMobile ? 1.5 : 2))}
                 far={sc ? 5 : (isMobile ? 3 : 4)}
-                resolution={sc ? 512 : (isMobile ? 128 : 256)}
+                resolution={sc ? 512 : (qualityTier === "preview" ? 64 : (isMobile ? 128 : 256))}
               />
             );
           })()}
