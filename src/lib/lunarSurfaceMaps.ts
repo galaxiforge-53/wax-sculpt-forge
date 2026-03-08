@@ -433,7 +433,7 @@ function stampEjectaRays(
       const t = s / steps;
       const dist = c.radius * 0.8 + t * rayLength;
       const ru = c.cu + Math.cos(angle) * dist;
-      const rv = c.cv + Math.sin(angle) * dist * physicalAspect;
+      const rv = c.cv + Math.sin(angle) * dist / physicalAspect;
 
       if (rv < 0.05 || rv > 0.95) continue;
 
