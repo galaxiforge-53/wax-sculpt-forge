@@ -111,6 +111,7 @@ interface RingMeshProps {
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional polishing finish
   detailBoost?: number; // 0–100, exaggerates surface detail for inspection
+  thicknessHeatmap?: boolean; // show colour-coded thickness overlay
 }
 
 // ── Physically-based metal material configs ───────────────────────
@@ -637,8 +638,100 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
   return { outerGeo, innerGeo, capGeoTop, capGeoBot };
 }
 
+// ── Thickness heatmap overlay — vertex-colored mesh showing wall thickness ──
+function ThicknessHeatmapOverlay({ outerGeo, params }: { outerGeo: THREE.LatheGeometry; params: RingParameters }) {
+  const heatmapGeo = useMemo(() => {
+    const geo = outerGeo.clone();
+    const pos = geo.attributes.position;
+    const innerR = params.innerDiameter / 2 / 10;
+    const nominalThickness = params.thickness / 10;
+    // Casting risk threshold: 1.2mm = 0.12 scene units
+    const riskThreshold = 0.12;
+    const warnThreshold = 0.18;
+
+    // Build inner bore radius lookup by Y position
+    const interiorProfile = params.interiorProfile ?? "comfort-dome";
+    const curvature = (params.interiorCurvature ?? 40) / 100;
+    const comfortDepth = (params.comfortFitDepth ?? 50) / 100;
+    const halfW = params.width / 2 / 10;
+    const maxBulge = nominalThickness * 0.35 * curvature * comfortDepth;
+
+    function getInnerRadiusAtY(y: number): number {
+      if (Math.abs(y) > halfW) return innerR;
+      const t = (y / (halfW * 2)) + 0.5; // 0..1
+      let r = innerR;
+      if (interiorProfile === "comfort-dome" && curvature >= 0.01) {
+        r = innerR - maxBulge * Math.sin(t * Math.PI);
+      } else if (interiorProfile === "european" && curvature >= 0.01) {
+        r = innerR - maxBulge * 0.7 * Math.pow(Math.sin(t * Math.PI), 2);
+      } else if (interiorProfile === "anatomical" && curvature >= 0.01) {
+        const asymmetry = 0.15 * curvature;
+        r = innerR - maxBulge * Math.sin(t * Math.PI) * (1 + asymmetry * (t - 0.5));
+      }
+      return Math.max(r, innerR * 0.85);
+    }
+
+    // Heatmap color ramp: red (thin/risk) → yellow (warn) → green (ok) → blue (thick/safe)
+    function thicknessToColor(thickness: number): [number, number, number] {
+      const t = Math.max(0, Math.min(1, (thickness - riskThreshold) / (nominalThickness * 1.1 - riskThreshold)));
+      if (t < 0.25) {
+        // Red to orange
+        const s = t / 0.25;
+        return [1, s * 0.5, 0];
+      } else if (t < 0.5) {
+        // Orange to yellow
+        const s = (t - 0.25) / 0.25;
+        return [1, 0.5 + s * 0.5, 0];
+      } else if (t < 0.75) {
+        // Yellow to green
+        const s = (t - 0.5) / 0.25;
+        return [1 - s, 1, s * 0.3];
+      } else {
+        // Green to blue
+        const s = (t - 0.75) / 0.25;
+        return [0, 1 - s * 0.5, 0.3 + s * 0.7];
+      }
+    }
+
+    const colors = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const outerDist = Math.sqrt(x * x + z * z); // radial distance in XZ plane (lathe)
+      const innerRAtY = getInnerRadiusAtY(y);
+      const localThickness = outerDist - innerRAtY;
+      const [r, g, b] = thicknessToColor(localThickness);
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }, [outerGeo, params]);
+
+  useEffect(() => {
+    return () => { heatmapGeo.dispose(); };
+  }, [heatmapGeo]);
+
+  return (
+    <mesh geometry={heatmapGeo} renderOrder={1}>
+      <meshBasicMaterial
+        vertexColors
+        transparent
+        opacity={0.65}
+        depthWrite={false}
+        side={THREE.FrontSide}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        polygonOffsetUnits={-1}
+      />
+    </mesh>
+  );
+}
+
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, detailBoost = 0, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
   const wearAmount = wearPreview;
@@ -992,6 +1085,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       <mesh geometry={outerGeo} castShadow onPointerDown={handlePointerDown}>
         {outerMaterial}
       </mesh>
+
+      {/* Thickness heatmap overlay */}
+      {thicknessHeatmap && (
+        <ThicknessHeatmapOverlay outerGeo={outerGeo} params={debouncedParams} />
+      )}
 
       {/* Inner bore — smooth polished surface */}
       <mesh geometry={innerGeo} castShadow>
@@ -1587,6 +1685,7 @@ interface RingViewportProps {
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional jewellery polishing
   detailBoost?: number; // 0–100, exaggerates surface detail for inspection
+  thicknessHeatmap?: boolean; // show colour-coded thickness overlay
   turntableSpeed?: number; // 0 = off, positive = RPM (e.g. 4 for slow spin)
   bgPreset?: BackgroundPreset;
 }
@@ -1766,7 +1865,7 @@ function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, polishPreview = 0, detailBoost = 0, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const insp = inspectionMode;
@@ -1922,6 +2021,26 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               </div>
               <span className="text-[8px] text-secondary-foreground/50 pl-5">
                 {detailBoost <= 30 ? "Subtle enhancement" : detailBoost <= 60 ? "Clear inspection view" : "Maximum detail reveal"}
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Thickness heatmap legend */}
+        {thicknessHeatmap && (
+          <div className="absolute bottom-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200">
+            <div className="flex flex-col gap-1.5 px-3 py-2 bg-card/90 backdrop-blur-sm border border-border/60 rounded-lg shadow-lg">
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Thickness Map</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-24 h-2.5 rounded-sm" style={{
+                  background: "linear-gradient(to right, #ff0000, #ff8800, #ffff00, #00ff4d, #0055ff)"
+                }} />
+              </div>
+              <div className="flex justify-between text-[7px] text-muted-foreground w-24">
+                <span>Thin (risk)</span>
+                <span>Thick (safe)</span>
+              </div>
+              <span className="text-[7px] text-destructive/70">
+                {"Red < 1.2mm = casting risk"}
               </span>
             </div>
           </div>
@@ -2101,6 +2220,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               wearPreview={wearPreview}
               polishPreview={polishPreview}
               detailBoost={detailBoost}
+              thicknessHeatmap={thicknessHeatmap}
               onGenProgress={handleGenProgress}
             />
 

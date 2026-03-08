@@ -22,7 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock, ArrowLeftRight, Aperture } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock, ArrowLeftRight, Aperture, Thermometer } from "lucide-react";
 import InspectionLoupe from "@/components/builder/InspectionLoupe";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
@@ -64,6 +64,7 @@ function BuilderInner() {
   const [wearPreview, setWearPreview] = useState(0);
   const [polishPreview, setPolishPreview] = useState(0);
   const [detailBoost, setDetailBoost] = useState(0);
+  const [thicknessHeatmap, setThicknessHeatmap] = useState(false);
   const [turntableSpeed, setTurntableSpeed] = useState(0);
   const [bgPreset, setBgPreset] = useState<BackgroundPreset>("dark-studio");
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
@@ -465,6 +466,7 @@ function BuilderInner() {
               wearPreview={wearPreview}
               polishPreview={polishPreview}
               detailBoost={detailBoost}
+              thicknessHeatmap={thicknessHeatmap}
               turntableSpeed={turntableSpeed}
               bgPreset={bgPreset}
             />
@@ -685,6 +687,18 @@ function BuilderInner() {
                       </p>
                     </div>
                   </div>
+                  {/* Thickness heatmap toggle */}
+                  <button
+                    onClick={() => setThicknessHeatmap(v => !v)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${thicknessHeatmap
+                        ? "bg-destructive/20 text-destructive border border-destructive/40 shadow-[0_0_8px_hsl(var(--destructive)/0.2)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title="Thickness heatmap — shows thin/thick areas for casting safety"
+                  >
+                    <Thermometer className="w-3 h-3" />
+                  </button>
                   <button
                     onClick={() => {
                       setShowPrinterBed((v) => !v);
