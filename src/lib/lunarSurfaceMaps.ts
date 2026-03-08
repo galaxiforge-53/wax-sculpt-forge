@@ -1653,7 +1653,7 @@ export function buildHeightmap(
   const layerMedium = (lunar.layerMediumImpacts ?? 50) / 50;
   const layerMicro = (lunar.layerMicroPitting ?? 50) / 50;
 
-  const edgeMask = buildEdgeMask(MAP_W, MAP_H);
+  const edgeRow = buildEdgeRow(MAP_H);
 
   // ─── 1) fBm base terrain layer (computed at half-res, then upscaled) ──
   // 6-octave fBm is the most expensive per-pixel operation. Since it produces
