@@ -295,6 +295,11 @@ export function useRingDesign() {
     logCraftAction("engraving_updated", { text: next.text, font: next.font, sizeMm: next.sizeMm, depthMm: next.depthMm });
   }, [logCraftAction]);
 
+  const setImageTerrain = useCallback((next: ImageTerrainState) => {
+    setImageTerrainRaw(next);
+    logCraftAction("image_terrain_updated", { enabled: next.enabled, mode: next.mode, depth: next.depth });
+  }, [logCraftAction]);
+
   // --- Inlay helpers ---
   const addInlayChannel = useCallback((input: Omit<InlayChannel, "id" | "createdAt">) => {
     const channel: InlayChannel = {
