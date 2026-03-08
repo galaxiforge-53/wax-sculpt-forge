@@ -666,9 +666,9 @@ function BuilderInner() {
             onMetalChange={setMetalPreset}
             onFinishChange={setFinishPreset}
           />
-          {/* XYZ Position & Rotation controls — bottom-right overlay (desktop) */}
+          {/* XYZ Position & Rotation controls — bottom-right overlay (desktop), offset above autosave */}
           {!isMobile && (
-            <div className="absolute bottom-3 right-3 z-10 bg-card/90 backdrop-blur-xl border border-builder-divider rounded-xl p-2.5 space-y-2 min-w-[180px] shadow-lg shadow-black/30">
+            <div className="absolute bottom-14 right-3 z-10 bg-card/90 backdrop-blur-xl border border-builder-divider rounded-xl p-2.5 space-y-2 min-w-[180px] shadow-lg shadow-black/30">
               <div className="flex items-center justify-between">
                 <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-display flex items-center gap-1">
                   <Move className="w-3 h-3" /> Transform
