@@ -1057,6 +1057,8 @@ function applyValhallaConcentric(
     const dv = y * invH - centerV;
     const dv2 = dv * dv;
     const rowOff = y * w;
+    const valhallaRowMask = edgeMask[rowOff]; // row-constant
+    if (valhallaRowMask < 0.001) continue; // skip edge rows
     for (let x = 0; x < w; x++) {
       let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
@@ -1064,7 +1066,7 @@ function applyValhallaConcentric(
       const dist = Math.sqrt(du * du + dv2);
       const ringVal = Math.sin(dist * ringPhaseScale) * fastExpNeg4(dist);
       const idx = rowOff + x;
-      hmap[idx] += ringVal * ringAmp * edgeMask[idx];
+      hmap[idx] += ringVal * ringAmp * valhallaRowMask;
     }
   }
 }
