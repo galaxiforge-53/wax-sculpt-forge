@@ -65,13 +65,85 @@ interface PropertiesPanelProps {
   metalPreset?: MetalPreset;
 }
 
-const PROFILES: { value: RingProfile; label: string; desc: string }[] = [
-  { value: "flat", label: "Flat", desc: "Sharp parallel walls" },
-  { value: "dome", label: "Dome", desc: "Classic rounded exterior" },
-  { value: "comfort", label: "Comfort Fit", desc: "Rounded inner surface" },
-  { value: "square", label: "Square", desc: "Angular box profile" },
-  { value: "knife-edge", label: "Knife Edge", desc: "Pointed peak" },
+const PROFILES: { value: RingProfile; label: string; desc: string; tip: string }[] = [
+  { value: "flat", label: "Flat", desc: "Sharp parallel walls", tip: "Best for wide bands, grooves, and surface texturing" },
+  { value: "dome", label: "Dome", desc: "Classic rounded exterior", tip: "Timeless — comfortable and reflects light beautifully" },
+  { value: "comfort", label: "Comfort Fit", desc: "Rounded inner & outer", tip: "Slides easily over knuckles, ideal for everyday wear" },
+  { value: "square", label: "Square", desc: "Angular box profile", tip: "Modern and bold — pairs well with matte finishes" },
+  { value: "knife-edge", label: "Knife Edge", desc: "Pointed peak", tip: "Dramatic silhouette — best at 4mm+ width" },
 ];
+
+/** SVG cross-section path for each profile */
+function ProfileCrossSectionSVG({ profile, isActive, thickness, width }: { profile: RingProfile; isActive: boolean; thickness: number; width: number }) {
+  // Normalized cross-section: viewBox is 60x40, ring section drawn inside
+  const t = Math.min(thickness / 4, 1); // normalized 0–1
+  const w = Math.min(width / 14, 1);    // normalized 0–1
+
+  const wallW = 6 + t * 10;  // wall thickness in SVG units
+  const bandH = 10 + w * 20; // band height in SVG units
+  const cx = 30;             // center x
+  const cy = 20;             // center y
+  const halfH = bandH / 2;
+
+  // Outer profile path (left side = outer surface)
+  let outerPath = "";
+  // Inner profile path (right side = inner bore)
+  const innerX = cx + wallW / 2;
+  const outerX = cx - wallW / 2;
+
+  switch (profile) {
+    case "flat":
+      outerPath = `M ${outerX} ${cy - halfH} L ${outerX} ${cy + halfH}`;
+      break;
+    case "dome":
+      outerPath = `M ${outerX} ${cy - halfH} Q ${outerX - wallW * 0.4} ${cy} ${outerX} ${cy + halfH}`;
+      break;
+    case "comfort":
+      outerPath = `M ${outerX} ${cy - halfH} Q ${outerX - wallW * 0.3} ${cy} ${outerX} ${cy + halfH}`;
+      break;
+    case "square":
+      outerPath = `M ${outerX - 1} ${cy - halfH} L ${outerX - 1} ${cy + halfH}`;
+      break;
+    case "knife-edge":
+      outerPath = `M ${outerX + 2} ${cy - halfH} L ${outerX - wallW * 0.35} ${cy} L ${outerX + 2} ${cy + halfH}`;
+      break;
+  }
+
+  const innerPath = `M ${innerX} ${cy - halfH} L ${innerX} ${cy + halfH}`;
+
+  // Top and bottom caps
+  const topCap = `M ${outerX + (profile === "knife-edge" ? 2 : profile === "square" ? -1 : 0)} ${cy - halfH} L ${innerX} ${cy - halfH}`;
+  const botCap = `M ${outerX + (profile === "knife-edge" ? 2 : profile === "square" ? -1 : 0)} ${cy + halfH} L ${innerX} ${cy + halfH}`;
+
+  const strokeColor = isActive ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))";
+  const fillColor = isActive ? "hsl(var(--primary) / 0.12)" : "hsl(var(--muted) / 0.3)";
+
+  return (
+    <svg viewBox="0 0 60 40" className="w-full h-full" aria-label={`${profile} profile cross-section`}>
+      {/* Fill area */}
+      <path
+        d={`${outerPath} L ${innerX} ${cy + halfH} L ${innerX} ${cy - halfH} Z`}
+        fill={fillColor}
+        stroke="none"
+      />
+      {/* Outer surface */}
+      <path d={outerPath} fill="none" stroke={strokeColor} strokeWidth={isActive ? 1.5 : 1} strokeLinecap="round" />
+      {/* Inner bore */}
+      <path d={innerPath} fill="none" stroke={strokeColor} strokeWidth={isActive ? 1.5 : 1} strokeLinecap="round" strokeDasharray={profile === "comfort" ? "" : ""} />
+      {/* Caps */}
+      <path d={topCap} fill="none" stroke={strokeColor} strokeWidth={0.8} />
+      <path d={botCap} fill="none" stroke={strokeColor} strokeWidth={0.8} />
+      {/* Dimension line (outer arrow) */}
+      {isActive && (
+        <>
+          <line x1={outerX - 6} y1={cy - halfH} x2={outerX - 6} y2={cy + halfH} stroke={strokeColor} strokeWidth={0.4} strokeDasharray="1.5 1" />
+          <line x1={outerX - 8} y1={cy - halfH} x2={outerX - 4} y2={cy - halfH} stroke={strokeColor} strokeWidth={0.4} />
+          <line x1={outerX - 8} y1={cy + halfH} x2={outerX - 4} y2={cy + halfH} stroke={strokeColor} strokeWidth={0.4} />
+        </>
+      )}
+    </svg>
+  );
+}
 
 const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
   { value: "dent", label: "Dent" },
@@ -183,27 +255,46 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         )}
       </div>
 
-      {/* ── Profile ── */}
+      {/* ── Profile Editor ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Profile</Label>
-        <Select
-          value={params.profile}
-          onValueChange={(v) => onUpdate({ profile: v as RingProfile })}
-        >
-          <SelectTrigger className="bg-secondary border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PROFILES.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                <div className="flex flex-col">
-                  <span>{p.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{p.desc}</span>
+        <Label className="text-xs text-secondary-foreground">Cross-Section Profile</Label>
+        <div className="grid grid-cols-5 gap-1.5">
+          {PROFILES.map((p) => {
+            const isActive = params.profile === p.value;
+            return (
+              <button
+                key={p.value}
+                onClick={() => onUpdate({ profile: p.value })}
+                className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all
+                  ${isActive
+                    ? "bg-primary/10 border-primary/40 ring-1 ring-primary/20"
+                    : "bg-card border-border hover:bg-secondary hover:border-border"
+                  }`}
+                title={p.desc}
+              >
+                <div className="w-full aspect-[3/2]">
+                  <ProfileCrossSectionSVG
+                    profile={p.value}
+                    isActive={isActive}
+                    thickness={params.thickness}
+                    width={params.width}
+                  />
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                <span className={`text-[9px] font-medium leading-tight text-center
+                  ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                  {p.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Active profile tip */}
+        <div className="p-2 rounded-md bg-secondary/60 border border-border/50">
+          <p className="text-[10px] text-muted-foreground">
+            <span className="text-primary font-medium">{PROFILES.find(p => p.value === params.profile)?.label}:</span>{" "}
+            {PROFILES.find(p => p.value === params.profile)?.tip}
+          </p>
+        </div>
       </div>
 
       {/* ── Comfort Fit ── */}
