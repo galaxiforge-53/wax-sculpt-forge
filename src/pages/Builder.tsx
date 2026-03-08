@@ -51,6 +51,7 @@ function BuilderInner() {
   const [ringPosition, setRingPosition] = useState<[number, number, number]>([0, 0, 0]);
   const [ringRotation, setRingRotation] = useState<[number, number, number]>([0, 0, 0]);
   const [showPrinterBed, setShowPrinterBed] = useState(false);
+  const [rotationLocked, setRotationLocked] = useState(false);
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
