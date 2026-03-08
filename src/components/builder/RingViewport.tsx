@@ -647,7 +647,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   // Adaptive quality for geometry detail
   const geoQuality = useAdaptiveQuality(
-    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar, debouncedWear],
+    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.edgeStyle, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar, debouncedWear],
     isMobile ? 1200 : 600,
   );
 
