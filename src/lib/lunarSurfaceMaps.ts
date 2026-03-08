@@ -1833,7 +1833,7 @@ export function buildHeightmap(
     const hasPeak = s.tier <= 1;
     const hasTerraces = s.tier === 0;
     stampCrater(
-      hmap, MAP_W, MAP_H, s, rimSharp, edgeMask, warpNoise, warpAmp,
+      hmap, MAP_W, MAP_H, s, rimSharp, edgeRow, warpNoise, warpAmp,
       hasPeak, hasTerraces, physicalAspect,
       shapeMode, ovalElong, floorNoise,
     );
