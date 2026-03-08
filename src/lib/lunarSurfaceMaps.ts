@@ -603,7 +603,6 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   if (mariaFactor <= 0) return;
 
   // Approximate percentile via random sampling (O(k) instead of O(n log n) full sort)
-  // Sampling 2000 points gives <2% error on 4M-pixel maps
   const sampleCount = 2000;
   const sampleRng = seededRng(seed + 6500);
   const samples = new Float32Array(sampleCount);
@@ -612,22 +611,26 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   }
   samples.sort();
   const threshold = samples[Math.floor(sampleCount * (0.35 + mariaFactor * 0.15))];
+  const invThreshold = 1 / Math.max(0.01, threshold);
+  const fillTarget = threshold * 0.85;
 
   const mariaNoise = makeNoise2D(seed + 6000);
   const mariaStrength = mariaFactor * 0.7;
+  const invW6 = 6 / w;
+  const invH6 = 6 / h;
 
   for (let y = 0; y < h; y++) {
+    const rowOff = y * w;
+    const vCoord = y * invH6;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const hVal = hmap[idx];
-      if (hVal < threshold) {
-        const depth = (threshold - hVal) / Math.max(0.01, threshold);
-        const noise = mariaNoise(x / w * 6, y / h * 6) * 0.3 + 0.5;
-        const fill = depth * mariaStrength * noise;
-        const mask = edgeMask[idx];
-        // Raise low areas toward threshold (fill in)
-        hmap[idx] = lerp(hVal, threshold * 0.85, fill * mask);
-      }
+      if (hVal >= threshold) continue; // branch: skip above-threshold pixels early
+      const depth = (threshold - hVal) * invThreshold;
+      const noise = mariaNoise(x * invW6, vCoord) * 0.3 + 0.5;
+      const fill = depth * mariaStrength * noise;
+      const mask = edgeMask[idx];
+      hmap[idx] = hVal + (fillTarget - hVal) * fill * mask;
     }
   }
 }
