@@ -1122,16 +1122,17 @@ function applyAsteroidRubble(
     const vn10 = y * invH_rubble * 10 * aspectCorr;
     const vn35 = y * invH_rubble * 35 * aspectCorr;
     const rowOff = y * w;
+    const rubbleRowMask = edgeMask[rowOff]; // row-constant
+    if (rubbleRowMask < 0.01) continue; // skip entire edge rows
+
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
-      const mask = edgeMask[idx];
-      if (mask < 0.01) continue;
 
       const un = x * invW_rubble;
       const coarse = fbm(rubbleNoise, un * 10, vn10, 4, 2.3, 0.55);
       const fine = Math.abs(boulderNoise(un * 35, vn35));
       const rubble = coarse * 0.6 + (fine - 0.3) * 0.4;
-      hmap[idx] += rubble * rubbleAmp * mask;
+      hmap[idx] += rubble * rubbleAmp * rubbleRowMask;
     }
   }
 
