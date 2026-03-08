@@ -88,7 +88,6 @@ function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
 // calls invalidate() each frame while damping is still settling.
 function DampingInvalidator() {
   const { invalidate } = useThree();
-  const isInteractingRef = useRef(false);
   const dampingActiveRef = useRef(false);
   const lastCamPosRef = useRef(new THREE.Vector3());
 
@@ -101,8 +100,9 @@ function DampingInvalidator() {
       dampingActiveRef.current = true;
       invalidate();
     } else if (dampingActiveRef.current) {
-      // Camera settled — stop invalidating
+      // One extra frame to ensure final settled state renders
       dampingActiveRef.current = false;
+      invalidate();
     }
   });
 
