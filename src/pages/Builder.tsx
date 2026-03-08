@@ -134,6 +134,22 @@ function BuilderInner() {
     }, 400);
   };
 
+  const handleCaptureSnapshot = () => {
+    const snap: DesignSnapshot = {
+      id: crypto.randomUUID(),
+      label: currentProjectName || "Current Design",
+      capturedAt: new Date().toISOString(),
+      params: { ...params },
+      viewMode,
+      metalPreset,
+      finishPreset,
+      lunarTexture: { ...lunarTexture },
+      engraving: { ...engraving },
+    };
+    setCompareSnapshot(snap);
+    toast({ title: "📸 Snapshot Captured", description: "Make changes, then compare side-by-side" });
+  };
+
   const embed = isEmbedMode();
 
   // Load template or saved project on mount
