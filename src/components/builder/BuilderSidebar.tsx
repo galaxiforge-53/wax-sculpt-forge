@@ -18,6 +18,7 @@ import EngravingPanel from "./EngravingPanel";
 import TemplatesPanel from "./TemplatesPanel";
 import AIAssistantPanel from "./AIAssistantPanel";
 import LightingStudioPanel from "./LightingStudioPanel";
+import PresetManager from "./PresetManager";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
@@ -272,6 +273,15 @@ export default function BuilderSidebar({
               onEngravingChange={onEngravingChange}
               onMetalChange={onMetalChange}
               onFinishChange={onFinishChange}
+            />
+          </div>
+          <div className="border-t border-border/40 mt-3 pt-3">
+            <SubLabel>My Presets</SubLabel>
+            <PresetManager
+              params={params}
+              lunarTexture={lunarTexture}
+              onApplyDimensions={onUpdate}
+              onApplyLunar={onLunarChange}
             />
           </div>
         </Section>
