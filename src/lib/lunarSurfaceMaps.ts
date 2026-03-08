@@ -38,6 +38,7 @@ function cacheKey(lunar: LunarTextureState): string {
     lunar.ovalElongation ?? 50, lunar.ovalAngle ?? 0,
     lunar.mariaFill ?? 0, lunar.highlandRidges ?? 0,
     lunar.craterFloorTexture ?? 30, lunar.ejectaStrength ?? 50,
+    lunar.terrainType ?? "generic",
   ].join("-");
 }
 
