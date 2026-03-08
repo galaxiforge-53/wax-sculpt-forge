@@ -977,12 +977,14 @@ function applyLunarRayBrightening(
   for (let y = 0; y < h; y++) {
     const v05 = y * invH * 0.5;
     const rowOff = y * w;
+    const rayRowMask = edgeMask[rowOff]; // row-constant
+    if (rayRowMask < 0.001) continue; // skip edge rows
     for (let x = 0; x < w; x++) {
       const u3 = x * invW * 3;
       const n = rayNoise(u3, v05);
       if (n > 0.3) {
         const idx = rowOff + x;
-        hmap[idx] += (n - 0.3) * rayAmp * edgeMask[idx];
+        hmap[idx] += (n - 0.3) * rayAmp * rayRowMask;
       }
     }
   }
