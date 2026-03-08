@@ -632,10 +632,16 @@ function BuilderInner() {
           </div>
 
           {/* View controls — top-right, grouped (simplified on mobile) */}
-          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1.5 items-end">
-            {/* Cutaway row */}
-            <div className="flex gap-1">
-              {(["normal", "inside", "cross-section", "quarter-cut"] as CutawayMode[]).map((mode) => {
+          <div className={cn(
+            "absolute top-2 right-2 z-10 flex flex-col gap-1.5 items-end",
+            isMobile && "max-w-[50%]"
+          )}>
+            {/* Cutaway row — simplified on mobile */}
+            <div className="flex gap-1 flex-wrap justify-end">
+              {(isMobile
+                ? (["normal", "inside"] as CutawayMode[])
+                : (["normal", "inside", "cross-section", "quarter-cut"] as CutawayMode[])
+              ).map((mode) => {
                 const labels: Record<CutawayMode, string> = { normal: "Full", inside: "Inside", "cross-section": "X-Section", "quarter-cut": "¼ Cut" };
                 const icons: Record<CutawayMode, string> = { normal: "◉", inside: "◔", "cross-section": "◑", "quarter-cut": "◕" };
                 return (
@@ -645,11 +651,13 @@ function BuilderInner() {
                       setCutawayMode(mode);
                       setCutawayOffset(0);
                     }}
-                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all
-                      ${cutawayMode === mode
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all touch-target",
+                      cutawayMode === mode
                         ? "bg-primary/30 text-primary border border-primary/40"
-                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
-                      }`}
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground",
+                      isMobile && "px-2.5 py-1.5"
+                    )}
                     title={labels[mode]}
                   >
                     {isMobile ? icons[mode] : labels[mode]}
