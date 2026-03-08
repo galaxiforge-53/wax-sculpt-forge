@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NativeImage = globalThis.Image;
-import { Upload, Image, Layers, ArrowDown, ArrowUp, RotateCcw, FlipVertical } from "lucide-react";
+import { Upload, Layers, ArrowDown, ArrowUp, RotateCcw, FlipVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ImageTerrainPanelProps {
