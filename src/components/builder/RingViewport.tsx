@@ -1592,12 +1592,13 @@ function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const insp = inspectionMode;
     const rPos = ringPosition ?? [0, 0, 0];
     const rRot = ringRotation ?? [0, 0, 0];
+    const isRotationLocked = rotationLocked;
     const snapshotApiRef = useRef<{ capture: (pos: [number, number, number]) => Promise<string> } | null>(null);
     const isMobile = useIsMobile();
     const [surfaceProgress, setSurfaceProgress] = useState<GenerationProgress | null>(null);
