@@ -262,10 +262,10 @@ export default function ScaleReference({ type, ringOuterDiameter, ringInnerDiame
             anchorX="left"
             anchorY="middle"
           >
-            {`Size ${Math.round(innerDiam > 0 ? Object.entries(RING_SIZE_APPROX).reduce((best, [size, diam]) => 
+            {`Size ${Math.round(innerDiam > 0 ? Number(Object.entries(RING_SIZE_APPROX).reduce((best, [size, diam]) => 
               Math.abs(diam - innerDiam) < Math.abs(best[1] - innerDiam) ? [size, diam] as [string, number] : best, 
               ["8", 18.1] as [string, number]
-            )[0] : "8")} · Ø${innerDiam.toFixed(1)}mm`}
+            )[0]) : 8)} · Ø${innerDiam.toFixed(1)}mm`}
           </Text>
           <Text
             position={[fingerRadius + 0.25, -fingerLength * 0.2 - 0.07, 0]}
