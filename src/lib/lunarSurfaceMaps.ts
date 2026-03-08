@@ -2220,27 +2220,30 @@ export function generateLunarSurfaceMapsAsync(
       onProgress({ stage: "craters", label: `${craterCount.toLocaleString()} craters stamped`, craterCount, percent: 40 });
 
       setTimeout(() => {
-        onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 55 });
+        onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 50 });
         const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
         const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, normalStrength, aspect);
         const normalMap = new THREE.CanvasTexture(normalCanvas);
         setupDataTexture(normalMap);
 
+        // Pre-compute shared half-res downsample for roughness/AO/albedo
+        const sharedHalf = getSharedHalfHmap(hmap, MAP_W, MAP_H);
+
         setTimeout(() => {
-          onProgress({ stage: "roughness", label: "Computing roughness…", craterCount, percent: 65 });
-          const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail);
+          onProgress({ stage: "roughness", label: "Computing roughness…", craterCount, percent: 62 });
+          const roughnessCanvas = heightmapToRoughnessCanvas(hmap, MAP_W, MAP_H, lunar.microDetail, sharedHalf);
           const roughnessMap = new THREE.CanvasTexture(roughnessCanvas);
           setupDataTexture(roughnessMap);
 
           setTimeout(() => {
-            onProgress({ stage: "ao", label: "Computing ambient occlusion…", craterCount, percent: 75 });
-            const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H);
+            onProgress({ stage: "ao", label: "Computing ambient occlusion…", craterCount, percent: 74 });
+            const aoCanvas = heightmapToAOCanvas(hmap, MAP_W, MAP_H, sharedHalf);
             const aoMap = new THREE.CanvasTexture(aoCanvas);
             setupDataTexture(aoMap);
 
             setTimeout(() => {
-              onProgress({ stage: "albedo", label: "Generating surface color…", craterCount, percent: 85 });
-              const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed);
+              onProgress({ stage: "albedo", label: "Generating surface color…", craterCount, percent: 86 });
+              const albedoCanvas = heightmapToAlbedoCanvas(hmap, MAP_W, MAP_H, lunar.seed, sharedHalf);
               const albedoMap = new THREE.CanvasTexture(albedoCanvas);
               setupDataTexture(albedoMap);
               albedoMap.colorSpace = THREE.SRGBColorSpace;
