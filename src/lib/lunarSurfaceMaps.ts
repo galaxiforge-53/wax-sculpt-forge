@@ -631,7 +631,7 @@ function stampEjectaRays(
 // ── Maria fill pass ──────────────────────────────────────────────
 // Simulates dark smooth plains that fill low-lying areas
 
-function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeMask: Float32Array, seed: number) {
+function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeRow: Float32Array, seed: number) {
   if (mariaFactor <= 0) return;
 
   // Approximate percentile via random sampling (O(k) instead of O(n log n) full sort)
