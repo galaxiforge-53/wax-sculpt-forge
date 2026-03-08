@@ -70,7 +70,7 @@ export default function SmartSuggestions({
           id: `param-${key}`,
           icon: isStructural ? "shield" : "sparkles",
           label: summary,
-          detail: `${key}: ${(params as Record<string, unknown>)[key]} → ${value}`,
+          detail: `${key}: ${(params as unknown as Record<string, unknown>)[key]} → ${value}`,
           category: isComfort ? "comfort" : isStructural ? "structural" : "visual",
           apply: () => onUpdateParams({ [key]: value }),
         });
