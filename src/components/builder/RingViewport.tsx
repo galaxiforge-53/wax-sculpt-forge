@@ -913,7 +913,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       <meshPhysicalMaterial
         color={mc.color}
         roughness={Math.max(0.02, Math.min(1,
-          (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness)
+          (hasLunar ? mc.roughness + (0.15 + detailRoughContrast) * (1 - lunarWearRoughnessUniformity) : mc.roughness)
           + finishRoughMod + wearRoughnessBoost - polishRoughnessReduction
         ))}
         metalness={mc.metalness}
