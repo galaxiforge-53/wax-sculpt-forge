@@ -1683,13 +1683,14 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         {/* Rotation lock indicator */}
         {isRotationLocked && (
           <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200">
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/15 backdrop-blur-sm border border-amber-500/30 rounded-lg">
-              <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-warning/15 backdrop-blur-sm border border-warning/30 rounded-lg">
+              <svg className="w-3.5 h-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              <span className="text-[10px] font-medium text-amber-500/90">Rotation Locked</span>
+              <span className="text-[10px] font-medium text-warning/90">Rotation Locked</span>
             </div>
           </div>
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
