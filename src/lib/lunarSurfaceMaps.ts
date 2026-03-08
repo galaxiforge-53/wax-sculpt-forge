@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { LunarTextureState, TerrainType } from "@/types/lunar";
+import { LunarTextureState, TerrainType, SurfaceZone } from "@/types/lunar";
 
 /**
  * Generates full-ring UV-space maps (normalMap, roughnessMap, aoMap, albedoMap, displacementMap)
