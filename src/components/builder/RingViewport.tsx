@@ -1347,6 +1347,12 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
     const isMobile = useIsMobile();
     const [surfaceProgress, setSurfaceProgress] = useState<GenerationProgress | null>(null);
 
+    // Adaptive quality: drops to preview during editing, upgrades after idle
+    const qualityTier = useAdaptiveQuality(
+      [params, viewMode, metalPreset, finishPreset, lunarTexture, engraving, lighting],
+      isMobile ? 1000 : 800,
+    );
+
     const handleGenProgress = useCallback((p: GenerationProgress | null) => {
       setSurfaceProgress(p);
     }, []);
