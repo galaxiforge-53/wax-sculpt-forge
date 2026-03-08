@@ -139,7 +139,8 @@ function snapToHeight(currentVh: number, velocityPxPerMs: number): PanelHeight {
 
 export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("shape");
-  const [panelHeight, setPanelHeight] = useState<PanelHeight>("collapsed");
+  // Default to "peek" so users immediately see the tab bar + a hint of controls
+  const [panelHeight, setPanelHeight] = useState<PanelHeight>("peek");
   const { isPremium } = useAccess();
   const { toast } = useToast();
 
