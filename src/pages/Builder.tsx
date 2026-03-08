@@ -641,98 +641,14 @@ function BuilderInner() {
             onMetalChange={setMetalPreset}
             onFinishChange={setFinishPreset}
           />
-          {/* XYZ Position & Rotation controls — bottom-right overlay (desktop), offset above autosave */}
+          {/* XYZ Position & Rotation controls — collapsible overlay (desktop only) */}
           {!isMobile && (
-            <div className="absolute bottom-14 right-3 z-10 bg-card/90 backdrop-blur-xl border border-builder-divider rounded-xl p-2.5 space-y-2 min-w-[180px] shadow-lg shadow-black/30">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-display flex items-center gap-1">
-                  <Move className="w-3 h-3" /> Transform
-                </span>
-                <button
-                  onClick={() => { setRingPosition([0, 0, 0]); setRingRotation([0, 0, 0]); }}
-                  className="text-[9px] text-primary hover:text-primary/80 flex items-center gap-0.5 transition-colors"
-                  title="Reset position and rotation"
-                >
-                  <RefreshCw className="w-2.5 h-2.5" /> Reset
-                </button>
-              </div>
-
-              {/* Position */}
-              <div className="space-y-1">
-                <span className="text-[8px] text-muted-foreground/60 uppercase tracking-widest">Position</span>
-                <div className="flex gap-1">
-                  {(["X", "Y", "Z"] as const).map((axis, idx) => (
-                    <div key={axis} className="flex-1">
-                      <label className={`text-[8px] font-mono font-bold ${idx === 0 ? "text-red-400" : idx === 1 ? "text-emerald-400" : "text-blue-400"}`}>{axis}</label>
-                      <input
-                        type="number"
-                        step="0.05"
-                        value={ringPosition[idx].toFixed(2)}
-                        onChange={(e) => {
-                          const v = parseFloat(e.target.value) || 0;
-                          const next = [...ringPosition] as [number, number, number];
-                          next[idx] = v;
-                          setRingPosition(next);
-                        }}
-                        className="w-full h-5 px-1 text-[9px] font-mono bg-secondary/50 border border-border/30 rounded text-foreground text-center"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Rotation */}
-              <div className="space-y-1">
-                <span className="text-[8px] text-muted-foreground/60 uppercase tracking-widest">Rotation °</span>
-                <div className="flex gap-1">
-                  {(["X", "Y", "Z"] as const).map((axis, idx) => (
-                    <div key={axis} className="flex-1">
-                      <label className={`text-[8px] font-mono font-bold ${idx === 0 ? "text-red-400" : idx === 1 ? "text-emerald-400" : "text-blue-400"}`}>{axis}</label>
-                      <input
-                        type="number"
-                        step="5"
-                        value={Math.round(ringRotation[idx] * 180 / Math.PI)}
-                        onChange={(e) => {
-                          const deg = parseFloat(e.target.value) || 0;
-                          const next = [...ringRotation] as [number, number, number];
-                          next[idx] = deg * Math.PI / 180;
-                          setRingRotation(next);
-                        }}
-                        className="w-full h-5 px-1 text-[9px] font-mono bg-secondary/50 border border-border/30 rounded text-foreground text-center"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick rotation presets */}
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setRingRotation([Math.PI / 2, 0, 0])}
-                  className="flex-1 px-1.5 py-1 text-[8px] rounded bg-secondary/40 border border-border/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
-                >
-                  Flat
-                </button>
-                <button
-                  onClick={() => setRingRotation([0, 0, 0])}
-                  className="flex-1 px-1.5 py-1 text-[8px] rounded bg-secondary/40 border border-border/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
-                >
-                  Upright
-                </button>
-                <button
-                  onClick={() => setRingRotation([Math.PI / 4, Math.PI / 6, 0])}
-                  className="flex-1 px-1.5 py-1 text-[8px] rounded bg-secondary/40 border border-border/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
-                >
-                  Tilted
-                </button>
-                <button
-                  onClick={() => setRingRotation([0, 0, Math.PI / 2])}
-                  className="flex-1 px-1.5 py-1 text-[8px] rounded bg-secondary/40 border border-border/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all"
-                >
-                  Side
-                </button>
-              </div>
-            </div>
+            <TransformPanel
+              ringPosition={ringPosition}
+              ringRotation={ringRotation}
+              setRingPosition={setRingPosition}
+              setRingRotation={setRingRotation}
+            />
           )}
 
           {isMobile && (

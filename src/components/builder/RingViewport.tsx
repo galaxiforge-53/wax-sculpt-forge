@@ -17,14 +17,18 @@ import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
 
 // ── Debounce hook for lunar texture regeneration ──────────────────
-// Uses JSON serialization for stable deep comparison of object values
+// For objects, uses JSON fingerprint; for primitives, uses identity comparison directly.
+// Avoids expensive JSON.stringify on every render for primitive values (numbers, booleans).
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
-  const serialized = typeof value === "object" ? JSON.stringify(value) : String(value);
+  // Only serialize objects — primitives use direct comparison via useEffect deps
+  const isObj = value !== null && typeof value === "object";
+  const serialized = isObj ? JSON.stringify(value) : undefined;
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), delayMs);
     return () => clearTimeout(timer);
-  }, [serialized, delayMs]); // eslint-disable-line react-hooks/exhaustive-deps
+    // For objects: depend on serialized string. For primitives: depend on value directly.
+  }, isObj ? [serialized, delayMs] : [value, delayMs]); // eslint-disable-line react-hooks/exhaustive-deps
   return debounced;
 }
 
