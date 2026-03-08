@@ -51,6 +51,10 @@ export interface LunarTextureState {
   // ── v8 surface zones ──
   zones?: SurfaceZone[];        // multiple texture zones across the ring width
   zonesEnabled?: boolean;       // whether to use multi-zone rendering
+  // ── v9 surface masks ──
+  masks?: SurfaceMask[];        // shape-based masks to control where texture applies
+  masksEnabled?: boolean;       // whether to use masking
+  maskMode?: MaskMode;          // how masks combine: "include" = texture only inside, "exclude" = texture everywhere except
 }
 
 export type SymmetryMode = "none" | "2" | "3" | "4" | "6" | "8";
@@ -105,6 +109,71 @@ export const ZONE_PRESETS: Record<ZonePreset, SurfaceZone[]> = {
   "custom": [],
 };
 
+// ── Surface Masks ─────────────────────────────────────────────────
+
+export type MaskMode = "include" | "exclude";
+export type MaskShape = "circle" | "rectangle" | "stripe-h" | "stripe-v" | "noise" | "gradient-h" | "gradient-v";
+
+export interface SurfaceMask {
+  id: string;
+  name: string;
+  enabled: boolean;
+  shape: MaskShape;
+  // Position (0-1 in UV space)
+  centerU: number;             // 0–1, horizontal position around ring
+  centerV: number;             // 0–1, vertical position across width
+  // Size (0-1 relative)
+  width: number;               // 0–1, width of mask shape
+  height: number;              // 0–1, height of mask shape
+  // Properties
+  feather: number;             // 0–100, edge softness
+  rotation: number;            // 0–360 degrees
+  invert: boolean;             // flip mask inside/outside
+  // Stripe/pattern specific
+  stripeCount?: number;        // for stripe patterns
+  stripeGap?: number;          // 0–100, gap between stripes
+  // Noise specific
+  noiseScale?: number;         // 0–100, size of noise pattern
+  noiseThreshold?: number;     // 0–100, cutoff point
+}
+
+export const DEFAULT_MASK: SurfaceMask = {
+  id: "mask-1",
+  name: "Mask 1",
+  enabled: true,
+  shape: "circle",
+  centerU: 0.5,
+  centerV: 0.5,
+  width: 0.3,
+  height: 0.3,
+  feather: 20,
+  rotation: 0,
+  invert: false,
+  stripeCount: 4,
+  stripeGap: 50,
+  noiseScale: 50,
+  noiseThreshold: 50,
+};
+
+export const MASK_PRESETS: Record<string, SurfaceMask[]> = {
+  "center-spot": [
+    { ...DEFAULT_MASK, id: "m1", name: "Center Spot", shape: "circle", centerU: 0.5, centerV: 0.5, width: 0.4, height: 0.6, feather: 30 },
+  ],
+  "horizontal-band": [
+    { ...DEFAULT_MASK, id: "m1", name: "Center Band", shape: "rectangle", centerU: 0.5, centerV: 0.5, width: 1, height: 0.4, feather: 15 },
+  ],
+  "vertical-stripes": [
+    { ...DEFAULT_MASK, id: "m1", name: "Vertical Stripes", shape: "stripe-v", centerU: 0.5, centerV: 0.5, width: 1, height: 1, feather: 5, stripeCount: 6, stripeGap: 50 },
+  ],
+  "organic-patches": [
+    { ...DEFAULT_MASK, id: "m1", name: "Organic Patches", shape: "noise", centerU: 0.5, centerV: 0.5, width: 1, height: 1, feather: 10, noiseScale: 40, noiseThreshold: 45 },
+  ],
+  "dual-spots": [
+    { ...DEFAULT_MASK, id: "m1", name: "Top Spot", shape: "circle", centerU: 0.25, centerV: 0.5, width: 0.25, height: 0.5, feather: 25 },
+    { ...DEFAULT_MASK, id: "m2", name: "Bottom Spot", shape: "circle", centerU: 0.75, centerV: 0.5, width: 0.25, height: 0.5, feather: 25 },
+  ],
+};
+
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   enabled: false,
   intensity: 50,
@@ -137,4 +206,7 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   symmetryBlend: 30,
   zonesEnabled: false,
   zones: [],
+  masksEnabled: false,
+  masks: [],
+  maskMode: "include",
 };

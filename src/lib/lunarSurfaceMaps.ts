@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { LunarTextureState, TerrainType, SurfaceZone } from "@/types/lunar";
+import { LunarTextureState, TerrainType, SurfaceZone, SurfaceMask, MaskMode } from "@/types/lunar";
 
 /**
  * Generates full-ring UV-space maps (normalMap, roughnessMap, aoMap, albedoMap, displacementMap)
@@ -45,6 +45,9 @@ function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
   const zonesKey = lunar.zonesEnabled && lunar.zones?.length
     ? lunar.zones.map(z => `${z.startV}-${z.endV}-${z.intensity}-${z.smoothness}-${z.blendWidth}`).join("|")
     : "no-zones";
+  const masksKey = lunar.masksEnabled && lunar.masks?.length
+    ? lunar.masks.filter(m => m.enabled).map(m => `${m.shape}-${m.centerU}-${m.centerV}-${m.width}-${m.height}-${m.feather}-${m.invert}`).join("|")
+    : "no-masks";
   return [
     lunar.seed, lunar.craterDensity, lunar.craterSize, lunar.intensity,
     lunar.microDetail, lunar.rimSharpness, lunar.overlapIntensity,
@@ -62,6 +65,8 @@ function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
     lunar.symmetry ?? "none",
     lunar.symmetryBlend ?? 30,
     zonesKey,
+    masksKey,
+    lunar.maskMode ?? "include",
     // Include ring aspect ratio so different ring sizes get distinct textures
     ringAspect !== undefined ? ringAspect.toFixed(2) : "1.00",
   ].join("-");
@@ -1020,6 +1025,141 @@ function applySurfaceZones(
   }
 }
 
+// ── Apply surface masks to heightmap ──────────────────────────────
+
+function computeMaskValue(
+  u: number,
+  v: number,
+  mask: SurfaceMask,
+  noiseFunc: (x: number, y: number) => number,
+): number {
+  const { shape, centerU, centerV, width, height, feather, rotation, invert } = mask;
+  const featherNorm = feather / 100;
+
+  // Transform coordinates for rotation
+  const rad = (rotation / 180) * Math.PI;
+  const cosR = Math.cos(rad);
+  const sinR = Math.sin(rad);
+  const du = u - centerU;
+  const dv = v - centerV;
+  const ru = du * cosR + dv * sinR;
+  const rv = -du * sinR + dv * cosR;
+
+  let value = 0;
+
+  switch (shape) {
+    case "circle": {
+      const dist = Math.sqrt((ru / (width / 2)) ** 2 + (rv / (height / 2)) ** 2);
+      if (dist < 1 - featherNorm) {
+        value = 1;
+      } else if (dist < 1) {
+        value = 1 - (dist - (1 - featherNorm)) / featherNorm;
+      }
+      break;
+    }
+    case "rectangle": {
+      const distU = Math.abs(ru) / (width / 2);
+      const distV = Math.abs(rv) / (height / 2);
+      const maxDist = Math.max(distU, distV);
+      if (maxDist < 1 - featherNorm) {
+        value = 1;
+      } else if (maxDist < 1) {
+        value = 1 - (maxDist - (1 - featherNorm)) / featherNorm;
+      }
+      break;
+    }
+    case "stripe-h": {
+      const count = mask.stripeCount ?? 4;
+      const gap = (mask.stripeGap ?? 50) / 100;
+      const stripe = Math.sin(v * Math.PI * 2 * count);
+      value = stripe > (gap * 2 - 1) ? 1 : 0;
+      // Apply feather
+      if (featherNorm > 0 && stripe > (gap * 2 - 1) - featherNorm && stripe <= (gap * 2 - 1)) {
+        value = (stripe - ((gap * 2 - 1) - featherNorm)) / featherNorm;
+      }
+      break;
+    }
+    case "stripe-v": {
+      const count = mask.stripeCount ?? 4;
+      const gap = (mask.stripeGap ?? 50) / 100;
+      const stripe = Math.sin(u * Math.PI * 2 * count);
+      value = stripe > (gap * 2 - 1) ? 1 : 0;
+      if (featherNorm > 0 && stripe > (gap * 2 - 1) - featherNorm && stripe <= (gap * 2 - 1)) {
+        value = (stripe - ((gap * 2 - 1) - featherNorm)) / featherNorm;
+      }
+      break;
+    }
+    case "noise": {
+      const scale = (mask.noiseScale ?? 50) / 10;
+      const threshold = (mask.noiseThreshold ?? 50) / 100;
+      const n = noiseFunc(u * scale, v * scale) * 0.5 + 0.5;
+      const featherRange = featherNorm * 0.3;
+      if (n > threshold + featherRange) {
+        value = 1;
+      } else if (n > threshold - featherRange) {
+        value = (n - (threshold - featherRange)) / (featherRange * 2);
+      }
+      break;
+    }
+    case "gradient-h": {
+      const start = centerU - width / 2;
+      const end = centerU + width / 2;
+      if (u < start) value = 0;
+      else if (u > end) value = 1;
+      else value = (u - start) / (end - start);
+      break;
+    }
+    case "gradient-v": {
+      const start = centerV - height / 2;
+      const end = centerV + height / 2;
+      if (v < start) value = 0;
+      else if (v > end) value = 1;
+      else value = (v - start) / (end - start);
+      break;
+    }
+  }
+
+  return invert ? 1 - value : value;
+}
+
+function applySurfaceMasks(
+  hmap: Float32Array,
+  w: number,
+  h: number,
+  masks: SurfaceMask[],
+  mode: MaskMode,
+  seed: number,
+) {
+  const activeMasks = masks.filter(m => m.enabled);
+  if (activeMasks.length === 0) return;
+
+  const noiseFunc = makeNoise2D(seed + 77777);
+
+  for (let y = 0; y < h; y++) {
+    const v = y / h;
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+      const idx = y * w + x;
+      const original = hmap[idx];
+
+      // Combine all mask values (union for include, intersection for exclude)
+      let combinedMask = mode === "include" ? 0 : 1;
+      for (const mask of activeMasks) {
+        const maskVal = computeMaskValue(u, v, mask, noiseFunc);
+        if (mode === "include") {
+          combinedMask = Math.max(combinedMask, maskVal);
+        } else {
+          combinedMask = Math.min(combinedMask, 1 - maskVal);
+        }
+      }
+
+      // Apply mask: blend between original texture and flat surface
+      const flat = 0.5;
+      hmap[idx] = flat + (original - flat) * combinedMask;
+    }
+  }
+}
+
 // ── Build heightmap ───────────────────────────────────────────────
 
 const REF_INNER_DIAM = 18.1;
@@ -1314,6 +1454,11 @@ export function buildHeightmap(
   // ─── 10) Apply surface zones ──
   if (lunar.zonesEnabled && lunar.zones && lunar.zones.length > 0) {
     applySurfaceZones(hmap, MAP_W, MAP_H, lunar.zones);
+  }
+
+  // ─── 11) Apply surface masks ──
+  if (lunar.masksEnabled && lunar.masks && lunar.masks.length > 0) {
+    applySurfaceMasks(hmap, MAP_W, MAP_H, lunar.masks, lunar.maskMode ?? "include", lunar.seed);
   }
 
   return { hmap, craterCount: totalCraterCount };
