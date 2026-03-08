@@ -206,6 +206,7 @@ function BuilderInner() {
     inlays, addInlayChannel, removeInlayChannel, clearInlays,
     lunarTexture, setLunarTexture, applyLunarPreset, randomizeLunar,
     engraving, setEngraving,
+    imageTerrain, setImageTerrain,
     enhanceDesign,
     balanceAnalysis,
     autoBalance,
