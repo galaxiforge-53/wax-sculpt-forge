@@ -37,13 +37,19 @@ export interface ImageTerrainState {
   autoCleanup: boolean;
   /** Active preset id or null for custom */
   presetId: string | null;
+  /** Terrain strength: overall amplitude multiplier, 0–100 (50 = 1×) */
+  strength: number;
+  /** Terrain compression: compresses dynamic range to avoid extreme peaks/valleys, 0–100 */
+  compression: number;
+  /** Edge protection: fades terrain to neutral near ring top/bottom edges, 0–100 */
+  edgeProtection: number;
 }
 
 export interface ImageTerrainPreset {
   id: string;
   label: string;
   desc: string;
-  icon: string; // lucide icon name hint
+  icon: string;
   params: Partial<ImageTerrainState>;
 }
 
@@ -63,6 +69,9 @@ export const IMAGE_TERRAIN_PRESETS: ImageTerrainPreset[] = [
       autoCleanup: true,
       invert: false,
       threshold: 50,
+      strength: 50,
+      compression: 30,
+      edgeProtection: 40,
     },
   },
   {
@@ -80,6 +89,9 @@ export const IMAGE_TERRAIN_PRESETS: ImageTerrainPreset[] = [
       autoCleanup: true,
       invert: false,
       threshold: 50,
+      strength: 65,
+      compression: 15,
+      edgeProtection: 25,
     },
   },
   {
@@ -97,6 +109,9 @@ export const IMAGE_TERRAIN_PRESETS: ImageTerrainPreset[] = [
       autoCleanup: true,
       invert: true,
       threshold: 50,
+      strength: 55,
+      compression: 25,
+      edgeProtection: 35,
     },
   },
   {
@@ -114,6 +129,9 @@ export const IMAGE_TERRAIN_PRESETS: ImageTerrainPreset[] = [
       autoCleanup: true,
       invert: false,
       threshold: 45,
+      strength: 55,
+      compression: 20,
+      edgeProtection: 50,
     },
   },
   {
@@ -131,6 +149,9 @@ export const IMAGE_TERRAIN_PRESETS: ImageTerrainPreset[] = [
       autoCleanup: true,
       invert: false,
       threshold: 55,
+      strength: 55,
+      compression: 20,
+      edgeProtection: 45,
     },
   },
 ];
@@ -154,4 +175,7 @@ export const DEFAULT_IMAGE_TERRAIN: ImageTerrainState = {
   wrapCorrection: 50,
   autoCleanup: false,
   presetId: null,
+  strength: 50,
+  compression: 20,
+  edgeProtection: 30,
 };

@@ -1,14 +1,15 @@
 /**
- * Image-to-Terrain Engine v2
+ * Image-to-Terrain Engine v3
  * Converts an uploaded image into displacement, normal, roughness, and AO maps
  * suitable for wrapping around a ring's outer surface.
  *
- * v2 additions:
- * - Auto-cleanup (histogram normalisation + mild denoise)
- * - Unsharp-mask sharpening
- * - Circular wrap correction (compensates curvature stretch)
- * - Improved seam blending with cosine crossfade
- * - Depth balance clamping for manufacturability
+ * v3 additions:
+ * - Terrain strength (amplitude multiplier)
+ * - Terrain compression (dynamic range compression for manufacturability)
+ * - Edge protection (fade to neutral near ring top/bottom borders)
+ * - Improved detail balancing (multi-scale min-feature clamping)
+ * - Enhanced seam blending (wider zone, hermite interpolation)
+ * - Normal-map preview export for 3-panel UI
  */
 import * as THREE from "three";
 import { ImageTerrainState } from "@/types/imageTerrain";
@@ -55,7 +56,6 @@ function separableBlur(data: Float32Array, w: number, h: number, radius: number)
   const diam = radius * 2 + 1;
   const invDiam = 1 / diam;
 
-  // Horizontal pass (wrapping U)
   for (let y = 0; y < h; y++) {
     let sum = 0;
     for (let x = -radius; x <= radius; x++) {
@@ -68,7 +68,6 @@ function separableBlur(data: Float32Array, w: number, h: number, radius: number)
     }
   }
 
-  // Vertical pass (clamping V)
   for (let x = 0; x < w; x++) {
     let sum = 0;
     for (let y = -radius; y <= radius; y++) {
@@ -82,9 +81,8 @@ function separableBlur(data: Float32Array, w: number, h: number, radius: number)
   }
 }
 
-// ── Auto-cleanup: histogram normalisation ──
-function autoCleanup(heightmap: Float32Array) {
-  // Find 2nd and 98th percentile for robust normalisation
+// ── Auto-cleanup: histogram normalisation + mild denoise ──
+function autoCleanup(heightmap: Float32Array, w: number, h: number) {
   const sorted = Float32Array.from(heightmap).sort();
   const lo = sorted[Math.floor(sorted.length * 0.02)];
   const hi = sorted[Math.floor(sorted.length * 0.98)];
@@ -94,8 +92,7 @@ function autoCleanup(heightmap: Float32Array) {
     heightmap[i] = Math.max(0, Math.min(1, (heightmap[i] - lo) / range));
   }
 
-  // Mild denoise: 1px blur
-  separableBlur(heightmap, MAP_W, MAP_H, 1);
+  separableBlur(heightmap, w, h, 1);
 }
 
 // ── Unsharp-mask sharpening ──
@@ -104,7 +101,7 @@ function unsharpMask(heightmap: Float32Array, w: number, h: number, strength: nu
   const blurred = Float32Array.from(heightmap);
   separableBlur(blurred, w, h, 3);
 
-  const factor = strength / 50; // 50 = 1× sharpening
+  const factor = strength / 50;
   for (let i = 0; i < heightmap.length; i++) {
     heightmap[i] = Math.max(0, Math.min(1,
       heightmap[i] + (heightmap[i] - blurred[i]) * factor
@@ -113,26 +110,18 @@ function unsharpMask(heightmap: Float32Array, w: number, h: number, strength: nu
 }
 
 // ── Circular wrap correction ──
-// The outer surface of a ring stretches more at the "equator" (center of V)
-// and compresses near the edges. This pre-distorts the U axis to compensate.
 function circularWrapCorrection(heightmap: Float32Array, w: number, h: number, amount: number) {
   if (amount <= 0) return;
   const factor = amount / 100;
   const tmp = new Float32Array(heightmap.length);
 
   for (let y = 0; y < h; y++) {
-    // v goes from -1 to 1 across the ring width
     const v = (y / (h - 1)) * 2 - 1;
-    // At the edges of the band the circumference is smaller → compress U
-    // At center it's larger → stretch U
-    // The correction: scale U by 1/(1 + factor * (1 - v²))
     const curveFactor = 1 / (1 + factor * 0.3 * (1 - v * v));
 
     for (let x = 0; x < w; x++) {
-      // Remap x through the curvature correction
       const center = w / 2;
       const srcX = center + (x - center) * curveFactor;
-      // Bilinear sample with U wrapping
       const sx = ((srcX % w) + w) % w;
       const x0 = Math.floor(sx);
       const x1 = (x0 + 1) % w;
@@ -145,13 +134,17 @@ function circularWrapCorrection(heightmap: Float32Array, w: number, h: number, a
   heightmap.set(tmp);
 }
 
-// ── Improved seam blending with cosine crossfade ──
+// ── Hermite smooth-step for blend curves ──
+function hermite(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+// ── Improved seam blending with wider zone + hermite ──
 function seamBlend(heightmap: Float32Array, w: number, h: number) {
-  const blendZone = Math.max(8, Math.round(w * 0.04)); // 4% each side
+  const blendZone = Math.max(12, Math.round(w * 0.05)); // 5% each side
 
   for (let y = 0; y < h; y++) {
     const row = y * w;
-    // Collect left and right edge values
     const leftVals = new Float32Array(blendZone);
     const rightVals = new Float32Array(blendZone);
     for (let x = 0; x < blendZone; x++) {
@@ -160,26 +153,96 @@ function seamBlend(heightmap: Float32Array, w: number, h: number) {
     }
 
     for (let x = 0; x < blendZone; x++) {
-      // Cosine crossfade: smoother than linear
-      const t = 0.5 - 0.5 * Math.cos(Math.PI * x / blendZone);
-      // Left edge blends from right-side value
+      const t = hermite(x / blendZone);
+      // Left edge: blend from right mirror
       heightmap[row + x] = rightVals[blendZone - 1 - x] * (1 - t) + leftVals[x] * t;
-      // Right edge blends toward left-side value
+      // Right edge: blend toward left mirror
       const ri = w - blendZone + x;
       heightmap[row + ri] = rightVals[x] * (1 - t) + leftVals[blendZone - 1 - x] * t;
     }
   }
 }
 
-// ── Depth balance: clamp extreme peaks/valleys for manufacturability ──
-function depthBalance(heightmap: Float32Array) {
-  // Soft-clamp: map through a tanh-like curve to prevent extremes
-  // that would be too thin for wax printing / too deep for casting
+// ── Terrain strength: amplitude multiplier around 0.5 midpoint ──
+function applyStrength(heightmap: Float32Array, strength: number) {
+  // strength 50 = 1×, 0 = flat, 100 = 2×
+  const factor = strength / 50;
+  for (let i = 0; i < heightmap.length; i++) {
+    heightmap[i] = Math.max(0, Math.min(1, 0.5 + (heightmap[i] - 0.5) * factor));
+  }
+}
+
+// ── Terrain compression: squash dynamic range via soft-knee curve ──
+function applyCompression(heightmap: Float32Array, compression: number) {
+  if (compression <= 0) return;
+  // compression 0–100 maps to knee factor 0–0.6
+  const knee = compression / 100 * 0.6;
   for (let i = 0; i < heightmap.length; i++) {
     const centered = heightmap[i] * 2 - 1; // -1..1
-    // Soft saturation
-    const balanced = centered / (1 + Math.abs(centered) * 0.15);
-    heightmap[i] = balanced * 0.5 + 0.5;
+    // Soft saturation: tanh-like
+    const compressed = centered / (1 + Math.abs(centered) * knee);
+    heightmap[i] = compressed * 0.5 + 0.5;
+  }
+}
+
+// ── Edge protection: fade terrain to 0.5 near V borders ──
+function applyEdgeProtection(heightmap: Float32Array, w: number, h: number, edgeProtection: number) {
+  if (edgeProtection <= 0) return;
+  // edgeProtection 0–100 maps to fade zone 0–40% of height from each edge
+  const fadeRatio = (edgeProtection / 100) * 0.4;
+  const fadeRows = Math.max(1, Math.round(h * fadeRatio));
+
+  for (let y = 0; y < h; y++) {
+    let fade = 1;
+    if (y < fadeRows) {
+      fade = hermite(y / fadeRows);
+    } else if (y >= h - fadeRows) {
+      fade = hermite((h - 1 - y) / fadeRows);
+    }
+
+    if (fade < 1) {
+      const row = y * w;
+      for (let x = 0; x < w; x++) {
+        // Blend toward neutral (0.5)
+        heightmap[row + x] = 0.5 + (heightmap[row + x] - 0.5) * fade;
+      }
+    }
+  }
+}
+
+// ── Detail balance: clamp minimum feature size for printability ──
+function detailBalance(heightmap: Float32Array, w: number, h: number) {
+  // Compute local gradient magnitude; if gradient is extreme but feature is tiny,
+  // smooth it out. Use a simple laplacian-based approach.
+  const laplacian = new Float32Array(heightmap.length);
+  for (let y = 1; y < h - 1; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const xl = (x - 1 + w) % w;
+      const xr = (x + 1) % w;
+      const lap = heightmap[row + xl] + heightmap[row + xr]
+                + heightmap[(y - 1) * w + x] + heightmap[(y + 1) * w + x]
+                - 4 * heightmap[row + x];
+      laplacian[row + x] = Math.abs(lap);
+    }
+  }
+
+  // Where laplacian is very high (sharp spikes), blend toward local average
+  // This prevents un-printable needle-thin features
+  const threshold = 0.15;
+  for (let y = 1; y < h - 1; y++) {
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const lap = laplacian[row + x];
+      if (lap > threshold) {
+        const xl = (x - 1 + w) % w;
+        const xr = (x + 1) % w;
+        const avg = (heightmap[row + xl] + heightmap[row + xr]
+                   + heightmap[(y - 1) * w + x] + heightmap[(y + 1) * w + x]) / 4;
+        const blend = Math.min(1, (lap - threshold) / threshold);
+        heightmap[row + x] = heightmap[row + x] * (1 - blend * 0.5) + avg * blend * 0.5;
+      }
+    }
   }
 }
 
@@ -231,12 +294,12 @@ function imageToHeightmap(
     heightmap[i] = lum;
   }
 
-  // ── Auto-cleanup ──
+  // Pipeline order matters: cleanup → contrast → sharpen → mode → invert → smooth → strength → compression → wrap → edge → seam → detail
+
   if (state.autoCleanup) {
-    autoCleanup(heightmap);
+    autoCleanup(heightmap, w, h);
   }
 
-  // ── Contrast ──
   if (state.contrast !== 100) {
     const factor = state.contrast / 100;
     for (let i = 0; i < heightmap.length; i++) {
@@ -244,10 +307,8 @@ function imageToHeightmap(
     }
   }
 
-  // ── Sharpening ──
   unsharpMask(heightmap, w, h, state.sharpness);
 
-  // ── Mode processing ──
   if (state.mode === "engraved" || state.mode === "raised") {
     const thresh = state.threshold / 100;
     for (let i = 0; i < heightmap.length; i++) {
@@ -261,27 +322,24 @@ function imageToHeightmap(
     }
   }
 
-  // ── Invert ──
   if (state.invert) {
     for (let i = 0; i < heightmap.length; i++) {
       heightmap[i] = 1 - heightmap[i];
     }
   }
 
-  // ── Smoothing ──
   if (state.smoothing > 0) {
     const radius = Math.round(state.smoothing * (w / 512));
     if (radius > 0) separableBlur(heightmap, w, h, radius);
   }
 
-  // ── Circular wrap correction ──
+  // New v3 processing stages
+  applyStrength(heightmap, state.strength);
+  applyCompression(heightmap, state.compression);
   circularWrapCorrection(heightmap, w, h, state.wrapCorrection);
-
-  // ── Seam blending ──
+  applyEdgeProtection(heightmap, w, h, state.edgeProtection);
   seamBlend(heightmap, w, h);
-
-  // ── Depth balance ──
-  depthBalance(heightmap);
+  detailBalance(heightmap, w, h);
 
   return heightmap;
 }
@@ -388,19 +446,31 @@ function heightmapToAOCanvas(heightmap: Float32Array, w: number, h: number): HTM
 }
 
 /**
- * Generate a small preview canvas from the processed heightmap
- * for the before/after comparison UI.
+ * Generate preview images for the 3-panel terrain preview.
+ * Returns { heightmap, normalMap } as data URLs.
  */
-export async function generateHeightmapPreview(
+export async function generateTerrainPreviews(
   state: ImageTerrainState,
-): Promise<string | null> {
+): Promise<{ heightmap: string; normalMap: string } | null> {
   if (!state.imageDataUrl) return null;
   const img = await loadImage(state.imageDataUrl);
   const pw = 512;
   const ph = 128;
-  const heightmap = imageToHeightmap(img, pw, ph, state);
-  const canvas = heightmapToDisplacementCanvas(heightmap, pw, ph);
-  return canvas.toDataURL("image/png");
+  const hm = imageToHeightmap(img, pw, ph, state);
+  const dispCanvas = heightmapToDisplacementCanvas(hm, pw, ph);
+  const normCanvas = heightmapToNormalCanvas(hm, pw, ph);
+  return {
+    heightmap: dispCanvas.toDataURL("image/png"),
+    normalMap: normCanvas.toDataURL("image/png"),
+  };
+}
+
+// Keep backward-compat export
+export async function generateHeightmapPreview(
+  state: ImageTerrainState,
+): Promise<string | null> {
+  const result = await generateTerrainPreviews(state);
+  return result?.heightmap ?? null;
 }
 
 /**
