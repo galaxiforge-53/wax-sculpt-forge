@@ -101,11 +101,12 @@ function PremiumLock() {
 
 // ── Panel heights ────────────────────────────────────────────────
 
-type PanelHeight = "collapsed" | "half" | "full";
-const PANEL_HEIGHTS: Record<PanelHeight, string> = {
-  collapsed: "h-0",
-  half: "h-[40vh]",
-  full: "h-[70vh]",
+type PanelHeight = "collapsed" | "peek" | "half" | "full";
+const PANEL_HEIGHTS: Record<PanelHeight, number> = {
+  collapsed: 0,
+  peek: 25,
+  half: 40,
+  full: 70,
 };
 
 // ── Component ────────────────────────────────────────────────────
