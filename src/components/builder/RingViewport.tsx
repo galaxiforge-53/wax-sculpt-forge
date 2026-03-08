@@ -1412,7 +1412,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               return (
                 <>
                   <ambientLight intensity={lighting.ambientIntensity + 0.3} color="#f5f0e8" />
-                  <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity * 0.6} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} shadow-bias={-0.001} color="#ffffff" />
+                  <directionalLight position={[keyX, keyY, keyZ]} intensity={lighting.keyIntensity * 0.6} castShadow={!isMobile} shadow-mapSize-width={isMobile ? 512 : 1024} shadow-mapSize-height={isMobile ? 512 : 1024} shadow-bias={-0.001} color="#ffffff" />
                   <directionalLight position={[fillX, fillY, fillZ]} intensity={lighting.fillIntensity + 0.2} color="#f0f0f0" />
                   <pointLight position={[0, -2, 3]} intensity={0.4} color="#ffffff" />
                 </>
