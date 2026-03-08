@@ -933,15 +933,17 @@ function applyLunarRayBrightening(
 ) {
   const rayNoise = makeNoise2D(seed + 13001);
   const rayAmp = 0.015 * depthScale;
+  const invW = 6 / w;
+  const invH = 6 / h;
 
   for (let y = 0; y < h; y++) {
+    const v05 = y * invH * 0.5;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const u = x / w * 6;
-      const v = y / h * 6;
-      // Directional noise creating subtle linear brightening
-      const n = rayNoise(u * 3, v * 0.5);
+      const u3 = x * invW * 3;
+      const n = rayNoise(u3, v05);
       if (n > 0.3) {
-        const idx = y * w + x;
+        const idx = rowOff + x;
         hmap[idx] += (n - 0.3) * rayAmp * edgeMask[idx];
       }
     }
