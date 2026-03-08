@@ -65,6 +65,7 @@ function BuilderInner() {
   const [turntableSpeed, setTurntableSpeed] = useState(0);
   const [bgPreset, setBgPreset] = useState<BackgroundPreset>("dark-studio");
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
+  const [studioRenderOpen, setStudioRenderOpen] = useState(false);
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
   const viewportContainerRef = useRef<HTMLDivElement>(null);
