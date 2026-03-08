@@ -1430,8 +1430,9 @@ export function buildHeightmap(
 
       const pxR = pr * MAP_W;
       const pyR = pr * MAP_H * physicalAspect;
-      const x0 = Math.max(0, Math.floor((pu - pr * 1.2) * MAP_W));
-      const x1 = Math.min(MAP_W - 1, Math.ceil((pu + pr * 1.2) * MAP_W));
+      // Use wrapping for x (seamless circumference) and clamping for y (ring width edges)
+      const x0 = Math.floor((pu - pr * 1.2) * MAP_W);
+      const x1 = Math.ceil((pu + pr * 1.2) * MAP_W);
       const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * MAP_H));
       const y1 = Math.min(MAP_H - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * MAP_H));
 
