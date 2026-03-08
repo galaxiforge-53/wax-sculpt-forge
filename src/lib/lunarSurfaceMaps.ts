@@ -675,15 +675,15 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   for (let y = 0; y < h; y++) {
     const v = y * invH;
     const rowOff = y * w;
+    const ridgeRowMask = edgeMask[rowOff]; // row-constant
+    if (ridgeRowMask < 0.01) continue; // skip entire edge rows — eliminates ~4096 iterations per skipped row
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
-      const mask = edgeMask[idx];
-      if (mask < 0.01) continue;
       const u = x * invW;
       const n = Math.abs(fbm(ridgeNoise, u, v, 4, 2.2, 0.5));
       const ridge = 1.0 - n * 2.0;
       if (ridge > 0) {
-        hmap[idx] += ridge * ridgeAmp * mask;
+        hmap[idx] += ridge * ridgeAmp * ridgeRowMask;
       }
     }
   }
