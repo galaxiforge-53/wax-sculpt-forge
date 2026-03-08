@@ -280,8 +280,11 @@ function shapedDistance(
     }
     case "organic": {
       // Extra domain warp for irregular natural shapes
-      const wU2 = sp.warpNoise(px * sp.noiseScale * 1.5 / w + 200, py * sp.noiseScale * 1.5 / h + 200);
-      const wV2 = sp.warpNoise(py * sp.noiseScale * 1.5 / h + 300, px * sp.noiseScale * 1.5 / w + 300);
+      // Hoist divisions: multiply by pre-computed reciprocals
+      const organicScaleW = sp.noiseScale * 1.5 / w;
+      const organicScaleH = sp.noiseScale * 1.5 / h;
+      const wU2 = sp.warpNoise(px * organicScaleW + 200, py * organicScaleH + 200);
+      const wV2 = sp.warpNoise(py * organicScaleH + 300, px * organicScaleW + 300);
       sdu += sp.warpAmp * 0.35 * wU2;
       sdv += sp.warpAmp * 0.35 * wV2;
       break;
