@@ -63,6 +63,7 @@ export const INITIAL_VIEWPORT_STATE: ViewportState = {
 
 type ViewportAction =
   | { type: "SET"; field: keyof ViewportState; value: unknown }
+  | { type: "TOGGLE"; field: keyof ViewportState }
   | { type: "SET_CUTAWAY"; mode: CutawayMode }
   | { type: "TOGGLE_PRINTER_BED" }
   | { type: "RESET_TRANSFORM" }
@@ -73,6 +74,8 @@ function viewportReducer(state: ViewportState, action: ViewportAction): Viewport
     case "SET":
       if (state[action.field] === action.value) return state;
       return { ...state, [action.field]: action.value };
+    case "TOGGLE":
+      return { ...state, [action.field]: !(state[action.field] as boolean) };
     case "SET_CUTAWAY":
       return { ...state, cutawayMode: action.mode, cutawayOffset: 0 };
     case "TOGGLE_PRINTER_BED":
@@ -102,9 +105,10 @@ export function useViewportState() {
     dispatch({ type: "SET", field, value });
   }, []);
 
+  // Fixed: uses dispatch instead of reading stale state
   const toggle = useCallback((field: keyof ViewportState) => {
-    dispatch({ type: "SET", field, value: !(state[field] as boolean) });
-  }, [state]);
+    dispatch({ type: "TOGGLE", field });
+  }, []);
 
   return { vp: state, vpDispatch: dispatch, vpSet: set, vpToggle: toggle };
 }
