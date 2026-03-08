@@ -255,27 +255,46 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         )}
       </div>
 
-      {/* ── Profile ── */}
+      {/* ── Profile Editor ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Profile</Label>
-        <Select
-          value={params.profile}
-          onValueChange={(v) => onUpdate({ profile: v as RingProfile })}
-        >
-          <SelectTrigger className="bg-secondary border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PROFILES.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                <div className="flex flex-col">
-                  <span>{p.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{p.desc}</span>
+        <Label className="text-xs text-secondary-foreground">Cross-Section Profile</Label>
+        <div className="grid grid-cols-5 gap-1.5">
+          {PROFILES.map((p) => {
+            const isActive = params.profile === p.value;
+            return (
+              <button
+                key={p.value}
+                onClick={() => onUpdate({ profile: p.value })}
+                className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border transition-all
+                  ${isActive
+                    ? "bg-primary/10 border-primary/40 ring-1 ring-primary/20"
+                    : "bg-card border-border hover:bg-secondary hover:border-border"
+                  }`}
+                title={p.desc}
+              >
+                <div className="w-full aspect-[3/2]">
+                  <ProfileCrossSectionSVG
+                    profile={p.value}
+                    isActive={isActive}
+                    thickness={params.thickness}
+                    width={params.width}
+                  />
                 </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                <span className={`text-[9px] font-medium leading-tight text-center
+                  ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                  {p.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Active profile tip */}
+        <div className="p-2 rounded-md bg-secondary/60 border border-border/50">
+          <p className="text-[10px] text-muted-foreground">
+            <span className="text-primary font-medium">{PROFILES.find(p => p.value === params.profile)?.label}:</span>{" "}
+            {PROFILES.find(p => p.value === params.profile)?.tip}
+          </p>
+        </div>
       </div>
 
       {/* ── Comfort Fit ── */}
