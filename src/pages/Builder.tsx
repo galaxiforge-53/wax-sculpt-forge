@@ -410,6 +410,14 @@ function BuilderInner() {
             />
           </ViewportErrorBoundary>
 
+          {/* Magnified inspection loupe */}
+          <InspectionLoupe
+            containerRef={viewportContainerRef}
+            active={loupeActive}
+            zoom={loupeZoom}
+            onZoomChange={setLoupeZoom}
+          />
+
           {/* Camera presets — top-left */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
             {CAMERA_BUTTONS.map((cam) => (
