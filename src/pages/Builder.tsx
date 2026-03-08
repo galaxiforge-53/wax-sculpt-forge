@@ -411,6 +411,7 @@ function BuilderInner() {
               ringRotation={ringRotation}
               showPrinterBed={showPrinterBed}
               rotationLocked={rotationLocked}
+              scaleReference={scaleReference}
             />
           </ViewportErrorBoundary>
 
