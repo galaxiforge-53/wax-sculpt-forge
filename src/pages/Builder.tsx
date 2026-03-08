@@ -22,11 +22,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock, ArrowLeftRight } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock, ArrowLeftRight, Aperture } from "lucide-react";
 import InspectionLoupe from "@/components/builder/InspectionLoupe";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
+import StudioRenderPanel from "@/components/builder/StudioRenderPanel";
 import SmartSuggestions from "@/components/builder/SmartSuggestions";
 import CompareView, { DesignSnapshot } from "@/components/builder/CompareView";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ function BuilderInner() {
   const [turntableSpeed, setTurntableSpeed] = useState(0);
   const [bgPreset, setBgPreset] = useState<BackgroundPreset>("dark-studio");
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
+  const [studioRenderOpen, setStudioRenderOpen] = useState(false);
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
   const viewportContainerRef = useRef<HTMLDivElement>(null);
@@ -775,6 +777,14 @@ function BuilderInner() {
                     </div>
                   </div>
                   <button
+                    onClick={() => setStudioRenderOpen(true)}
+                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    title="Studio render mode"
+                  >
+                    <Aperture className="w-3 h-3" />
+                  </button>
+                  <button
                     onClick={() => setRenderGalleryOpen(true)}
                     className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
                       bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
@@ -1011,6 +1021,23 @@ function BuilderInner() {
         metalPreset={metalPreset}
         finishPreset={finishPreset}
         params={params}
+      />
+
+      <StudioRenderPanel
+        open={studioRenderOpen}
+        onClose={() => setStudioRenderOpen(false)}
+        viewportRef={viewportRef}
+        viewMode={viewMode}
+        metalPreset={metalPreset}
+        finishPreset={finishPreset}
+        params={params}
+        lighting={lighting}
+        onLightingChange={setLighting}
+        bgPreset={bgPreset}
+        onBgPresetChange={setBgPreset}
+        onCameraPreset={(angle) => setCameraPreset(angle)}
+        turntableSpeed={turntableSpeed}
+        onTurntableSpeedChange={setTurntableSpeed}
       />
 
       {/* Preferences Sheet */}
