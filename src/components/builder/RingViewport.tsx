@@ -1850,7 +1850,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                   Wear {wearPreview}% · {wearPreview <= 25 ? "1 year" : wearPreview <= 50 ? "5 years" : wearPreview <= 75 ? "10 years" : "20+ years"}
                 </span>
               </div>
-              {hasLunarTexture && wearPreview > 15 && (
+              {!!lunarTexture?.enabled && wearPreview > 15 && (
                 <span className="text-[8px] text-accent-foreground/50 pl-5">
                   {wearPreview <= 40 ? "Crater rims softening" : wearPreview <= 70 ? "Surface detail eroding" : "Terrain significantly worn"}
                 </span>
