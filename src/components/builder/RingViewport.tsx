@@ -2144,13 +2144,15 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                 />
 
                 {/* Overhead softbox — large area light for smooth gradients on curved surfaces */}
-                <rectAreaLight
-                  width={5}
-                  height={5}
-                  position={[0, 5, 0]}
-                  intensity={isCast ? 0.8 : 0.5}
-                  color="#ffffff"
-                />
+                {!isMobile && (
+                  <rectAreaLight
+                    width={5}
+                    height={5}
+                    position={[0, 5, 0]}
+                    intensity={isCast ? 0.8 : 0.5}
+                    color="#ffffff"
+                  />
+                )}
 
                 {/* Rim / kicker light — edge highlights that separate ring from background */}
                 <spotLight
@@ -2168,19 +2170,24 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                   color="#ffffff"
                 />
 
-                {/* Top-back hair light — subtle rim highlight on upper edge */}
-                <pointLight
-                  position={[0, 4, -3]}
-                  intensity={isCast ? 0.6 : 0.3}
-                  color="#f0f0ff"
-                />
+                {/* Additional lights only on desktop for quality */}
+                {!isMobile && (
+                  <>
+                    {/* Top-back hair light — subtle rim highlight on upper edge */}
+                    <pointLight
+                      position={[0, 4, -3]}
+                      intensity={isCast ? 0.6 : 0.3}
+                      color="#f0f0ff"
+                    />
 
-                {/* Side accent — warm kiss light that catches crater rims */}
-                <pointLight
-                  position={[-4, 0.5, 1]}
-                  intensity={isCast ? 0.5 : 0.3}
-                  color={isCast ? "#ffe0c0" : "#d0d0ff"}
-                />
+                    {/* Side accent — warm kiss light that catches crater rims */}
+                    <pointLight
+                      position={[-4, 0.5, 1]}
+                      intensity={isCast ? 0.5 : 0.3}
+                      color={isCast ? "#ffe0c0" : "#d0d0ff"}
+                    />
+                  </>
+                )}
 
                 {/* Showcase extra lights — rim light and accent */}
                 {sc && (
