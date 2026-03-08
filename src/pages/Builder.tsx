@@ -111,16 +111,54 @@ function BuilderInner() {
   const { prefs, updatePrefs } = useUserPreferences();
   const [prefsOpen, setPrefsOpen] = useState(false);
 
+  // ── Autosave system ──
+  const autosaveStatus = useAutosave({
+    generateDesignPackage,
+    projectId: currentProjectId,
+    projectName: currentProjectName,
+    userId: user?.id ?? null,
+    enabled: prefs.autoSave !== false,
+  });
+
   // Apply user preferences as initial defaults (only once on mount, before any template/project override)
   const prefsAppliedRef = useRef(false);
   useEffect(() => {
     if (prefsAppliedRef.current) return;
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
     const hasProject = !!sessionStorage.getItem("openProjectId");
-    if (hasTemplate || hasProject) {
+    const hasCloud = !!sessionStorage.getItem("openCloudDesignId");
+    const hasShared = !!sessionStorage.getItem("sharedDesignPackage");
+    if (hasTemplate || hasProject || hasCloud || hasShared) {
       prefsAppliedRef.current = true;
       return; // Don't override if loading a template/project
     }
+
+    // Check for autosave recovery
+    const autosaved = loadAutosave();
+    if (autosaved) {
+      const savedAt = new Date(autosaved.meta.savedAt);
+      const ageMinutes = (Date.now() - savedAt.getTime()) / 60000;
+      // Only offer recovery if less than 24 hours old
+      if (ageMinutes < 1440) {
+        const timeLabelParts: string[] = [];
+        if (ageMinutes < 1) timeLabelParts.push("just now");
+        else if (ageMinutes < 60) timeLabelParts.push(`${Math.round(ageMinutes)}m ago`);
+        else timeLabelParts.push(`${Math.round(ageMinutes / 60)}h ago`);
+        const nameLabel = autosaved.meta.projectName ? ` "${autosaved.meta.projectName}"` : "";
+
+        // Auto-restore silently — toast to inform user
+        restoreDesign(autosaved.pkg);
+        if (autosaved.meta.projectId) setCurrentProjectId(autosaved.meta.projectId);
+        if (autosaved.meta.projectName) setCurrentProjectName(autosaved.meta.projectName);
+        toast({
+          title: "🔄 Design Restored",
+          description: `Recovered${nameLabel} from ${timeLabelParts[0]}.`,
+        });
+        prefsAppliedRef.current = true;
+        return;
+      }
+    }
+
     prefsAppliedRef.current = true;
     setMetalPreset(prefs.defaultMetal);
     setFinishPreset(prefs.defaultFinish);
