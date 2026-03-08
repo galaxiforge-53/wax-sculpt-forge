@@ -585,11 +585,12 @@ function stampEjectaRays(
       const jitter = rayWidth * w;
       const jCeil = Math.ceil(jitter);
       const pyRow = py * w;
+      const ejectaRowMask = edgeMask[pyRow]; // row-constant
       for (let j = -jCeil; j <= jCeil; j++) {
         let wpx = (px + j) % w;
         if (wpx < 0) wpx += w;
         const idx = pyRow + wpx;
-        hmap[idx] = hmap[idx] + rayBrightness * fadeoff * edgeMask[idx];
+        hmap[idx] = hmap[idx] + rayBrightness * fadeoff * ejectaRowMask;
         if (hmap[idx] > 1) hmap[idx] = 1;
       }
 
