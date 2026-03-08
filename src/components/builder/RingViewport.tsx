@@ -1374,14 +1374,16 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         )}
         <Canvas
           camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
-          shadows={sc || insp ? "soft" : true}
+          shadows={sc || insp ? "soft" : (isMobile ? false : true)}
+          frameloop="demand"
           gl={{
             preserveDrawingBuffer: true,
-            antialias: true,
+            antialias: !isMobile,
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : 0.95),
+            powerPreference: isMobile ? "low-power" : "high-performance",
           }}
-          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
+          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1] : [1, 2]))}
         >
           <ClipPlaneManager mode={cutawayMode} />
 
