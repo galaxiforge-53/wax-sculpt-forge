@@ -1086,6 +1086,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         {outerMaterial}
       </mesh>
 
+      {/* Thickness heatmap overlay */}
+      {thicknessHeatmap && (
+        <ThicknessHeatmapOverlay outerGeo={outerGeo} params={debouncedParams} />
+      )}
+
       {/* Inner bore — smooth polished surface */}
       <mesh geometry={innerGeo} castShadow>
         {innerMaterial}
