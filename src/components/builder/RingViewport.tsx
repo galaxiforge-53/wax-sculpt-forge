@@ -2282,17 +2282,17 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <OrbitControls
             enablePan={false}
             enableRotate={!isRotationLocked && turntableSpeed === 0}
-            minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
-            maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
+            minDistance={insp ? 0.8 : (isMobile ? 1.8 : 2.0)}
+            maxDistance={insp ? 8 : (isMobile ? 10 : 14)}
             autoRotate={turntableSpeed > 0}
             autoRotateSpeed={turntableSpeed}
             enableDamping
-            dampingFactor={isMobile ? 0.12 : 0.08}
-            rotateSpeed={isMobile ? 0.5 : 1.0}
-            zoomSpeed={isMobile ? 0.7 : 1.0}
+            dampingFactor={isMobile ? 0.15 : 0.08}
+            rotateSpeed={isMobile ? 0.6 : 1.0}
+            zoomSpeed={isMobile ? 0.8 : 1.0}
             touches={{ ONE: isRotationLocked ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-            minPolarAngle={0}
-            maxPolarAngle={Math.PI}
+            minPolarAngle={0.1}
+            maxPolarAngle={Math.PI - 0.1}
           />
 
           {/* Rotation lock indicator */}
