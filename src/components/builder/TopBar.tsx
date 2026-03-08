@@ -52,7 +52,7 @@ const FINISHES: { value: FinishPreset; label: string }[] = [
 export default function TopBar({
   viewMode, onViewModeChange, metalPreset, onMetalChange,
   finishPreset, onFinishChange, onUndo, onRedo, canUndo, canRedo, onExport, onSave, isSaving, onForgeNow,
-  onEnhance, isEnhancing,
+  onEnhance, isEnhancing, onShare, isSharing,
 }: TopBarProps) {
   const embed = isEmbedMode();
   const isMobile = useIsMobile();
