@@ -509,6 +509,8 @@ export function useRingDesign() {
     randomizeLunar,
     engraving,
     setEngraving,
+    imageTerrain,
+    setImageTerrain,
     enhanceDesign,
     balanceAnalysis,
     autoBalance,
