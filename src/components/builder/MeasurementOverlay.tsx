@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { Text, Line } from "@react-three/drei";
 import * as THREE from "three";
-import { RingParameters } from "@/types/ring";
+import { RingParameters, RingSizeStandard, DimensionUnit, formatRingSize, formatDimension } from "@/types/ring";
 
 interface MeasurementOverlayProps {
   params: RingParameters;
   visible: boolean;
+  sizeStandard?: RingSizeStandard;
+  dimensionUnit?: DimensionUnit;
 }
 
 /** Subtle 3D dimension guides rendered inside the Canvas */
