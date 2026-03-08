@@ -1793,32 +1793,73 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   return canvas;
 }
 
-// ── Albedo map ────────────────────────────────────────────────────
+// ── Albedo map (computed at half resolution, then upscaled) ───────
+// Albedo is a very low-frequency property (subtle stone color variation).
+// Computing fBm at half-res eliminates ~3M redundant noise evaluations.
 
 function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(w, h);
 
+  const hw = w >> 1;
+  const hh = h >> 1;
   const stoneNoise = makeNoise2D(seed + 7000);
   const grainRng = seededRng(seed + 8000);
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const u = x / w * 4;
-      const v = y / h * 4;
+  // Downsample heightmap for height-tint calculation
+  const halfHmap = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      halfHmap[y * hw + x] = (
+        hmap[sy * w + sx] +
+        hmap[sy * w + sx + 1] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
+      ) * 0.25;
+    }
+  }
+
+  // Compute albedo at half resolution
+  const halfAlbedo = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    for (let x = 0; x < hw; x++) {
+      const u = x / hw * 4;
+      const v = y / hh * 4;
       const n = fbm(stoneNoise, u, v, 2, 2.0, 0.5) * 0.5 + 0.5;
       const grain = (grainRng() - 0.5) * 0.04;
-      const hVal = hmap[y * w + x];
+      const hVal = halfHmap[y * hw + x];
       const heightTint = 0.95 + (hVal - 0.5) * 0.1;
-
       let albedo = 0.82 + n * 0.12 + grain;
       albedo *= heightTint;
-      albedo = Math.max(0.6, Math.min(1.0, albedo));
+      halfAlbedo[y * hw + x] = Math.max(0.6, Math.min(1.0, albedo));
+    }
+  }
 
-      const val = Math.round(albedo * 255);
+  // Bilinear upscale to full resolution
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const fy = (y / h) * (hh - 1);
+    const iy = Math.floor(fy);
+    const fy1 = fy - iy;
+    const iy0 = Math.min(iy, hh - 1);
+    const iy1 = Math.min(iy + 1, hh - 1);
+    for (let x = 0; x < w; x++) {
+      const fx = (x / w) * (hw - 1);
+      const ix = Math.floor(fx);
+      const fx1 = fx - ix;
+      const ix0 = ((ix) % hw + hw) % hw;
+      const ix1 = ((ix + 1) % hw + hw) % hw;
+
+      const val = Math.round((
+        halfAlbedo[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
+        halfAlbedo[iy0 * hw + ix1] * fx1 * (1 - fy1) +
+        halfAlbedo[iy1 * hw + ix0] * (1 - fx1) * fy1 +
+        halfAlbedo[iy1 * hw + ix1] * fx1 * fy1
+      ) * 255);
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
       img.data[idx] = val;
