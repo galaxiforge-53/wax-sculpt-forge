@@ -910,7 +910,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
