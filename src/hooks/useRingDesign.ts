@@ -342,7 +342,7 @@ export function useRingDesign() {
     };
   }, [params, viewMode, metalPreset, finishPreset, toolHistory, pipelineState, waxMarks, craftActions, inlays, lunarTexture, engraving]);
 
-  const castabilityReport = useMemo(() => evaluateCastability(params, lunarTexture, engraving), [params, lunarTexture, engraving]);
+  const castabilityReport = useMemo(() => evaluateCastability(params, lunarTexture, engraving, inlays), [params, lunarTexture, engraving, inlays]);
 
   const balanceAnalysis = useMemo(() => analyzeSurfaceBalance(params, lunarTexture, engraving, waxMarks, inlays), [params, lunarTexture, engraving, waxMarks, inlays]);
 
