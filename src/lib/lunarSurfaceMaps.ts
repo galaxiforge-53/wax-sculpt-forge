@@ -1454,11 +1454,27 @@ export function buildHeightmap(
       }
     }
 
+    // Random grain particles with directional bias simulating micro-meteorite bombardment
     const grainRng = seededRng(lunar.seed + 9999);
     const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
-    for (let i = 0; i < hmap.length; i++) {
-      const mask = edgeMask[i];
-      hmap[i] += (grainRng() - 0.5) * grainStrength * mask;
+    // Directional impact noise — elongated in a dominant direction
+    const impactNoise = makeNoise2D(lunar.seed + 11111);
+    const impactAngle = seededRng(lunar.seed + 12222)() * Math.PI; // random dominant direction
+    const cosA = Math.cos(impactAngle);
+    const sinA = Math.sin(impactAngle);
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const idx = y * MAP_W + x;
+        const mask = edgeMask[idx];
+        // Base random grain
+        const grain = (grainRng() - 0.5) * grainStrength;
+        // Directional micro-scratch pattern (like regolith raking from impacts)
+        const ru = (x / MAP_W * 200) * cosA + (y / MAP_H * 200 * aspectCorrection) * sinA;
+        const rv = -(x / MAP_W * 200) * sinA + (y / MAP_H * 200 * aspectCorrection) * cosA;
+        // Stretch along impact direction for elongated scratches
+        const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
+        hmap[idx] += (grain + scratch) * mask;
+      }
     }
   }
 
