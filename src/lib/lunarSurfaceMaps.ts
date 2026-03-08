@@ -1620,28 +1620,63 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
   return canvas;
 }
 
-// ── Roughness map ─────────────────────────────────────────────────
+// ── Roughness map (computed at half resolution, then upscaled) ─────
+// Roughness is a low-frequency property — half-res gives ~4× speedup
+// with no visible quality loss on the curved ring surface.
 
 function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, microDetail: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(w, h);
 
+  const hw = w >> 1;
+  const hh = h >> 1;
   const microFactor = microDetail / 100;
   const grainRng = seededRng(7777 + Math.round(microDetail));
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const hVal = hmap[y * w + x];
+  // Compute at half resolution
+  const halfRough = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      // 2×2 box filter downsample of heightmap
+      const hVal = (
+        hmap[sy * w + sx] +
+        hmap[sy * w + sx + 1] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
+      ) * 0.25;
       let roughness = 0.92 - (hVal - 0.5) * 0.9;
       if (microFactor > 0) {
         roughness += (grainRng() - 0.5) * 0.12 * microFactor;
       }
-      roughness = Math.max(0.2, Math.min(1.0, roughness));
+      halfRough[y * hw + x] = Math.max(0.2, Math.min(1.0, roughness));
+    }
+  }
 
-      const v = Math.round(roughness * 255);
+  // Bilinear upscale to full resolution
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const fy = (y / h) * (hh - 1);
+    const iy = Math.floor(fy);
+    const fy1 = fy - iy;
+    const iy0 = Math.min(iy, hh - 1);
+    const iy1 = Math.min(iy + 1, hh - 1);
+    for (let x = 0; x < w; x++) {
+      const fx = (x / w) * (hw - 1);
+      const ix = Math.floor(fx);
+      const fx1 = fx - ix;
+      const ix0 = ((ix) % hw + hw) % hw;
+      const ix1 = ((ix + 1) % hw + hw) % hw;
+
+      const v = Math.round((
+        halfRough[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
+        halfRough[iy0 * hw + ix1] * fx1 * (1 - fy1) +
+        halfRough[iy1 * hw + ix0] * (1 - fx1) * fy1 +
+        halfRough[iy1 * hw + ix1] * fx1 * fy1
+      ) * 255);
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
       img.data[idx] = v;
