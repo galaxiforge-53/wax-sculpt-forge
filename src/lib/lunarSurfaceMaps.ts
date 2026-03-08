@@ -1706,7 +1706,7 @@ export function buildHeightmap(
   }
 
   // ─── 1b) Highland ridges layer ──
-  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeMask, lunar.seed, depthScale, physicalAspect);
+  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeRow, lunar.seed, depthScale, physicalAspect);
 
   // ─── 2) Domain warp noise ──
   const warpNoise = makeNoise2D(lunar.seed + 1234);
