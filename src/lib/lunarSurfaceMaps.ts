@@ -1093,6 +1093,8 @@ function applyOrganicDunes(
     const v3 = v * 3;
     const v5 = v * 5;
     const rowOff = y * w;
+    const duneRowMask = edgeMask[rowOff]; // row-constant — hoist to avoid per-pixel lookups
+    if (duneRowMask < 0.001) continue; // skip edge rows entirely
     for (let x = 0; x < w; x++) {
       const u = x * invW;
       const u8 = u * 8;
@@ -1102,7 +1104,7 @@ function applyOrganicDunes(
       const crossDune = Math.sin(u * 40 + duneNoise2(u5, v5) * 2) * 0.3 + 0.5;
       const combined = dune * 0.7 + crossDune * 0.3;
       const idx = rowOff + x;
-      hmap[idx] += (combined - 0.5) * duneAmp * edgeMask[idx];
+      hmap[idx] += (combined - 0.5) * duneAmp * duneRowMask;
     }
   }
 }
