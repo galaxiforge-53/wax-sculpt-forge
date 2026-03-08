@@ -1947,18 +1947,23 @@ export function buildHeightmap(
 
       const pxR2 = pxR * pxR; // squared radius for fast rejection
 
+      const puW = pu * MAP_W;
+      const pvH = pv * MAP_H;
+      const aspectRatio = pxR / pyR;
+      const invPxR2 = 1 / pxR2;
       for (let py = y0; py <= y1; py++) {
+        const rowOff_pit = py * MAP_W;
+        const dv = (py - pvH) * aspectRatio;
+        const dv2 = dv * dv;
+        if (dv2 > pxR2) continue; // early row rejection
         for (let px = x0; px <= x1; px++) {
-          // Wrap x for seamless circumference
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
-          const du = (px - pu * MAP_W);
-          const dv = (py - pv * MAP_H) * (pxR / pyR); // aspect-correct to circle space
-          const d2 = du * du + dv * dv;
-          if (d2 > pxR2) continue; // squared distance check — no sqrt needed
-          const falloff = 1 - d2 / pxR2; // d²/r² maps 0→1 to 1→0
-          const mask = edgeMask[py * MAP_W + wpx];
-          hmap[py * MAP_W + wpx] -= pd * falloff * mask;
+          const du = px - puW;
+          const d2 = du * du + dv2;
+          if (d2 > pxR2) continue;
+          const idx_pit = rowOff_pit + wpx;
+          hmap[idx_pit] -= pd * (1 - d2 * invPxR2) * edgeMask[idx_pit];
         }
       }
     }
