@@ -1577,6 +1577,7 @@ interface RingViewportProps {
   scaleReference?: ScaleReferenceType; // Show real-world scale reference objects
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional jewellery polishing
+  detailBoost?: number; // 0–100, exaggerates surface detail for inspection
   turntableSpeed?: number; // 0 = off, positive = RPM (e.g. 4 for slow spin)
   bgPreset?: BackgroundPreset;
 }
