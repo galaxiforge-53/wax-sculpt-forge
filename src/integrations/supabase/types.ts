@@ -228,6 +228,39 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_templates: {
+        Row: {
+          created_at: string
+          design_package: Json
+          id: string
+          name: string
+          share_code: string
+          thumbnail: string | null
+          user_id: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          design_package: Json
+          id?: string
+          name?: string
+          share_code: string
+          thumbnail?: string | null
+          user_id: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          design_package?: Json
+          id?: string
+          name?: string
+          share_code?: string
+          thumbnail?: string | null
+          user_id?: string
+          view_count?: number
+        }
+        Relationships: []
+      }
       user_access: {
         Row: {
           code_id: string
@@ -292,6 +325,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_share_views: {
+        Args: { p_share_code: string }
+        Returns: undefined
       }
       redeem_access_code: { Args: { p_code: string }; Returns: Json }
     }
