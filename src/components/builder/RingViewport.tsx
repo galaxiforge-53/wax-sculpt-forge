@@ -108,7 +108,8 @@ interface RingMeshProps {
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   stampSettings?: StampSettings;
   lunarTexture?: LunarTextureState;
-  wearPreview?: number; // 0–100, simulates polishing/wear softening
+  wearPreview?: number; // 0–100, simulates aging/wear softening
+  polishPreview?: number; // 0–100, simulates professional polishing finish
 }
 
 // ── Physically-based metal material configs ───────────────────────
@@ -636,14 +637,16 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
   const wearAmount = wearPreview;
+  const polishAmount = polishPreview;
 
   // Debounce params for geometry builds to avoid thrashing during slider drags
   const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
   const debouncedWear = useDebouncedValue(wearAmount, 100);
+  const debouncedPolish = useDebouncedValue(polishAmount, 100);
 
   // Adaptive quality for geometry detail
   const geoQuality = useAdaptiveQuality(
@@ -699,6 +702,17 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const lunarWearAoReduction = wearFactor * 0.5;        // AO fades — debris fills crevices
   const lunarWearDispReduction = wearFactor * 0.45;     // displacement softens — craters shallow out
   const lunarWearRoughnessUniformity = wearFactor * 0.3; // roughness map becomes more uniform
+
+  // ── Polishing simulation: jeweller's finishing pass ──
+  // Polishing is the inverse of wear — it makes surfaces smoother, shinier,
+  // and softens sharp crater rims/edges like tumble or hand polishing
+  const polishFactor = debouncedPolish / 100;
+  const polishRoughnessReduction = polishFactor * 0.18;    // surface gets smoother
+  const polishClearcoatBoost = polishFactor * 0.6;         // fresh clearcoat layer
+  const polishReflectivityBoost = polishFactor * 0.25;     // sharper reflections
+  const polishNormalSoften = polishFactor * 0.35;          // crater rims soften from buffing
+  const polishDispSoften = polishFactor * 0.2;             // high points get filed down
+  const polishEnvBoost = polishFactor * 0.4;               // mirror-like environment reflection
 
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
@@ -809,18 +823,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
-    // Wear erodes crater rims — normal detail progressively flattens
-    const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction);
+    // Wear erodes rims, polishing buffs them smooth — both reduce normal detail
+    const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction) * (1 - polishNormalSoften);
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction]);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften]);
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
     const baseDisp = outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
-    // Wear progressively shallows craters — rims erode, bowls fill with wear debris
-    return baseDisp * (1 - lunarWearDispReduction);
-  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale, lunarWearDispReduction]);
+    // Wear shallows craters; polishing files down high points (rims)
+    return baseDisp * (1 - lunarWearDispReduction) * (1 - polishDispSoften);
+  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale, lunarWearDispReduction, polishDispSoften]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
@@ -889,20 +903,25 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
+        roughness={Math.max(0.02, Math.min(1,
+          (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness)
+          + finishRoughMod + wearRoughnessBoost - polishRoughnessReduction
+        ))}
         metalness={mc.metalness}
         normalMap={lunarMaps?.normalMap ?? null}
         roughnessMap={lunarMaps?.roughnessMap ?? null}
         aoMap={lunarMaps?.aoMap ?? null}
         aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) : 0}
         normalScale={normalScale}
-        envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15)}
-        clearcoat={Math.max(0, (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss))}
-        clearcoatRoughness={mc.clearcoatRoughness + wearFactor * 0.15}
-        reflectivity={mc.reflectivity}
+        envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15 + polishEnvBoost)}
+        clearcoat={Math.min(1, Math.max(0,
+          (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss) + polishClearcoatBoost
+        ))}
+        clearcoatRoughness={Math.max(0.01, mc.clearcoatRoughness + wearFactor * 0.15 - polishFactor * 0.08)}
+        reflectivity={Math.min(1, mc.reflectivity + polishReflectivityBoost)}
         sheen={mc.sheen + wearSheenBoost}
         sheenColor={mc.sheenColor}
-        sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1)}
+        sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1 - polishFactor * 0.05)}
         ior={mc.ior}
         displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
         displacementScale={dispScale}
@@ -910,7 +929,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
@@ -923,17 +942,17 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3 + wearRoughnessBoost * 1.5)}
+        roughness={Math.max(0.02, Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3 + wearRoughnessBoost * 1.5 - polishRoughnessReduction * 0.8))}
         metalness={mc.metalness}
-        envMapIntensity={mc.envMapIntensity * 0.8}
-        clearcoat={Math.max(0, 0.4 * (1 - wearClearcoatLoss * 0.5))}
-        clearcoatRoughness={0.03 + wearFactor * 0.1}
-        reflectivity={mc.reflectivity}
+        envMapIntensity={mc.envMapIntensity * (0.8 + polishEnvBoost * 0.3)}
+        clearcoat={Math.min(1, Math.max(0, 0.4 * (1 - wearClearcoatLoss * 0.5) + polishClearcoatBoost * 0.4))}
+        clearcoatRoughness={Math.max(0.01, 0.03 + wearFactor * 0.1 - polishFactor * 0.02)}
+        reflectivity={Math.min(1, mc.reflectivity + polishReflectivityBoost * 0.5)}
         ior={mc.ior}
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, wearRoughnessBoost, wearClearcoatLoss, wearFactor]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, wearRoughnessBoost, wearClearcoatLoss, wearFactor, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor]);
 
   // Cap material — matches inner but matte
   const capMaterial = useMemo(() => {
@@ -1556,7 +1575,8 @@ interface RingViewportProps {
   showPrinterBed?: boolean;
   rotationLocked?: boolean; // When true, disables orbit rotation but keeps zoom
   scaleReference?: ScaleReferenceType; // Show real-world scale reference objects
-  wearPreview?: number; // 0–100, simulates polishing/wear softening
+  wearPreview?: number; // 0–100, simulates aging/wear softening
+  polishPreview?: number; // 0–100, simulates professional jewellery polishing
   turntableSpeed?: number; // 0 = off, positive = RPM (e.g. 4 for slow spin)
   bgPreset?: BackgroundPreset;
 }
@@ -1736,7 +1756,7 @@ function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, polishPreview = 0, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const insp = inspectionMode;
@@ -1853,6 +1873,26 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               {!!lunarTexture?.enabled && wearPreview > 15 && (
                 <span className="text-[8px] text-accent-foreground/50 pl-5">
                   {wearPreview <= 40 ? "Crater rims softening" : wearPreview <= 70 ? "Surface detail eroding" : "Terrain significantly worn"}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Polish preview indicator */}
+        {polishPreview > 0 && (
+          <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200" style={{ top: isRotationLocked ? (wearPreview > 0 ? '6.5rem' : '3.5rem') : (wearPreview > 0 ? '3.75rem' : '0.75rem') }}>
+            <div className="flex flex-col gap-0.5 px-2.5 py-1.5 bg-primary/10 backdrop-blur-sm border border-primary/25 rounded-lg">
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                <span className="text-[10px] font-medium text-primary/80">
+                  Polish {polishPreview}% · {polishPreview <= 30 ? "Light buff" : polishPreview <= 60 ? "Standard finish" : polishPreview <= 85 ? "Mirror polish" : "Jeweller's grade"}
+                </span>
+              </div>
+              {!!lunarTexture?.enabled && polishPreview > 20 && (
+                <span className="text-[8px] text-primary/50 pl-5">
+                  {polishPreview <= 45 ? "Crater rims smoothing" : polishPreview <= 75 ? "Texture detail softened" : "High-polish crater finish"}
                 </span>
               )}
             </div>
@@ -2031,6 +2071,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               stampSettings={stampSettings}
               lunarTexture={lunarTexture}
               wearPreview={wearPreview}
+              polishPreview={polishPreview}
               onGenProgress={handleGenProgress}
             />
 
