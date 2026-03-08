@@ -233,9 +233,16 @@ function shapedDistance(
     // "circular" — no transformation
   }
 
-  // Standard domain warp (applies to all shapes for natural variation)
-  const wU = sp.warpNoise(px * sp.noiseScale / w, py * sp.noiseScale / h);
-  const wV = sp.warpNoise(py * sp.noiseScale / h + 100, px * sp.noiseScale / w + 100);
+  // Multi-octave domain warp for more organic, natural crater edges
+  // Two octaves of warp: coarse (large-scale irregularity) + fine (edge detail)
+  const coarseScale = sp.noiseScale * 0.5;
+  const fineScale = sp.noiseScale * 2.0;
+  const wU_coarse = sp.warpNoise(px * coarseScale / w, py * coarseScale / h);
+  const wV_coarse = sp.warpNoise(py * coarseScale / h + 100, px * coarseScale / w + 100);
+  const wU_fine = sp.warpNoise(px * fineScale / w + 50, py * fineScale / h + 50);
+  const wV_fine = sp.warpNoise(py * fineScale / h + 150, px * fineScale / w + 150);
+  const wU = wU_coarse * 0.7 + wU_fine * 0.3;
+  const wV = wV_coarse * 0.7 + wV_fine * 0.3;
   const wdu = sdu + sp.warpAmp * 0.22 * wU;
   const wdv = sdv + sp.warpAmp * 0.22 * wV;
 
@@ -344,8 +351,20 @@ function stampCrater(
       if (dist < bowlEnd) {
         const t = slumpDist / bowlEnd;
         const tClamped = Math.min(t, 1.0);
-        const parabola = tClamped * tClamped;
-        delta = -c.depth * (1.0 - parabola * 0.92);
+        // Realistic crater bowl: flat floor in center transitioning to steep walls
+        // Real craters have flat floors from melt pooling, with concave walls rising to rim
+        const flatFloorEnd = 0.35; // inner 35% is nearly flat
+        let bowlProfile: number;
+        if (tClamped < flatFloorEnd) {
+          // Flat floor with very subtle dish
+          bowlProfile = 1.0 - tClamped * tClamped * 0.15;
+        } else {
+          // Steep concave wall rising to rim — cubic ease-out for realistic curvature
+          const wallT = (tClamped - flatFloorEnd) / (1.0 - flatFloorEnd);
+          const wallCurve = wallT * wallT * (3.0 - 2.0 * wallT); // smoothstep
+          bowlProfile = (1.0 - flatFloorEnd * flatFloorEnd * 0.15) * (1.0 - wallCurve * 0.95);
+        }
+        delta = -c.depth * bowlProfile;
 
         // Crater floor texture — add roughness inside the bowl
         if (floorNoise && c.floorTextureFactor > 0 && tClamped < 0.7) {
@@ -1435,11 +1454,27 @@ export function buildHeightmap(
       }
     }
 
+    // Random grain particles with directional bias simulating micro-meteorite bombardment
     const grainRng = seededRng(lunar.seed + 9999);
     const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
-    for (let i = 0; i < hmap.length; i++) {
-      const mask = edgeMask[i];
-      hmap[i] += (grainRng() - 0.5) * grainStrength * mask;
+    // Directional impact noise — elongated in a dominant direction
+    const impactNoise = makeNoise2D(lunar.seed + 11111);
+    const impactAngle = seededRng(lunar.seed + 12222)() * Math.PI; // random dominant direction
+    const cosA = Math.cos(impactAngle);
+    const sinA = Math.sin(impactAngle);
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const idx = y * MAP_W + x;
+        const mask = edgeMask[idx];
+        // Base random grain
+        const grain = (grainRng() - 0.5) * grainStrength;
+        // Directional micro-scratch pattern (like regolith raking from impacts)
+        const ru = (x / MAP_W * 200) * cosA + (y / MAP_H * 200 * aspectCorrection) * sinA;
+        const rv = -(x / MAP_W * 200) * sinA + (y / MAP_H * 200 * aspectCorrection) * cosA;
+        // Stretch along impact direction for elongated scratches
+        const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
+        hmap[idx] += (grain + scratch) * mask;
+      }
     }
   }
 
@@ -1463,6 +1498,36 @@ export function buildHeightmap(
   // ─── 11) Apply surface masks ──
   if (lunar.masksEnabled && lunar.masks && lunar.masks.length > 0) {
     applySurfaceMasks(hmap, MAP_W, MAP_H, lunar.masks, lunar.maskMode ?? "include", lunar.seed);
+  }
+
+  // ─── 12) Smooth edges final pass ──
+  // When smoothEdges is enabled, apply a light blur to soften harsh crater boundaries
+  // and reduce aliasing artifacts — important for castability in wax printing
+  if (lunar.smoothEdges) {
+    const smoothTemp = new Float32Array(hmap.length);
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
+        const idx = y * MAP_W + x;
+        let sum = hmap[idx] * 4;
+        let count = 4;
+        const xl = ((x - 1) % MAP_W + MAP_W) % MAP_W;
+        const xr = ((x + 1) % MAP_W + MAP_W) % MAP_W;
+        sum += hmap[y * MAP_W + xl]; count++;
+        sum += hmap[y * MAP_W + xr]; count++;
+        if (y > 0) { sum += hmap[(y - 1) * MAP_W + x]; count++; }
+        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + x]; count++; }
+        // Diagonals for smoother result
+        if (y > 0) { sum += hmap[(y - 1) * MAP_W + xl] * 0.5; count += 0.5; }
+        if (y > 0) { sum += hmap[(y - 1) * MAP_W + xr] * 0.5; count += 0.5; }
+        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + xl] * 0.5; count += 0.5; }
+        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + xr] * 0.5; count += 0.5; }
+        smoothTemp[idx] = sum / count;
+      }
+    }
+    // Blend 40% smoothed for subtle effect
+    for (let i = 0; i < hmap.length; i++) {
+      hmap[i] = hmap[i] * 0.6 + smoothTemp[i] * 0.4;
+    }
   }
 
   return { hmap, craterCount: totalCraterCount };
@@ -1548,7 +1613,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   return canvas;
 }
 
-// ── AO map ────────────────────────────────────────────────────────
+// ── AO map (multi-scale for better occlusion quality) ─────────────
 
 function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -1557,23 +1622,45 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
 
-  const kernelR = 4;
+  // Multi-scale AO: small kernel for fine detail + large kernel for broad occlusion
+  const kernels = [
+    { radius: 3, step: 1, weight: 0.5 },   // Fine detail AO
+    { radius: 8, step: 2, weight: 0.35 },   // Medium-scale
+    { radius: 16, step: 4, weight: 0.15 },  // Broad occlusion
+  ];
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const center = hmap[y * w + x];
-      let higher = 0, samples = 0;
+      let totalAO = 0;
 
-      for (let ky = -kernelR; ky <= kernelR; ky += 2) {
-        for (let kx = -kernelR; kx <= kernelR; kx += 2) {
-          const sy = Math.max(0, Math.min(h - 1, y + ky));
-          const sx = ((x + kx) % w + w) % w;
-          if (hmap[sy * w + sx] > center) higher++;
-          samples++;
+      for (const kernel of kernels) {
+        let higher = 0, samples = 0;
+        let heightDiffSum = 0;
+
+        for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
+          for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
+            const sy = Math.max(0, Math.min(h - 1, y + ky));
+            const sx = ((x + kx) % w + w) % w;
+            const sampleH = hmap[sy * w + sx];
+            if (sampleH > center) {
+              higher++;
+              // Weight by how much higher the neighbor is (deeper bowls = more occlusion)
+              heightDiffSum += (sampleH - center);
+            }
+            samples++;
+          }
         }
+
+        // Combine occlusion count with height difference for more realistic AO
+        const countAO = higher / samples;
+        const heightAO = Math.min(1, heightDiffSum / samples * 8);
+        const kernelAO = countAO * 0.6 + heightAO * 0.4;
+        totalAO += kernelAO * kernel.weight;
       }
 
-      const ao = 1.0 - (higher / samples) * 0.6;
-      const v = Math.round(Math.max(0.3, Math.min(1.0, ao)) * 255);
+      const ao = 1.0 - totalAO * 0.7;
+      const v = Math.round(Math.max(0.2, Math.min(1.0, ao)) * 255);
 
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
