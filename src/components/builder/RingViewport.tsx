@@ -649,6 +649,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
   const debouncedWear = useDebouncedValue(wearAmount, 100);
   const debouncedPolish = useDebouncedValue(polishAmount, 100);
+  const debouncedDetail = useDebouncedValue(detailAmount, 100);
 
   // Adaptive quality for geometry detail
   const geoQuality = useAdaptiveQuality(
