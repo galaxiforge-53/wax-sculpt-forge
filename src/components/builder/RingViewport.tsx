@@ -717,7 +717,15 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const polishDispSoften = polishFactor * 0.2;             // high points get filed down
   const polishEnvBoost = polishFactor * 0.4;               // mirror-like environment reflection
 
-  // Compute physical aspect ratio for circular craters
+  // ── Detail boost: exaggerates surface features for inspection ──
+  // Amplifies normals, displacement, AO, and roughness contrast so users can
+  // clearly see crater depth, rim sharpness, and engraving clarity
+  const detailFactor = debouncedDetail / 100;
+  const detailNormalMul = 1 + detailFactor * 1.8;          // normals up to 2.8× stronger
+  const detailDispMul = 1 + detailFactor * 1.2;            // displacement up to 2.2× deeper
+  const detailAoMul = 1 + detailFactor * 2.0;              // AO up to 3× for cavity emphasis
+  const detailRoughContrast = detailFactor * 0.15;         // roughness variation increases
+
   const physicalAspect = useMemo(() => {
     const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
     const circumference = Math.PI * outerDiam;
