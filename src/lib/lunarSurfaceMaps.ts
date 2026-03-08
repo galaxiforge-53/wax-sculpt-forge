@@ -904,6 +904,9 @@ export function buildHeightmap(
   const ridgeFactor = (lunar.highlandRidges ?? 0) / 100;
   const floorTexFactor = (lunar.craterFloorTexture ?? 30) / 100;
   const ejectaFactor = (lunar.ejectaStrength ?? 50) / 100;
+  const layerLarge = (lunar.layerLargeCraters ?? 50) / 50;   // 0–2 multiplier (50 = 1.0 = default)
+  const layerMedium = (lunar.layerMediumImpacts ?? 50) / 50;
+  const layerMicro = (lunar.layerMicroPitting ?? 50) / 50;
 
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
@@ -930,24 +933,24 @@ export function buildHeightmap(
   // ─── 2b) Floor texture noise ──
   const floorNoise = makeNoise2D(lunar.seed + 8888);
 
-  // ─── 3) 5-tier crater distribution ──
+  // ─── 3) 5-tier crater distribution (scaled by layer mix) ──
   const densityMul = lunar.craterDensity === "low" ? 0.5 : lunar.craterDensity === "med" ? 1.0 : 1.8;
   const sizeMul = lunar.craterSize === "small" ? 0.6 : lunar.craterSize === "med" ? 1.0 : 1.5;
   const saf = surfaceAreaFactor;
 
-  const megaCount = Math.round((1 + densityMul * 1.5) * Math.max(0.6, Math.min(1.5, saf)));
+  const megaCount = Math.round((1 + densityMul * 1.5) * Math.max(0.6, Math.min(1.5, saf)) * layerLarge);
   const megaRadMin = 0.12 * sizeMul, megaRadMax = 0.22 * sizeMul;
 
-  const heroCount = Math.round((3 + densityMul * 5) * Math.sqrt(saf));
+  const heroCount = Math.round((3 + densityMul * 5) * Math.sqrt(saf) * layerLarge);
   const heroRadMin = 0.06 * sizeMul, heroRadMax = 0.12 * sizeMul;
 
-  const medCount = Math.round((15 + densityMul * 35 * sizeMul) * saf);
+  const medCount = Math.round((15 + densityMul * 35 * sizeMul) * saf * layerMedium);
   const medRadMin = 0.025 * sizeMul, medRadMax = 0.06 * sizeMul;
 
-  const smallCount = Math.round((40 + densityMul * 160) * saf);
+  const smallCount = Math.round((40 + densityMul * 160) * saf * layerMedium);
   const smallRadMin = 0.008, smallRadMax = 0.025 * sizeMul;
 
-  const microPitCount = Math.round((200 + densityMul * 600) * saf);
+  const microPitCount = Math.round((200 + densityMul * 600) * saf * layerMicro);
 
   const stamps: CraterStamp[] = [];
 
