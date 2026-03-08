@@ -29,6 +29,8 @@ interface TopBarProps {
   onForgeNow: () => void;
   onEnhance?: () => void;
   isEnhancing?: boolean;
+  onShare?: () => void;
+  isSharing?: boolean;
 }
 
 const METALS: { value: MetalPreset; label: string; gradient: string }[] = [
