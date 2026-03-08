@@ -9,6 +9,7 @@ import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
+import { ImageTerrainState } from "@/types/imageTerrain";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, disposeLunarMaps, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
