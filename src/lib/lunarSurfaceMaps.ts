@@ -1157,62 +1157,63 @@ function applySymmetry(
 ) {
   if (symmetry === "none") return;
 
-  const folds = parseInt(symmetry, 10); // 2, 3, 4, 6, or 8
+  const folds = parseInt(symmetry, 10);
   if (isNaN(folds) || folds < 2) return;
 
   const segmentWidth = w / folds;
+  const segW = Math.ceil(segmentWidth);
   const blendPx = Math.floor((blendPercent / 100) * segmentWidth * 0.5);
+  const invBlendPx = blendPx > 0 ? 1 / blendPx : 0;
+  const segWm1 = segW - 1;
 
-  // Create a copy of the first segment to use as source
-  const sourceSegment = new Float32Array(Math.ceil(segmentWidth) * h);
+  // Copy first segment once
+  const sourceSegment = new Float32Array(segW * h);
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < Math.ceil(segmentWidth); x++) {
-      sourceSegment[y * Math.ceil(segmentWidth) + x] = hmap[y * w + x];
+    const srcRow = y * w;
+    const dstRow = y * segW;
+    for (let x = 0; x < segW; x++) {
+      sourceSegment[dstRow + x] = hmap[srcRow + x];
     }
   }
 
-  // Apply the source segment to all other segments with optional blending
+  // Apply to all other segments
   for (let fold = 1; fold < folds; fold++) {
     const startX = Math.floor(fold * segmentWidth);
-    const mirror = fold % 2 === 1; // Alternate mirroring for seamless look
+    const mirror = fold & 1; // bit test instead of modulo
 
     for (let y = 0; y < h; y++) {
-      for (let localX = 0; localX < Math.ceil(segmentWidth); localX++) {
+      const srcRow = y * segW;
+      const dstRow = y * w;
+      for (let localX = 0; localX < segW; localX++) {
         const targetX = startX + localX;
         if (targetX >= w) continue;
 
-        // Get source position (mirrored if needed)
-        const srcX = mirror
-          ? Math.min(Math.ceil(segmentWidth) - 1, Math.ceil(segmentWidth) - 1 - localX)
-          : localX;
-        const srcIdx = y * Math.ceil(segmentWidth) + srcX;
-        const srcValue = sourceSegment[srcIdx] ?? 0.5;
+        const srcX = mirror ? segWm1 - localX : localX;
+        const srcValue = sourceSegment[srcRow + srcX];
+        const targetIdx = dstRow + targetX;
 
-        const targetIdx = y * w + targetX;
-        const existingValue = hmap[targetIdx];
-
-        // Blend at segment boundaries for smoother transitions
         let blend = 1.0;
         if (blendPx > 0) {
           if (localX < blendPx) {
-            blend = localX / blendPx;
+            blend = localX * invBlendPx;
           } else if (localX > segmentWidth - blendPx) {
-            blend = (segmentWidth - localX) / blendPx;
+            blend = (segmentWidth - localX) * invBlendPx;
           }
         }
 
-        hmap[targetIdx] = existingValue * (1 - blend) + srcValue * blend;
+        hmap[targetIdx] = hmap[targetIdx] * (1 - blend) + srcValue * blend;
       }
     }
   }
 
-  // Ensure seamless wrap at U=0/U=1 boundary
+  // Seamless wrap at U=0/U=1
   if (blendPx > 0) {
     for (let y = 0; y < h; y++) {
+      const row = y * w;
       for (let dx = 0; dx < blendPx; dx++) {
-        const leftIdx = y * w + dx;
-        const rightIdx = y * w + (w - 1 - dx);
-        const t = dx / blendPx;
+        const t = dx * invBlendPx;
+        const leftIdx = row + dx;
+        const rightIdx = row + w - 1 - dx;
         const avg = hmap[leftIdx] * (1 - t * 0.5) + hmap[rightIdx] * (t * 0.5);
         hmap[leftIdx] = avg;
         hmap[rightIdx] = hmap[leftIdx] * (t * 0.5) + hmap[rightIdx] * (1 - t * 0.5);
