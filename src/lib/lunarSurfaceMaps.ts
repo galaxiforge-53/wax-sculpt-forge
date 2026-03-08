@@ -1048,7 +1048,7 @@ function applyDustFill(
 
 function applyValhallaConcentric(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const rng = seededRng(seed + 15001);
   const centerU = 0.3 + rng() * 0.4;
