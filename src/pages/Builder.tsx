@@ -458,6 +458,7 @@ function BuilderInner() {
               rotationLocked={rotationLocked}
               scaleReference={scaleReference}
               wearPreview={wearPreview}
+              turntableSpeed={turntableSpeed}
             />
           </ViewportErrorBoundary>
 
