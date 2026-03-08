@@ -985,7 +985,7 @@ function applyIceFractures(
 
 function applyLunarRayBrightening(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const rayNoise = makeNoise2D(seed + 13001);
   const rayAmp = 0.015 * depthScale;
