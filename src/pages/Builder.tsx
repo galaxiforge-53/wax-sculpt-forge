@@ -28,7 +28,8 @@ import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
 import { Button } from "@/components/ui/button";
 import SEOHead from "@/components/SEOHead";
-import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
+import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
+import PreferencesPanel from "@/components/builder/PreferencesPanel";
 
 function BuilderInner() {
   const navigate = useNavigate();
