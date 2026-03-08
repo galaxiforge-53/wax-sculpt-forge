@@ -1394,6 +1394,8 @@ export function buildHeightmap(
   applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeMask, lunar.seed, depthScale, rand, physicalAspect);
 
 
+  // ─── 6) Combined micro-detail pass (pits + regolith + grain in one traversal) ──
+  // Merging 3 separate full-map passes into one reduces memory bandwidth overhead
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
     const pitCount = Math.floor(microPitCount * microFactor * layerMicro);
@@ -1401,6 +1403,7 @@ export function buildHeightmap(
     const pitRadiusMax = 0.008;
     const pitDepth = 0.1 * depthScale * microFactor * layerMicro;
 
+    // Stamp micro-pits first (sparse, random positions)
     for (let i = 0; i < pitCount; i++) {
       const pu = pitRng();
       const pv = 0.08 + pitRng() * 0.84;
@@ -1426,54 +1429,45 @@ export function buildHeightmap(
         }
       }
     }
-  }
 
-  // ─── 7) Regolith micro-texture ──
-  if (microFactor > 0) {
+    // ─── 7) Single-pass regolith + grain + directional scratches ──
+    // Previously 3 separate full-map traversals; now combined into one
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
-    const regolithStrength = microFactor * 0.05 * depthScale * layerMicro;
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const u = x / MAP_W * 48;
-        const v = y / MAP_H * 48 * aspectCorrection;
-        const n = fbm(regolithNoise, u, v, 5, 2.2, 0.45);
-        const mask = edgeMask[y * MAP_W + x];
-        hmap[y * MAP_W + x] += n * regolithStrength * mask;
-      }
-    }
-
     const fineRegolith = makeNoise2D(lunar.seed + 4444);
-    const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const u = x / MAP_W * 96;
-        const v = y / MAP_H * 96 * aspectCorrection;
-        const n = fineRegolith(u, v);
-        const mask = edgeMask[y * MAP_W + x];
-        hmap[y * MAP_W + x] += n * fineStrength * mask;
-      }
-    }
-
-    // Random grain particles with directional bias simulating micro-meteorite bombardment
-    const grainRng = seededRng(lunar.seed + 9999);
-    const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
-    // Directional impact noise — elongated in a dominant direction
     const impactNoise = makeNoise2D(lunar.seed + 11111);
-    const impactAngle = seededRng(lunar.seed + 12222)() * Math.PI; // random dominant direction
+    const grainRng = seededRng(lunar.seed + 9999);
+    const impactAngle = seededRng(lunar.seed + 12222)() * Math.PI;
     const cosA = Math.cos(impactAngle);
     const sinA = Math.sin(impactAngle);
+
+    const regolithStrength = microFactor * 0.05 * depthScale * layerMicro;
+    const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
+    const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
+
     for (let y = 0; y < MAP_H; y++) {
+      const vCoord8 = (y / MAP_H) * 8 * aspectCorrection;
+      const vCoord48 = (y / MAP_H) * 48 * aspectCorrection;
+      const vCoord96 = (y / MAP_H) * 96 * aspectCorrection;
+      const vCoord200 = (y / MAP_H) * 200 * aspectCorrection;
       for (let x = 0; x < MAP_W; x++) {
         const idx = y * MAP_W + x;
         const mask = edgeMask[idx];
-        // Base random grain
+        if (mask < 0.01) continue; // Skip fully masked edge pixels
+
+        const uNorm = x / MAP_W;
+
+        // Coarse regolith (5 octave fBm)
+        const regN = fbm(regolithNoise, uNorm * 48, vCoord48, 5, 2.2, 0.45);
+        // Fine regolith (single octave)
+        const fineN = fineRegolith(uNorm * 96, vCoord96);
+        // Random grain particle
         const grain = (grainRng() - 0.5) * grainStrength;
-        // Directional micro-scratch pattern (like regolith raking from impacts)
-        const ru = (x / MAP_W * 200) * cosA + (y / MAP_H * 200 * aspectCorrection) * sinA;
-        const rv = -(x / MAP_W * 200) * sinA + (y / MAP_H * 200 * aspectCorrection) * cosA;
-        // Stretch along impact direction for elongated scratches
+        // Directional micro-scratch
+        const ru = (uNorm * 200) * cosA + vCoord200 * sinA;
+        const rv = -(uNorm * 200) * sinA + vCoord200 * cosA;
         const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
-        hmap[idx] += (grain + scratch) * mask;
+
+        hmap[idx] += (regN * regolithStrength + fineN * fineStrength + grain + scratch) * mask;
       }
     }
   }
