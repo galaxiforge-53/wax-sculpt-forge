@@ -459,6 +459,33 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
     }
   }
 
+  // ── Wear post-processing: soften edges and slightly round the entire profile ──
+  if (wearFactor > 0 && outerPoints.length > 2) {
+    // Gaussian-like smoothing pass on the profile to simulate edge wear
+    const smoothPasses = Math.ceil(wearFactor * 4); // more wear = more smoothing
+    for (let pass = 0; pass < smoothPasses; pass++) {
+      const smoothed = outerPoints.map((p, i) => {
+        if (i === 0 || i === outerPoints.length - 1) {
+          // Edges lose more material (wear effect)
+          return new THREE.Vector2(
+            p.x - wearEdgeLoss * (1 - Math.min(i, outerPoints.length - 1 - i) / (outerPoints.length * 0.3)),
+            p.y,
+          );
+        }
+        const prev = outerPoints[i - 1];
+        const next = outerPoints[i + 1];
+        const weight = 0.15 * wearFactor;
+        return new THREE.Vector2(
+          p.x * (1 - weight * 2) + prev.x * weight + next.x * weight,
+          p.y,
+        );
+      });
+      for (let i = 0; i < outerPoints.length; i++) {
+        outerPoints[i] = smoothed[i];
+      }
+    }
+  }
+
   // 1. Outer surface — LatheGeometry (this gets lunar textures)
   const outerGeo = new THREE.LatheGeometry(outerPoints, radSegs);
   outerGeo.computeVertexNormals();
