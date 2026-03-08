@@ -375,25 +375,72 @@ function stampCrater(
     angularPhase: c.angularPhase,
   };
 
+  // Pre-compute whether we need expensive shape/asymmetry calculations
+  const isCircular = shapeMode === "circular";
+  const hasAsymmetry = c.rimAsymmetry > 0.01;
+  const hasSlump = c.slumpStrength > 0.01;
+  const invPxR = 1 / pxR;
+  const invPyR = 1 / pyR;
+  // Squared radius for cheap early rejection (before expensive shapedDistance)
+  const rejectR2 = (c.radius * 1.7) * (c.radius * 1.7);
+
   for (let py = y0; py <= y1; py++) {
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
 
-      const du = (px - c.cu * w) / pxR;
-      const dv = (py - c.cv * h) / pyR;
+      const rawDu = px - c.cu * w;
+      const rawDv = py - c.cv * h;
 
-      const { dist, wdu, wdv } = shapedDistance(du, dv, sp, px, py, w, h);
+      // Cheap squared-distance early rejection in UV space
+      // Avoids calling shapedDistance for pixels clearly outside crater influence
+      const rawU = rawDu / w;
+      const rawV = rawDv / h;
+      if (rawU * rawU + rawV * rawV * (1 / (vStretch * vStretch)) > rejectR2) continue;
+
+      const du = rawDu * invPxR;
+      const dv = rawDv * invPyR;
+
+      let dist: number, wdu: number, wdv: number;
+
+      if (isCircular) {
+        // Fast path for circular craters: skip shape transformation, only do domain warp
+        const coarseScale = sp.noiseScale * 0.5;
+        const fineScale = sp.noiseScale * 2.0;
+        const invW = 1 / w;
+        const invH = 1 / h;
+        const pxInvW = px * invW;
+        const pyInvH = py * invH;
+        const wU = sp.warpNoise(pxInvW * coarseScale, pyInvH * coarseScale) * 0.7
+                  + sp.warpNoise(pxInvW * fineScale + 50, pyInvH * fineScale + 50) * 0.3;
+        const wV = sp.warpNoise(pyInvH * coarseScale + 100, pxInvW * coarseScale + 100) * 0.7
+                  + sp.warpNoise(pyInvH * fineScale + 150, pxInvW * fineScale + 150) * 0.3;
+        wdu = du + sp.warpAmp * 0.22 * wU;
+        wdv = dv + sp.warpAmp * 0.22 * wV;
+        dist = Math.sqrt(wdu * wdu + wdv * wdv);
+      } else {
+        const result = shapedDistance(du, dv, sp, px, py, w, h);
+        dist = result.dist;
+        wdu = result.wdu;
+        wdv = result.wdv;
+      }
       if (dist > ejectaEnd) continue;
 
-      const angle = Math.atan2(wdv, wdu);
-      const angleDiff = Math.cos(angle - c.rimAsymAngle);
-      const rimAsymFactor = 1.0 + c.rimAsymmetry * 0.4 * angleDiff;
+      // Skip expensive atan2 for craters with no rim asymmetry
+      let rimAsymFactor = 1.0;
+      if (hasAsymmetry) {
+        const angle = Math.atan2(wdv, wdu);
+        rimAsymFactor = 1.0 + c.rimAsymmetry * 0.4 * Math.cos(angle - c.rimAsymAngle);
+      }
 
-      const slumpShift = c.slumpStrength * 0.08;
-      const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
-      const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
-      const slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
+      // Skip slump computation for craters with negligible slump
+      let slumpDist = dist;
+      if (hasSlump) {
+        const slumpShift = c.slumpStrength * 0.08;
+        const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
+        const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
+        slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
+      }
 
       let delta = 0;
       const effectiveRimH = c.rimHeight * rimAsymFactor;
