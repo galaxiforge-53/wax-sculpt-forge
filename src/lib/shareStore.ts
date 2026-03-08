@@ -42,16 +42,16 @@ export async function createShareLink(
 
 /** Load a shared template by code */
 export async function getSharedTemplate(shareCode: string) {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase
     .from("shared_templates" as any)
     .select("*")
     .eq("share_code", shareCode)
-    .single();
+    .single() as any);
 
   if (error || !data) return null;
 
   // Increment view count (fire and forget)
-  supabase.rpc("increment_share_views" as any, { p_share_code: shareCode } as any).catch(() => {});
+  (supabase.rpc as any)("increment_share_views", { p_share_code: shareCode }).catch(() => {});
 
   return data as {
     id: string;
