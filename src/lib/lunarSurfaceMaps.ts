@@ -40,6 +40,9 @@ function cacheKey(lunar: LunarTextureState): string {
     lunar.craterFloorTexture ?? 30, lunar.ejectaStrength ?? 50,
     lunar.terrainType ?? "generic",
     lunar.terrainContrast ?? 60,
+    lunar.layerLargeCraters ?? 50,
+    lunar.layerMediumImpacts ?? 50,
+    lunar.layerMicroPitting ?? 50,
   ].join("-");
 }
 
