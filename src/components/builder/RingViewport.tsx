@@ -1048,7 +1048,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
-  // Outer material — has lunar textures
+  // Outer material — has lunar/image terrain textures
   const outerMaterial = useMemo(() => {
     if (isWaxPrint) {
       return (
@@ -1056,12 +1056,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
           color="#C8B896"
           roughness={0.6}
           metalness={0.0}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 2.5 : 0.5}
+          normalMap={activeMaps?.normalMap ?? null}
+          roughnessMap={activeMaps?.roughnessMap ?? null}
+          aoMap={activeMaps?.aoMap ?? null}
+          aoMapIntensity={hasActiveSurface ? 2.5 : 0.5}
           normalScale={normalScale}
-          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementMap={hasActiveSurface ? activeMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
           side={THREE.FrontSide}
@@ -1072,14 +1072,14 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       return (
         <meshStandardMaterial
           color="#78A85B"
-          roughness={hasLunar ? 0.82 : 0.85}
+          roughness={hasActiveSurface ? 0.82 : 0.85}
           metalness={0.05}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 1.4 : 0}
+          normalMap={activeMaps?.normalMap ?? null}
+          roughnessMap={activeMaps?.roughnessMap ?? null}
+          aoMap={activeMaps?.aoMap ?? null}
+          aoMapIntensity={hasActiveSurface ? 1.4 : 0}
           normalScale={normalScale}
-          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementMap={hasActiveSurface ? activeMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
           side={THREE.FrontSide}
@@ -1090,18 +1090,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       <meshPhysicalMaterial
         color={mc.color}
         roughness={Math.max(0.02, Math.min(1,
-          (hasLunar ? mc.roughness + (0.15 + detailRoughContrast) * (1 - lunarWearRoughnessUniformity) : mc.roughness)
+          (hasActiveSurface ? mc.roughness + (0.15 + detailRoughContrast) * (1 - lunarWearRoughnessUniformity) : mc.roughness)
           + finishRoughMod + wearRoughnessBoost - polishRoughnessReduction
         ))}
         metalness={mc.metalness}
-        normalMap={lunarMaps?.normalMap ?? null}
-        roughnessMap={lunarMaps?.roughnessMap ?? null}
-        aoMap={lunarMaps?.aoMap ?? null}
-        aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) * detailAoMul : 0}
+        normalMap={activeMaps?.normalMap ?? null}
+        roughnessMap={activeMaps?.roughnessMap ?? null}
+        aoMap={activeMaps?.aoMap ?? null}
+        aoMapIntensity={hasActiveSurface ? 2.0 * (1 - lunarWearAoReduction) * detailAoMul : 0}
         normalScale={normalScale}
         envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15 + polishEnvBoost)}
         clearcoat={Math.min(1, Math.max(0,
-          (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss) + polishClearcoatBoost
+          (hasActiveSurface ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss) + polishClearcoatBoost
         ))}
         clearcoatRoughness={Math.max(0.01, mc.clearcoatRoughness + wearFactor * 0.15 - polishFactor * 0.08)}
         reflectivity={Math.min(1, mc.reflectivity + polishReflectivityBoost)}
@@ -1109,13 +1109,13 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         sheenColor={mc.sheenColor}
         sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1 - polishFactor * 0.05)}
         ior={mc.ior}
-        displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+        displacementMap={hasActiveSurface ? activeMaps?.displacementMap ?? null : null}
         displacementScale={dispScale}
         displacementBias={-dispScale * 0.5}
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor, detailRoughContrast, detailAoMul]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, activeMaps, normalScale, hasActiveSurface, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor, detailRoughContrast, detailAoMul]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
