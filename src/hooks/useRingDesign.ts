@@ -16,6 +16,7 @@ import { InlayChannel } from "@/types/inlays";
 import { slugFromUrl, findCodexMaterial } from "@/lib/codexMaterials";
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
+import { ImageTerrainState, DEFAULT_IMAGE_TERRAIN } from "@/types/imageTerrain";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
