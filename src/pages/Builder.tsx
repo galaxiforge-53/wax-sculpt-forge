@@ -576,6 +576,45 @@ function BuilderInner() {
                   >
                     {rotationLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                   </button>
+                  {/* Scale Reference dropdown */}
+                  <div className="relative group">
+                    <button
+                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                        ${scaleReference !== "none"
+                          ? "bg-secondary/30 text-secondary-foreground border border-secondary/40 shadow-[0_0_8px_hsl(var(--secondary)/0.3)]"
+                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                        }`}
+                      title="Show scale reference"
+                    >
+                      <Ruler className="w-3 h-3" />
+                    </button>
+                    <div className="absolute top-full left-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl py-1 min-w-[120px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      <button
+                        onClick={() => setScaleReference("none")}
+                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "none" ? "text-primary" : "text-foreground"}`}
+                      >
+                        None
+                      </button>
+                      <button
+                        onClick={() => setScaleReference("quarter")}
+                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "quarter" ? "text-primary" : "text-foreground"}`}
+                      >
+                        <Circle className="w-3 h-3" /> US Quarter
+                      </button>
+                      <button
+                        onClick={() => setScaleReference("ruler")}
+                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "ruler" ? "text-primary" : "text-foreground"}`}
+                      >
+                        <Ruler className="w-3 h-3" /> Ruler (mm)
+                      </button>
+                      <button
+                        onClick={() => setScaleReference("finger")}
+                        className={`w-full px-3 py-1.5 text-[10px] text-left hover:bg-muted/50 transition-colors flex items-center gap-2 ${scaleReference === "finger" ? "text-primary" : "text-foreground"}`}
+                      >
+                        <Hand className="w-3 h-3" /> Ring Finger
+                      </button>
+                    </div>
+                  </div>
                   <button
                     onClick={() => setRenderGalleryOpen(true)}
                     className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
