@@ -453,9 +453,8 @@ function stampCrater(
       // Skip slump computation for craters with negligible slump
       let slumpDist = dist;
       if (hasSlump) {
-        const slumpShift = c.slumpStrength * 0.08;
-        const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
-        const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
+        const slumpDu = wdu + slumpCos * slumpShift;
+        const slumpDv = wdv + slumpSin * slumpShift;
         slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
       }
 
