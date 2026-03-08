@@ -1958,8 +1958,8 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </span>
           </div>
         )}
-        {/* Rotation lock indicator */}
-        {isRotationLocked && (
+        {/* Rotation lock indicator — hide on mobile to avoid overlap */}
+        {isRotationLocked && !isMobile && (
           <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200">
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-warning/15 backdrop-blur-sm border border-warning/30 rounded-lg">
               <svg className="w-3.5 h-3.5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1969,8 +1969,8 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </div>
           </div>
         )}
-        {/* Wear preview indicator */}
-        {wearPreview > 0 && (
+        {/* Wear/Polish/Detail indicators — desktop only to avoid mobile viewport clutter */}
+        {!isMobile && wearPreview > 0 && (
           <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200" style={{ top: isRotationLocked ? '3.5rem' : '0.75rem' }}>
             <div className="flex flex-col gap-0.5 px-2.5 py-1.5 bg-accent/15 backdrop-blur-sm border border-accent/30 rounded-lg">
               <div className="flex items-center gap-1.5">
@@ -1981,16 +1981,10 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                   Wear {wearPreview}% · {wearPreview <= 25 ? "1 year" : wearPreview <= 50 ? "5 years" : wearPreview <= 75 ? "10 years" : "20+ years"}
                 </span>
               </div>
-              {!!lunarTexture?.enabled && wearPreview > 15 && (
-                <span className="text-[8px] text-accent-foreground/50 pl-5">
-                  {wearPreview <= 40 ? "Crater rims softening" : wearPreview <= 70 ? "Surface detail eroding" : "Terrain significantly worn"}
-                </span>
-              )}
             </div>
           </div>
         )}
-        {/* Polish preview indicator */}
-        {polishPreview > 0 && (
+        {!isMobile && polishPreview > 0 && (
           <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200" style={{ top: isRotationLocked ? (wearPreview > 0 ? '6.5rem' : '3.5rem') : (wearPreview > 0 ? '3.75rem' : '0.75rem') }}>
             <div className="flex flex-col gap-0.5 px-2.5 py-1.5 bg-primary/10 backdrop-blur-sm border border-primary/25 rounded-lg">
               <div className="flex items-center gap-1.5">
@@ -2001,16 +1995,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                   Polish {polishPreview}% · {polishPreview <= 30 ? "Light buff" : polishPreview <= 60 ? "Standard finish" : polishPreview <= 85 ? "Mirror polish" : "Jeweller's grade"}
                 </span>
               </div>
-              {!!lunarTexture?.enabled && polishPreview > 20 && (
-                <span className="text-[8px] text-primary/50 pl-5">
-                  {polishPreview <= 45 ? "Crater rims smoothing" : polishPreview <= 75 ? "Texture detail softened" : "High-polish crater finish"}
-                </span>
-              )}
             </div>
           </div>
         )}
-        {/* Detail boost indicator */}
-        {detailBoost > 0 && (
+        {/* Detail boost indicator — desktop only */}
+        {!isMobile && detailBoost > 0 && (
           <div className="absolute top-3 right-3 z-20 pointer-events-none animate-in fade-in slide-in-from-right-2 duration-200">
             <div className="flex flex-col gap-0.5 px-2.5 py-1.5 bg-secondary/20 backdrop-blur-sm border border-secondary/40 rounded-lg">
               <div className="flex items-center gap-1.5">
@@ -2021,9 +2010,6 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                   Detail ×{(1 + detailBoost / 100 * 1.8).toFixed(1)}
                 </span>
               </div>
-              <span className="text-[8px] text-secondary-foreground/50 pl-5">
-                {detailBoost <= 30 ? "Subtle enhancement" : detailBoost <= 60 ? "Clear inspection view" : "Maximum detail reveal"}
-              </span>
             </div>
           </div>
         )}
