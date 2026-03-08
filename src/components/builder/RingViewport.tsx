@@ -2026,7 +2026,12 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           {/* Real-world scale reference objects */}
           {activeScaleRef !== "none" && (
-            <ScaleReference type={activeScaleRef} ringOuterDiameter={params.innerDiameter + 2 * params.thickness} />
+            <ScaleReference
+              type={activeScaleRef}
+              ringOuterDiameter={params.innerDiameter + 2 * params.thickness}
+              ringInnerDiameter={params.innerDiameter}
+              ringWidth={params.width}
+            />
           )}
 
           {/* Environment bed — printer bed or workbench */}
