@@ -74,4 +74,5 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   layerLargeCraters: 50,
   layerMediumImpacts: 50,
   layerMicroPitting: 50,
+  frozen: false,
 };
