@@ -1629,11 +1629,11 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             return (
               <ContactShadows
                 position={[0, shadowY, 0]}
-                opacity={sc ? 0.65 : (isMobile ? 0.35 : 0.5)}
+                opacity={sc ? 0.65 : (qualityTier === "preview" ? 0.3 : (isMobile ? 0.35 : 0.5))}
                 scale={sc ? 8 : (isMobile ? 4 : 6)}
-                blur={sc ? 3 : (isMobile ? 1.5 : 2)}
+                blur={sc ? 3 : (qualityTier === "preview" ? 1 : (isMobile ? 1.5 : 2))}
                 far={sc ? 5 : (isMobile ? 3 : 4)}
-                resolution={sc ? 512 : (isMobile ? 128 : 256)}
+                resolution={sc ? 512 : (qualityTier === "preview" ? 64 : (isMobile ? 128 : 256))}
               />
             );
           })()}
