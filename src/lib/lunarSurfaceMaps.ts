@@ -925,7 +925,7 @@ function applyPhobosGrooves(
 
 function applyIceFractures(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const fractureRng = seededRng(seed + 12001);
   const fractureNoise = makeNoise2D(seed + 12002);
