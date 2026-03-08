@@ -1743,9 +1743,12 @@ export function buildHeightmap(
       const parent = stamps[Math.floor(rand() * stamps.length)];
       const radius = parent.radius * (0.3 + rand() * 0.5);
       const angle = rand() * Math.PI * 2;
+      // Hoist trig per overlap crater
+      const cosAngle = Math.cos(angle);
+      const sinAngle = Math.sin(angle);
       const dist = parent.radius * (0.6 + rand() * 0.8);
-      const cu = ((parent.cu + Math.cos(angle) * dist) % 1 + 1) % 1;
-      const cv = Math.max(0.08, Math.min(0.92, parent.cv + Math.sin(angle) * dist));
+      const cu = ((parent.cu + cosAngle * dist) % 1 + 1) % 1;
+      const cv = Math.max(0.08, Math.min(0.92, parent.cv + sinAngle * dist));
 
       const varScale = 1.0 + (rand() - 0.5) * craterVar * 0.6;
       const depth = (0.4 + rand() * 0.4) * depthScale * 0.7 * bowlDepthScale * varScale;
