@@ -63,6 +63,40 @@ export const RING_SIZE_MAP: Record<number, number> = {
   15: 23.8, 16: 24.6,
 };
 
+// ── Measurement unit system ──
+export type RingSizeStandard = "US" | "UK" | "EU";
+
+/** US → UK letter mapping (approximate) */
+export const US_TO_UK: Record<number, string> = {
+  3: "F", 4: "H", 5: "J½", 6: "L½", 7: "N½", 8: "P½",
+  9: "R½", 10: "T½", 11: "V½", 12: "X½", 13: "Z+1", 14: "Z+2",
+  15: "Z+3", 16: "Z+4",
+};
+
+/** US → EU size mapping (approximate, based on inner circumference) */
+export const US_TO_EU: Record<number, number> = {
+  3: 44, 4: 46.5, 5: 49, 6: 51.5, 7: 54, 8: 57,
+  9: 59.5, 10: 62, 11: 64.5, 12: 67, 13: 69.5, 14: 72,
+  15: 74.5, 16: 77,
+};
+
+/** Get ring size display string for a given US size in any standard */
+export function formatRingSize(usSize: number, standard: RingSizeStandard): string {
+  switch (standard) {
+    case "US": return `${usSize}`;
+    case "UK": return US_TO_UK[usSize] ?? `~${usSize}`;
+    case "EU": return `${US_TO_EU[usSize] ?? Math.round(usSize * 2.5 + 36.5)}`;
+  }
+}
+
+/** Get inner diameter in mm or inches */
+export type DimensionUnit = "mm" | "inch";
+
+export function formatDimension(mm: number, unit: DimensionUnit, decimals = 1): string {
+  if (unit === "inch") return `${(mm / 25.4).toFixed(decimals + 1)}"`;
+  return `${mm.toFixed(decimals)}mm`;
+}
+
 export const DEFAULT_RING: RingParameters = {
   size: 8,
   innerDiameter: 18.1,
