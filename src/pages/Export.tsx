@@ -84,7 +84,7 @@ const RING_SIZES = Object.keys(RING_SIZE_MAP).map(Number);
 
 // ── Submission Steps ─────────────────────────────────────────────
 
-type SubmitStep = "review" | "confirm" | "submitting" | "done";
+type SubmitStep = "review" | "confirm" | "submitting" | "uploading-stl" | "uploading-previews" | "done";
 
 // ── Main Export page ─────────────────────────────────────────────
 
@@ -163,7 +163,62 @@ export default function Export() {
     setSubmitStep("submitting");
 
     try {
-      // Build the full manufacturing package
+      const orderId = crypto.randomUUID();
+      const basePath = `${user.id}/${orderId}`;
+
+      // 1. Generate manufacturing STL with shrinkage compensation
+      const lunar: LunarTextureState = pkg.craftState?.lunarTexture ?? DEFAULT_LUNAR_TEXTURE;
+      const engravingState: EngravingState = pkg.craftState?.engraving ?? DEFAULT_ENGRAVING;
+
+      // Auto-select shrinkage based on confirmed metal
+      let autoShrinkage: ShrinkageMetal = "none";
+      if (confirmMetal === "gold" || confirmMetal === "rose-gold") autoShrinkage = "gold";
+      else if (confirmMetal === "silver") autoShrinkage = "silver";
+
+      const exportResult = generateExportSTL(
+        { ...pkg.parameters, size: confirmSize, innerDiameter: RING_SIZE_MAP[confirmSize] || pkg.parameters.innerDiameter },
+        lunar.enabled ? lunar : null,
+        engravingState.enabled ? engravingState : null,
+        autoShrinkage,
+      );
+
+      // 2. Upload STL to storage
+      setSubmitStep("uploading-stl");
+      const stlPath = `${basePath}/ring-${confirmSize}US-${pkg.parameters.width}mm.stl`;
+      const { error: stlErr } = await supabase.storage
+        .from("production-assets")
+        .upload(stlPath, exportResult.blob, {
+          contentType: "application/octet-stream",
+          upsert: true,
+        });
+      if (stlErr) throw new Error(`STL upload failed: ${stlErr.message}`);
+
+      // 3. Upload preview images
+      setSubmitStep("uploading-previews");
+      const previewUrls: string[] = [];
+      const previews = pkg.previews ?? [];
+      for (const preview of previews) {
+        if (!preview.dataUrl || preview.dataUrl.length < 100) continue;
+        try {
+          // Convert data URL to blob
+          const res = await fetch(preview.dataUrl);
+          const blob = await res.blob();
+          const ext = preview.dataUrl.startsWith("data:image/webp") ? "webp" : "png";
+          const imgPath = `${basePath}/preview-${preview.id}-${preview.viewMode}.${ext}`;
+
+          const { error: imgErr } = await supabase.storage
+            .from("production-assets")
+            .upload(imgPath, blob, {
+              contentType: `image/${ext}`,
+              upsert: true,
+            });
+          if (!imgErr) previewUrls.push(imgPath);
+        } catch (e) {
+          console.warn(`Preview upload failed for ${preview.id}:`, e);
+        }
+      }
+
+      // 4. Build the full manufacturing package
       const manufacturingPackage = {
         ...pkg,
         parameters: {
@@ -173,25 +228,39 @@ export default function Export() {
         },
         metalPreset: confirmMetal,
         finishPreset: confirmFinish,
+        manufacturing: {
+          shrinkageProfile: autoShrinkage,
+          shrinkageFactor: exportResult.scaleFactor,
+          stlTriangleCount: exportResult.triangleCount,
+          stlFileSizeKB: exportResult.fileSizeKB,
+          compensatedInnerDiameter: (RING_SIZE_MAP[confirmSize] || pkg.parameters.innerDiameter) * exportResult.scaleFactor,
+        },
       };
 
+      // 5. Insert production order with asset references
       const { error } = await supabase
         .from("production_orders")
         .insert({
+          id: orderId,
           user_id: user.id,
           ring_size: confirmSize,
           metal: confirmMetal,
           finish: confirmFinish,
           notes: notes.trim(),
           design_package: manufacturingPackage as any,
+          stl_path: stlPath,
+          preview_urls: previewUrls,
           status: "submitted",
-        });
+        } as any);
 
       if (error) throw error;
 
       setSubmitStep("done");
       setSent(true);
-      toast({ title: "Order Submitted! 🔥", description: "Your design has been sent to Galaxy Forge for production." });
+      toast({
+        title: "Order Submitted! 🔥",
+        description: `Complete package uploaded: STL (${exportResult.fileSizeKB} KB, ${exportResult.triangleCount.toLocaleString()} triangles) + ${previewUrls.length} preview image${previewUrls.length !== 1 ? "s" : ""}.`,
+      });
     } catch (err: any) {
       console.error("Submit error:", err);
       toast({ title: "Submission Failed", description: err.message, variant: "destructive" });
@@ -495,6 +564,29 @@ export default function Export() {
                   <span className="text-muted-foreground">Width × Thickness</span>
                   <span className="text-foreground font-mono">{pkg.parameters.width}mm × {pkg.parameters.thickness}mm</span>
                 </div>
+                <div className="border-t border-border/40 mt-2 pt-2">
+                  <p className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-display mb-1">Package Contents</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span className="text-muted-foreground">STL Model</span>
+                    <span className="text-primary font-mono text-[10px]">
+                      {stlResult ? `${stlResult.triangleCount.toLocaleString()} triangles · ${stlResult.fileSizeKB} KB` : "Will generate"}
+                    </span>
+                    <span className="text-muted-foreground">Shrinkage</span>
+                    <span className="text-foreground font-mono text-[10px]">
+                      {confirmMetal === "gold" || confirmMetal === "rose-gold"
+                        ? `Gold ×${SHRINKAGE_PROFILES.gold.factor}`
+                        : confirmMetal === "silver"
+                        ? `Silver ×${SHRINKAGE_PROFILES.silver.factor}`
+                        : "None (1:1)"}
+                    </span>
+                    <span className="text-muted-foreground">Preview Images</span>
+                    <span className="text-foreground font-mono text-[10px]">
+                      {(pkg.previews?.length ?? 0)} angle{(pkg.previews?.length ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-muted-foreground">Design Package</span>
+                    <span className="text-primary font-mono text-[10px]">Full JSON spec</span>
+                  </div>
+                </div>
               </div>
 
               {/* Actions */}
@@ -511,7 +603,7 @@ export default function Export() {
             </motion.div>
           )}
 
-          {submitStep === "submitting" && (
+          {(submitStep === "submitting" || submitStep === "uploading-stl" || submitStep === "uploading-previews") && (
             <motion.div
               key="submitting"
               initial={{ opacity: 0 }}
@@ -520,7 +612,18 @@ export default function Export() {
               className="bg-card border border-border rounded-xl p-8 text-center space-y-4"
             >
               <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
-              <p className="text-sm text-muted-foreground">Submitting your design to Galaxy Forge…</p>
+              <p className="text-sm text-muted-foreground">
+                {submitStep === "submitting" && "Generating manufacturing STL…"}
+                {submitStep === "uploading-stl" && "Uploading STL model…"}
+                {submitStep === "uploading-previews" && "Uploading preview images…"}
+              </p>
+              <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground/60">
+                <span className={submitStep === "submitting" ? "text-primary" : "text-muted-foreground"}>① Generate</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className={submitStep === "uploading-stl" ? "text-primary" : "text-muted-foreground"}>② STL Upload</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className={submitStep === "uploading-previews" ? "text-primary" : "text-muted-foreground"}>③ Previews</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
