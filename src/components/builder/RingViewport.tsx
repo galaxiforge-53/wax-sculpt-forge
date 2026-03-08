@@ -961,6 +961,34 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lunarParamsKey, effectiveAspect, effectiveDims]);
 
+  // ── Image terrain map generation ──
+  const [imgTerrainMaps, setImgTerrainMaps] = useState<ImageTerrainMapSet | null>(null);
+  const imgGenIdRef = useRef(0);
+  const debouncedImgTerrain = useDebouncedValue(imageTerrain, isMobile ? 400 : 250);
+
+  useEffect(() => {
+    if (!debouncedImgTerrain?.enabled || !debouncedImgTerrain?.imageDataUrl) {
+      if (imgTerrainMaps) {
+        disposeImageTerrainMaps(imgTerrainMaps);
+      }
+      setImgTerrainMaps(null);
+      return;
+    }
+    const genId = ++imgGenIdRef.current;
+    generateImageTerrainMaps(debouncedImgTerrain).then((maps) => {
+      if (imgGenIdRef.current !== genId || !maps) return;
+      setImgTerrainMaps((prev) => {
+        if (prev && prev !== maps) disposeImageTerrainMaps(prev);
+        return maps;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedImgTerrain]);
+
+  // ── Choose active surface maps: image terrain takes priority over lunar ──
+  const activeMaps = hasImageTerrain && imgTerrainMaps ? imgTerrainMaps : lunarMaps;
+  const hasActiveSurface = hasLunar || hasImageTerrain;
+
   // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
   // Smaller rings → stronger normals per-texel; larger rings → softer
   const dimScale = useMemo(() => {
@@ -973,13 +1001,21 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   }, [debouncedParams.innerDiameter, debouncedParams.thickness, debouncedParams.width]);
 
   const normalScale = useMemo(() => {
+    if (hasImageTerrain && imgTerrainMaps) {
+      const strength = 1.0 + (imageTerrain!.depth / 100) * 3.0;
+      return new THREE.Vector2(strength * dimScale, -strength * dimScale);
+    }
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
     const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction) * (1 - polishNormalSoften) * detailNormalMul;
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften, detailNormalMul]);
+  }, [hasImageTerrain, imgTerrainMaps, imageTerrain?.depth, lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften, detailNormalMul]);
 
   const dispScale = useMemo(() => {
+    if (hasImageTerrain && imgTerrainMaps) {
+      const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
+      return outerR * (0.02 + (imageTerrain!.depth / 100) * 0.12);
+    }
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
     const baseDisp = outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
