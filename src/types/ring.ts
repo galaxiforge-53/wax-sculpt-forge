@@ -7,6 +7,9 @@ export type ToolType = "carve" | "smooth" | "bevel" | "groove" | "measure" | "fl
 
 export type InteriorProfile = "flat" | "comfort-dome" | "european" | "anatomical";
 
+/** Edge style controls how the ring's outer edges transition at the top/bottom of the band */
+export type EdgeStyle = "sharp" | "soft-bevel" | "rounded" | "chamfer";
+
 export interface RingParameters {
   size: number; // US ring size 3-16
   innerDiameter: number; // mm
@@ -17,6 +20,8 @@ export interface RingParameters {
   grooveCount: number;
   grooveDepth: number;
   bevelSize: number;
+  // ── Edge style (optional for backward compat) ──
+  edgeStyle?: EdgeStyle; // defaults to "soft-bevel" for backward compat
   // ── Interior controls (optional for backward compat) ──
   interiorCurvature?: number;    // 0–100, how domed the inner bore surface is (0 = flat cylinder, 100 = deep dome)
   comfortFitDepth?: number;      // 0–100, how deep the comfort curve extends into the band
