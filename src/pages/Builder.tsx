@@ -720,6 +720,18 @@ function BuilderInner() {
                     <Camera className="w-3 h-3" />
                   </button>
                   <button
+                    onClick={handleCaptureSnapshot}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1",
+                      compareSnapshot
+                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    )}
+                    title={compareSnapshot ? "Re-capture snapshot for comparison" : "Capture snapshot to compare"}
+                  >
+                    <ArrowLeftRight className="w-3 h-3" />
+                  </button>
+                  <button
                     onClick={() => setPrefsOpen(true)}
                     className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
                       bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
