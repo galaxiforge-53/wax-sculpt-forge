@@ -19,7 +19,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn } from "lucide-react";
+import InspectionLoupe from "@/components/builder/InspectionLoupe";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
@@ -51,6 +52,9 @@ function BuilderInner() {
   const [ringRotation, setRingRotation] = useState<[number, number, number]>([0, 0, 0]);
   const [showPrinterBed, setShowPrinterBed] = useState(false);
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
+  const [loupeActive, setLoupeActive] = useState(false);
+  const [loupeZoom, setLoupeZoom] = useState(3);
+  const viewportContainerRef = useRef<HTMLDivElement>(null);
   const [guidedMode, setGuidedMode] = useState(() => {
     // Show guided mode for new users (no prior project or template)
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
@@ -377,7 +381,7 @@ function BuilderInner() {
         )}
 
         {/* Viewport */}
-        <div className="flex-1 p-0 sm:p-1 relative builder-viewport-bg">
+        <div ref={viewportContainerRef} className="flex-1 p-0 sm:p-1 relative builder-viewport-bg">
           <ViewportErrorBoundary>
             <RingViewport
               ref={viewportRef}
@@ -405,6 +409,14 @@ function BuilderInner() {
               showPrinterBed={showPrinterBed}
             />
           </ViewportErrorBoundary>
+
+          {/* Magnified inspection loupe */}
+          <InspectionLoupe
+            containerRef={viewportContainerRef}
+            active={loupeActive}
+            zoom={loupeZoom}
+            onZoomChange={setLoupeZoom}
+          />
 
           {/* Camera presets — top-left */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
@@ -522,6 +534,17 @@ function BuilderInner() {
                     title="Inspection mode"
                   >
                     <Search className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => setLoupeActive((v) => !v)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${loupeActive
+                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title="Magnifier loupe — scroll to zoom"
+                  >
+                    <ZoomIn className="w-3 h-3" />
                   </button>
                   <button
                     onClick={() => {
