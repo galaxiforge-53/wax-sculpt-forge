@@ -329,6 +329,11 @@ export default function BuilderSidebar({
           )}
         </Section>
 
+        {/* ═══ 3.5. IMAGE TERRAIN ═══ */}
+        <Section title="Image Terrain" icon={ImageIcon} defaultOpen={false}>
+          <ImageTerrainPanel state={imageTerrain} onChange={onImageTerrainChange} />
+        </Section>
+
         {/* ═══ 4. MATERIALS & LIGHTING ═══ */}
         <Section title="Materials" icon={Palette} defaultOpen={false}>
           <MetalPicker
