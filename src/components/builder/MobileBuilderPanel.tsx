@@ -104,10 +104,36 @@ function PremiumLock() {
 type PanelHeight = "collapsed" | "peek" | "half" | "full";
 const PANEL_HEIGHTS: Record<PanelHeight, number> = {
   collapsed: 0,
-  peek: 25,
-  half: 40,
-  full: 70,
+  peek: 28,
+  half: 42,
+  full: 72,
 };
+
+const HEIGHT_ORDER: PanelHeight[] = ["collapsed", "peek", "half", "full"];
+
+// Snap to nearest height based on current position + velocity
+function snapToHeight(currentVh: number, velocityPxPerMs: number): PanelHeight {
+  // If flicking fast, jump in that direction
+  if (Math.abs(velocityPxPerMs) > 0.4) {
+    const direction = velocityPxPerMs > 0 ? -1 : 1; // negative velocity = dragging up = expand
+    const currentIdx = HEIGHT_ORDER.findIndex(
+      (h) => Math.abs(PANEL_HEIGHTS[h] - currentVh) < 15
+    );
+    const bestIdx = Math.max(0, Math.min(HEIGHT_ORDER.length - 1, (currentIdx === -1 ? 1 : currentIdx) + direction));
+    return HEIGHT_ORDER[bestIdx];
+  }
+  // Otherwise snap to closest
+  let closest: PanelHeight = "collapsed";
+  let closestDist = Infinity;
+  for (const h of HEIGHT_ORDER) {
+    const dist = Math.abs(PANEL_HEIGHTS[h] - currentVh);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closest = h;
+    }
+  }
+  return closest;
+}
 
 // ── Component ────────────────────────────────────────────────────
 
@@ -124,13 +150,6 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
       setActiveTab(tab);
       setPanelHeight("half");
     }
-  };
-
-  const cycleHeight = () => {
-    if (panelHeight === "collapsed") setPanelHeight("peek");
-    else if (panelHeight === "peek") setPanelHeight("half");
-    else if (panelHeight === "half") setPanelHeight("full");
-    else setPanelHeight("collapsed");
   };
 
   // ── Tab content renderers ──────────────────────────────────────
@@ -359,49 +378,68 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
             initial={{ height: 0 }}
             animate={{ height: `${PANEL_HEIGHTS[panelHeight]}vh` }}
             exit={{ height: 0 }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="bg-card/95 backdrop-blur-xl border-t border-border overflow-hidden pointer-events-auto"
+            transition={{ type: "spring", damping: 30, stiffness: 350, mass: 0.8 }}
+            className="bg-card/95 backdrop-blur-xl border-t border-border overflow-hidden pointer-events-auto gpu-layer"
           >
             {/* Drag handle + close */}
             <div
-              className="flex items-center justify-between px-3 py-2 border-b border-border/50 cursor-grab active:cursor-grabbing touch-none"
+              className="flex items-center justify-between px-3 py-2.5 border-b border-border/50 cursor-grab active:cursor-grabbing touch-none select-none"
               onPointerDown={(e) => {
                 const startY = e.clientY;
-                const startHeight = panelHeight;
+                const startHeightVh = PANEL_HEIGHTS[panelHeight];
+                const vh = window.innerHeight / 100;
+                let lastY = startY;
+                let lastTime = Date.now();
+                let velocity = 0;
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);
+
                 const onMove = (moveE: PointerEvent) => {
-                  const dy = startY - moveE.clientY;
-                  if (startHeight === "peek" && dy > 50) setPanelHeight("half");
-                  else if (startHeight === "peek" && dy < -40) setPanelHeight("collapsed");
-                  else if (startHeight === "half" && dy > 60) setPanelHeight("full");
-                  else if (startHeight === "half" && dy < -60) setPanelHeight("peek");
-                  else if (startHeight === "full" && dy < -60) setPanelHeight("half");
+                  const now = Date.now();
+                  const dt = Math.max(1, now - lastTime);
+                  const dy = moveE.clientY - lastY;
+                  velocity = dy / dt; // px per ms (positive = dragging down)
+                  lastY = moveE.clientY;
+                  lastTime = now;
+
+                  // Live visual feedback — compute current height in vh
+                  const dragDeltaVh = (startY - moveE.clientY) / vh;
+                  const currentVh = Math.max(0, Math.min(80, startHeightVh + dragDeltaVh));
+                  // Find closest for spring animation
+                  const closest = snapToHeight(currentVh, 0);
+                  if (closest !== panelHeight) {
+                    setPanelHeight(closest);
+                  }
                 };
+
                 const onUp = () => {
                   el.releasePointerCapture(e.pointerId);
                   window.removeEventListener("pointermove", onMove);
                   window.removeEventListener("pointerup", onUp);
+                  // Snap based on final position + velocity
+                  const dragDeltaVh = (startY - lastY) / vh;
+                  const currentVh = Math.max(0, Math.min(80, startHeightVh + dragDeltaVh));
+                  setPanelHeight(snapToHeight(currentVh, velocity));
                 };
                 window.addEventListener("pointermove", onMove);
                 window.addEventListener("pointerup", onUp);
               }}
             >
               <div className="flex-1 flex justify-center">
-                <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
+                <div className="w-12 h-1.5 rounded-full bg-muted-foreground/40" />
               </div>
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-display absolute left-1/2 -translate-x-1/2">
                 {TABS.find((t) => t.id === activeTab)?.label}
               </span>
               <button
                 onClick={() => setPanelHeight("collapsed")}
-                className="p-1.5 -mr-1 text-muted-foreground hover:text-foreground transition-colors relative z-10 touch-target"
+                className="p-2 -mr-1 text-muted-foreground hover:text-foreground transition-colors relative z-10 touch-target"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <ScrollArea className="h-[calc(100%-44px)]">
-              <div className="p-3 pb-20">
+            <ScrollArea className="h-[calc(100%-48px)]">
+              <div className="p-3 pb-24">
                 {contentMap[activeTab]()}
               </div>
             </ScrollArea>

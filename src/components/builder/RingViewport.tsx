@@ -2051,7 +2051,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           </div>
         )}
         <Canvas
-          camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 32 : 35) }}
+          camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
           shadows={sc || insp ? "soft" : (isMobile ? false : (qualityTier === "preview" ? false : true))}
           frameloop={turntableSpeed > 0 || surfaceProgress ? "always" : "demand"}
           gl={{
@@ -2061,7 +2061,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : activeBg.toneMappingExposure),
             powerPreference: isMobile ? "low-power" : "high-performance",
           }}
-          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
+          dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.25] : [1, 2]))}
         >
           <AdaptiveDprController tier={qualityTier} isMobile={isMobile} isShowcase={sc} isInspection={insp} />
           <ClipPlaneManager mode={cutawayMode} offset={cutawayOffset} params={params} />
@@ -2275,17 +2275,19 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <OrbitControls
             enablePan={false}
             enableRotate={!isRotationLocked && turntableSpeed === 0}
-            minDistance={insp ? 0.8 : (isMobile ? 1.8 : 2.0)}
+            minDistance={insp ? 0.8 : (isMobile ? 2.0 : 2.0)}
             maxDistance={insp ? 8 : (isMobile ? 10 : 14)}
             autoRotate={turntableSpeed > 0}
             autoRotateSpeed={turntableSpeed}
             enableDamping
-            dampingFactor={isMobile ? 0.15 : 0.08}
-            rotateSpeed={isMobile ? 0.6 : 1.0}
-            zoomSpeed={isMobile ? 0.8 : 1.0}
+            dampingFactor={isMobile ? 0.12 : 0.08}
+            rotateSpeed={isMobile ? 0.7 : 1.0}
+            zoomSpeed={isMobile ? 0.6 : 1.0}
             touches={{ ONE: isRotationLocked ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0.1}
             maxPolarAngle={Math.PI - 0.1}
+            // Smoother touch feel
+            {...(isMobile ? { enableZoom: true, zoomToCursor: false } : {})}
           />
 
           {/* Rotation lock indicator */}

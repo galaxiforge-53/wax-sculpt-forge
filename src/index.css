@@ -356,5 +356,20 @@
   /* Prevent overscroll bounce on iOS when dragging panels */
   .builder-viewport-bg {
     overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  /* Prevent pull-to-refresh on mobile builder */
+  body:has(.builder-viewport-bg) {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Smooth 120fps-ready animations on high-refresh displays */
+@media (prefers-reduced-motion: no-preference) {
+  .gpu-layer {
+    will-change: transform, height;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 }
