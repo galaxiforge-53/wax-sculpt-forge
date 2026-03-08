@@ -634,16 +634,26 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
   const kernelSize = kernelR * 2 + 1;
   const invKernel = 1 / kernelSize;
 
-  // Horizontal pass
+  // Horizontal pass — pre-compute wrap indices to avoid modular arithmetic in hot loop
+  // Wrap index table: wrapIdx[x] = ((x % w) + w) % w for x in [-kernelR, w+kernelR]
+  const wrapRange = w + kernelR * 2 + 2;
+  const wrapIdx = new Int32Array(wrapRange);
+  for (let i = 0; i < wrapRange; i++) {
+    const x = i - kernelR - 1;
+    wrapIdx[i] = ((x % w) + w) % w;
+  }
+  const wrapOff = kernelR + 1; // offset so wrapIdx[x + wrapOff] = wrapped(x)
+
   for (let y = 0; y < h; y++) {
+    const rowOff = y * w;
     let sum = 0;
     for (let kx = -kernelR; kx <= kernelR; kx++) {
-      sum += hmap[y * w + ((kx % w) + w) % w];
+      sum += hmap[rowOff + wrapIdx[kx + wrapOff]];
     }
-    temp[y * w] = sum * invKernel;
+    temp[rowOff] = sum * invKernel;
     for (let x = 1; x < w; x++) {
-      sum += hmap[y * w + ((x + kernelR) % w + w) % w] - hmap[y * w + ((x - kernelR - 1) % w + w) % w];
-      temp[y * w + x] = sum * invKernel;
+      sum += hmap[rowOff + wrapIdx[x + kernelR + wrapOff]] - hmap[rowOff + wrapIdx[x - kernelR - 1 + wrapOff]];
+      temp[rowOff + x] = sum * invKernel;
     }
   }
 
