@@ -2105,8 +2105,8 @@ export function buildHeightmap(
       const vCoord96 = yNorm * 96 * aspectCorrection;
       const vCoord200 = yNorm * 200 * aspectCorrection;
       const rowOff = y * MAP_W;
-      const regRowMask = edgeMask[rowOff]; // row-constant — hoist to skip 4096 lookups per row
-      if (regRowMask < 0.01) continue; // skip entire edge rows
+      const regRowMask = edgeRow[y];
+      if (regRowMask < 0.01) continue;
 
       for (let x = 0; x < MAP_W; x++) {
         const idx = rowOff + x;
