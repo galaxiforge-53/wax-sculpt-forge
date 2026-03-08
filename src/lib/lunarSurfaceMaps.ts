@@ -1494,7 +1494,21 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 8) Depth contrast boost ──
+  // ─── 8) Normalize heightmap range then apply depth contrast ──
+  // After allowing extended range (-0.3 to 1.2) for realistic overlap stacking,
+  // remap back to 0–1 before contrast and downstream passes
+  let hMin = Infinity, hMax = -Infinity;
+  for (let i = 0; i < hmap.length; i++) {
+    if (hmap[i] < hMin) hMin = hmap[i];
+    if (hmap[i] > hMax) hMax = hmap[i];
+  }
+  const hRange = hMax - hMin;
+  if (hRange > 0.001) {
+    for (let i = 0; i < hmap.length; i++) {
+      hmap[i] = (hmap[i] - hMin) / hRange;
+    }
+  }
+
   const contrastVal = (lunar.terrainContrast ?? 60) / 100; // 0–1
   // Map 0–1 to a contrast multiplier: 0→0.6 (flat), 0.5→1.0 (neutral), 1.0→1.8 (dramatic)
   const contrastMult = 0.6 + contrastVal * 1.2;
