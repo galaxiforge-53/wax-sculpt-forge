@@ -1699,17 +1699,22 @@ export function buildHeightmap(
     const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
     const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
 
+    // Pre-compute reciprocals to avoid repeated division in the 4M-pixel inner loop
+    const invMapW = 1 / MAP_W;
+    const invMapH = 1 / MAP_H;
+
     for (let y = 0; y < MAP_H; y++) {
-      const vCoord8 = (y / MAP_H) * 8 * aspectCorrection;
-      const vCoord48 = (y / MAP_H) * 48 * aspectCorrection;
-      const vCoord96 = (y / MAP_H) * 96 * aspectCorrection;
-      const vCoord200 = (y / MAP_H) * 200 * aspectCorrection;
+      const yNorm = y * invMapH;
+      const vCoord48 = yNorm * 48 * aspectCorrection;
+      const vCoord96 = yNorm * 96 * aspectCorrection;
+      const vCoord200 = yNorm * 200 * aspectCorrection;
+      const rowOff = y * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
-        const idx = y * MAP_W + x;
+        const idx = rowOff + x;
         const mask = edgeMask[idx];
         if (mask < 0.01) continue; // Skip fully masked edge pixels
 
-        const uNorm = x / MAP_W;
+        const uNorm = x * invMapW;
 
         // Coarse regolith (5 octave fBm)
         const regN = fbm(regolithNoise, uNorm * 48, vCoord48, 5, 2.2, 0.45);
