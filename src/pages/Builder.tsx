@@ -460,6 +460,7 @@ function BuilderInner() {
               scaleReference={scaleReference}
               wearPreview={wearPreview}
               turntableSpeed={turntableSpeed}
+              bgPreset={bgPreset}
             />
           </ViewportErrorBoundary>
 
