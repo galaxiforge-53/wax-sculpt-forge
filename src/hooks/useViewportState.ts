@@ -1,4 +1,4 @@
-import { useReducer, useCallback, Dispatch } from "react";
+import { useReducer, useCallback, useMemo, Dispatch } from "react";
 import { SnapshotAngle, CutawayMode, BackgroundPreset } from "@/components/builder/RingViewport";
 import { ScaleReferenceType } from "@/components/builder/ScaleReference";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
@@ -110,7 +110,38 @@ export function useViewportState() {
     dispatch({ type: "TOGGLE", field });
   }, []);
 
-  return { vp: state, vpDispatch: dispatch, vpSet: set, vpToggle: toggle };
+  // ── Stable per-field setters (never change identity) ──────────
+  // These prevent re-renders in memoized children like ViewportControls
+  const setCameraPreset = useCallback((v: SnapshotAngle | null) => dispatch({ type: "SET", field: "cameraPreset", value: v }), []);
+  const setShowMeasurements = useCallback((v: boolean) => dispatch({ type: "SET", field: "showMeasurements", value: v }), []);
+  const setCutawayMode = useCallback((v: CutawayMode) => dispatch({ type: "SET", field: "cutawayMode", value: v }), []);
+  const setCutawayOffset = useCallback((v: number) => dispatch({ type: "SET", field: "cutawayOffset", value: v }), []);
+  const setLighting = useCallback((v: LightingSettings) => dispatch({ type: "SET", field: "lighting", value: v }), []);
+  const setShowcaseMode = useCallback((v: boolean) => dispatch({ type: "SET", field: "showcaseMode", value: v }), []);
+  const setInspectionMode = useCallback((v: boolean) => dispatch({ type: "SET", field: "inspectionMode", value: v }), []);
+  const setRingPosition = useCallback((v: [number, number, number]) => dispatch({ type: "SET", field: "ringPosition", value: v }), []);
+  const setRingRotation = useCallback((v: [number, number, number]) => dispatch({ type: "SET", field: "ringRotation", value: v }), []);
+  const setShowPrinterBed = useCallback((v: boolean) => dispatch({ type: "SET", field: "showPrinterBed", value: v }), []);
+  const setRotationLocked = useCallback((v: boolean) => dispatch({ type: "SET", field: "rotationLocked", value: v }), []);
+  const setScaleReference = useCallback((v: ScaleReferenceType) => dispatch({ type: "SET", field: "scaleReference", value: v }), []);
+  const setWearPreview = useCallback((v: number) => dispatch({ type: "SET", field: "wearPreview", value: v }), []);
+  const setPolishPreview = useCallback((v: number) => dispatch({ type: "SET", field: "polishPreview", value: v }), []);
+  const setDetailBoost = useCallback((v: number) => dispatch({ type: "SET", field: "detailBoost", value: v }), []);
+  const setThicknessHeatmap = useCallback((v: boolean) => dispatch({ type: "SET", field: "thicknessHeatmap", value: v }), []);
+  const setTurntableSpeed = useCallback((v: number) => dispatch({ type: "SET", field: "turntableSpeed", value: v }), []);
+  const setBgPreset = useCallback((v: BackgroundPreset) => dispatch({ type: "SET", field: "bgPreset", value: v }), []);
+  const setLoupeActive = useCallback((v: boolean) => dispatch({ type: "SET", field: "loupeActive", value: v }), []);
+  const setLoupeZoom = useCallback((v: number) => dispatch({ type: "SET", field: "loupeZoom", value: v }), []);
+
+  const setters = useMemo(() => ({
+    setCameraPreset, setShowMeasurements, setCutawayMode, setCutawayOffset,
+    setLighting, setShowcaseMode, setInspectionMode, setRingPosition,
+    setRingRotation, setShowPrinterBed, setRotationLocked, setScaleReference,
+    setWearPreview, setPolishPreview, setDetailBoost, setThicknessHeatmap,
+    setTurntableSpeed, setBgPreset, setLoupeActive, setLoupeZoom,
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { vp: state, vpDispatch: dispatch, vpSet: set, vpToggle: toggle, ...setters };
 }
 
 export type { ViewportAction };
