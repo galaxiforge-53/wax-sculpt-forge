@@ -60,6 +60,48 @@ function BuilderInner() {
 
   // ── Consolidated viewport state (replaces 18 individual useState calls) ──
   const { vp, vpSet } = useViewportState();
+  // Destructured aliases for compatibility with existing code
+  const cameraPreset = vp.cameraPreset;
+  const setCameraPreset = (v: SnapshotAngle | null) => vpSet("cameraPreset", v);
+  const showMeasurements = vp.showMeasurements;
+  const setShowMeasurements = (v: boolean) => vpSet("showMeasurements", v);
+  const cutawayMode = vp.cutawayMode;
+  const setCutawayMode = (v: CutawayMode) => vpSet("cutawayMode", v);
+  const cutawayOffset = vp.cutawayOffset;
+  const setCutawayOffset = (v: number) => vpSet("cutawayOffset", v);
+  const lighting = vp.lighting;
+  const setLighting = (v: LightingSettings) => vpSet("lighting", v);
+  const showcaseMode = vp.showcaseMode;
+  const setShowcaseMode = (v: boolean) => vpSet("showcaseMode", v);
+  const inspectionMode = vp.inspectionMode;
+  const setInspectionMode = (v: boolean) => vpSet("inspectionMode", v);
+  const ringPosition = vp.ringPosition;
+  const setRingPosition = (v: [number, number, number]) => vpSet("ringPosition", v);
+  const ringRotation = vp.ringRotation;
+  const setRingRotation = (v: [number, number, number]) => vpSet("ringRotation", v);
+  const showPrinterBed = vp.showPrinterBed;
+  const setShowPrinterBed = (v: boolean) => vpSet("showPrinterBed", v);
+  const rotationLocked = vp.rotationLocked;
+  const setRotationLocked = (v: boolean) => vpSet("rotationLocked", v);
+  const scaleReference = vp.scaleReference;
+  const setScaleReference = (v: ScaleReferenceType) => vpSet("scaleReference", v);
+  const wearPreview = vp.wearPreview;
+  const setWearPreview = (v: number) => vpSet("wearPreview", v);
+  const polishPreview = vp.polishPreview;
+  const setPolishPreview = (v: number) => vpSet("polishPreview", v);
+  const detailBoost = vp.detailBoost;
+  const setDetailBoost = (v: number) => vpSet("detailBoost", v);
+  const thicknessHeatmap = vp.thicknessHeatmap;
+  const setThicknessHeatmap = (v: boolean) => vpSet("thicknessHeatmap", v);
+  const turntableSpeed = vp.turntableSpeed;
+  const setTurntableSpeed = (v: number) => vpSet("turntableSpeed", v);
+  const bgPreset = vp.bgPreset;
+  const setBgPreset = (v: BackgroundPreset) => vpSet("bgPreset", v);
+  const loupeActive = vp.loupeActive;
+  const setLoupeActive = (v: boolean) => vpSet("loupeActive", v);
+  const loupeZoom = vp.loupeZoom;
+  const setLoupeZoom = (v: number) => vpSet("loupeZoom", v);
+  const viewportContainerRef = useRef<HTMLDivElement>(null);
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
   const [studioRenderOpen, setStudioRenderOpen] = useState(false);
 
