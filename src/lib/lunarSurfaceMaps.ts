@@ -2209,13 +2209,20 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
 
       const nx = (tl - tr + 2 * (ml - mr) + bl - br) * sX;
       const ny = (tl + 2 * tc + tr - bl - 2 * bc - br) * sY;
-      const nz = 1.0;
-      const lenSq = nx * nx + ny * ny + nz * nz;
+
+      // Fast path: skip expensive invSqrt for nearly-flat pixels (very common)
+      const nxny = nx * nx + ny * ny;
+      if (nxny < 0.0001) {
+        buf32[outRow + x] = FLAT_PIXEL;
+        continue;
+      }
+
+      const lenSq = nxny + 1.0; // nz = 1.0
       const invLen = fastInvSqrt(lenSq);
 
       const r = (nx * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
       const g = (ny * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
-      const b = (nz * invLen * 0.5 + 0.5) * 255 + 0.5 | 0;
+      const b = (invLen * 0.5 + 0.5) * 255 + 0.5 | 0; // nz * invLen
       buf32[outRow + x] = 0xFF000000 | (b << 16) | (g << 8) | r;
     }
   }
