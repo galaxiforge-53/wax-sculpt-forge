@@ -429,6 +429,22 @@ export default function MyDesigns() {
                         <Send className="h-3 w-3" />
                       </Button>
                     )}
+                    {design.source === "cloud" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn(
+                          "text-xs h-8 px-2",
+                          historyOpenId === design.id
+                            ? "border-primary/40 text-primary bg-primary/10"
+                            : ""
+                        )}
+                        onClick={() => toggleHistory(design.id)}
+                        title="Version history"
+                      >
+                        <History className="h-3 w-3" />
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" className="text-xs h-8 px-2"
                       onClick={() => handleDuplicate(design)} disabled={actionLoading === design.id} title="Duplicate">
                       <Copy className="h-3 w-3" />
@@ -443,6 +459,136 @@ export default function MyDesigns() {
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
+
+                  {/* Version History Panel */}
+                  <AnimatePresence>
+                    {historyOpenId === design.id && design.source === "cloud" && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-2 border-t border-border/50 space-y-2">
+                          <div className="flex items-center gap-1.5">
+                            <History className="w-3 h-3 text-primary" />
+                            <span className="text-[11px] font-display text-primary uppercase tracking-wider">
+                              Version History
+                            </span>
+                            {!versionsLoading && (
+                              <span className="text-[10px] text-muted-foreground">
+                                ({versions.length} version{versions.length !== 1 ? "s" : ""})
+                              </span>
+                            )}
+                          </div>
+
+                          {versionsLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : versions.length === 0 ? (
+                            <p className="text-[10px] text-muted-foreground/60 py-2">
+                              No versions yet. Versions are created automatically when you save.
+                            </p>
+                          ) : (
+                            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                              {versions.map((v, vi) => {
+                                const vPkg = v.design_package as any;
+                                const isLatest = vi === 0;
+                                return (
+                                  <div
+                                    key={v.id}
+                                    className={cn(
+                                      "flex items-start gap-2 p-2 rounded-lg border transition-colors",
+                                      isLatest
+                                        ? "border-primary/20 bg-primary/5"
+                                        : "border-border/50 bg-secondary/30 hover:bg-secondary/60"
+                                    )}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div className="flex flex-col items-center mt-1">
+                                      <div className={cn(
+                                        "w-2 h-2 rounded-full",
+                                        isLatest ? "bg-primary" : "bg-muted-foreground/40"
+                                      )} />
+                                      {vi < versions.length - 1 && (
+                                        <div className="w-px h-full bg-border/50 min-h-[16px]" />
+                                      )}
+                                    </div>
+
+                                    {/* Version info */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={cn(
+                                          "text-[11px] font-medium",
+                                          isLatest ? "text-primary" : "text-foreground"
+                                        )}>
+                                          {v.label || `v${v.version_number}`}
+                                        </span>
+                                        {isLatest && (
+                                          <Badge variant="outline" className="text-[8px] px-1 py-0 border-primary/30 text-primary">
+                                            Latest
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-[9px] text-muted-foreground">
+                                        {new Date(v.created_at).toLocaleDateString(undefined, {
+                                          month: "short", day: "numeric",
+                                          hour: "2-digit", minute: "2-digit",
+                                        })}
+                                        {vPkg?.parameters && (
+                                          <span className="ml-1">
+                                            · {vPkg.parameters.profile} · {vPkg.metalPreset ?? "—"}
+                                          </span>
+                                        )}
+                                      </p>
+                                    </div>
+
+                                    {/* Version actions */}
+                                    {!isLatest && (
+                                      <div className="flex items-center gap-0.5 shrink-0">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                                          onClick={() => handleRestore(design.id, v.id, v.label || `v${v.version_number}`)}
+                                          disabled={actionLoading === v.id}
+                                          title="Restore this version"
+                                        >
+                                          <RotateCcw className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                                          onClick={() => handleBranch(v.id, design.name, v.label || `v${v.version_number}`)}
+                                          disabled={actionLoading === v.id}
+                                          title="Branch new design from this version"
+                                        >
+                                          <GitBranch className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                          onClick={() => handleDeleteVersion(design.id, v.id)}
+                                          disabled={actionLoading === v.id}
+                                          title="Delete version"
+                                        >
+                                          <Trash2 className="h-2.5 w-2.5" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </motion.div>
             ))}
