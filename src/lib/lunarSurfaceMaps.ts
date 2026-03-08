@@ -915,7 +915,7 @@ function applyPhobosGrooves(
         const idx = py * w + x;
         const dist = Math.abs(dy) * invWidthPx;
         const profile = (1 - dist * dist);
-        hmap[idx] -= grooveDepth * profile * edgeMask[idx];
+        hmap[idx] -= grooveDepth * profile * edgeRow[py];
       }
     }
   }
