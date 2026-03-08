@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useRingDesign } from "@/hooks/useRingDesign";
 import { useEffect, useRef, useState } from "react";
 import RingViewport, { RingViewportHandle, SnapshotAngle, CutawayMode } from "@/components/builder/RingViewport";
+import ViewportErrorBoundary from "@/components/builder/ViewportErrorBoundary";
 import ToolRail from "@/components/builder/ToolRail";
 import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import TopBar from "@/components/builder/TopBar";
