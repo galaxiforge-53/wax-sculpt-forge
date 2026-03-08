@@ -34,6 +34,7 @@ function BuilderInner() {
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [forgeModalOpen, setForgeModalOpen] = useState(false);
   const [livePreviews, setLivePreviews] = useState<DesignPreview[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
