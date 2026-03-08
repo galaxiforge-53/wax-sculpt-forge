@@ -104,10 +104,14 @@ function makeNoise2D(seed: number) {
   for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
 
   return (x: number, y: number): number => {
-    const xi = Math.floor(x) & 255;
-    const yi = Math.floor(y) & 255;
-    const xf = x - Math.floor(x);
-    const yf = y - Math.floor(y);
+    // Cache Math.floor results — eliminates 2 redundant calls per invocation
+    // (was called twice each for x and y). On 50M+ calls this saves ~100M Math.floor ops.
+    const fx = Math.floor(x);
+    const fy = Math.floor(y);
+    const xi = fx & 255;
+    const yi = fy & 255;
+    const xf = x - fx;
+    const yf = y - fy;
     // Inline fade: t³(6t²-15t+10)
     const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
     const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
@@ -118,10 +122,12 @@ function makeNoise2D(seed: number) {
     const bb = (perm[perm[xi + 1] + yi + 1] & 255) * 2;
 
     // Inline dot products with flat gradient array
+    const xf1 = xf - 1;
+    const yf1 = yf - 1;
     const d00 = gradFlat[aa] * xf + gradFlat[aa + 1] * yf;
-    const d10 = gradFlat[ba] * (xf - 1) + gradFlat[ba + 1] * yf;
-    const d01 = gradFlat[ab] * xf + gradFlat[ab + 1] * (yf - 1);
-    const d11 = gradFlat[bb] * (xf - 1) + gradFlat[bb + 1] * (yf - 1);
+    const d10 = gradFlat[ba] * xf1 + gradFlat[ba + 1] * yf;
+    const d01 = gradFlat[ab] * xf + gradFlat[ab + 1] * yf1;
+    const d11 = gradFlat[bb] * xf1 + gradFlat[bb + 1] * yf1;
 
     // Inline bilinear interpolation
     const x0 = d00 + u * (d10 - d00);
@@ -384,19 +390,34 @@ function stampCrater(
   // Squared radius for cheap early rejection (before expensive shapedDistance)
   const rejectR2 = (c.radius * 1.7) * (c.radius * 1.7);
 
+  // Hoist per-crater constants outside the pixel loop
+  const cuW = c.cu * w;
+  const cvH = c.cv * h;
+  const invVStretch2 = 1 / (vStretch * vStretch);
+  const invW = 1 / w;
+  const invH = 1 / h;
+  // Circular fast-path constants (hoisted from inner loop)
+  const circ_coarseScale = sp.noiseScale * 0.5;
+  const circ_fineScale = sp.noiseScale * 2.0;
+  const circ_warpFactor = sp.warpAmp * 0.22;
+  // Pre-compute slump trig if needed
+  const slumpCos = hasSlump ? Math.cos(c.slumpAngle) : 0;
+  const slumpSin = hasSlump ? Math.sin(c.slumpAngle) : 0;
+  const slumpShift = hasSlump ? c.slumpStrength * 0.08 : 0;
+
   for (let py = y0; py <= y1; py++) {
+    const rowOff = py * w;
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
 
-      const rawDu = px - c.cu * w;
-      const rawDv = py - c.cv * h;
+      const rawDu = px - cuW;
+      const rawDv = py - cvH;
 
       // Cheap squared-distance early rejection in UV space
-      // Avoids calling shapedDistance for pixels clearly outside crater influence
-      const rawU = rawDu / w;
-      const rawV = rawDv / h;
-      if (rawU * rawU + rawV * rawV * (1 / (vStretch * vStretch)) > rejectR2) continue;
+      const rawU = rawDu * invW;
+      const rawV = rawDv * invH;
+      if (rawU * rawU + rawV * rawV * invVStretch2 > rejectR2) continue;
 
       const du = rawDu * invPxR;
       const dv = rawDv * invPyR;
@@ -405,18 +426,14 @@ function stampCrater(
 
       if (isCircular) {
         // Fast path for circular craters: skip shape transformation, only do domain warp
-        const coarseScale = sp.noiseScale * 0.5;
-        const fineScale = sp.noiseScale * 2.0;
-        const invW = 1 / w;
-        const invH = 1 / h;
         const pxInvW = px * invW;
         const pyInvH = py * invH;
-        const wU = sp.warpNoise(pxInvW * coarseScale, pyInvH * coarseScale) * 0.7
-                  + sp.warpNoise(pxInvW * fineScale + 50, pyInvH * fineScale + 50) * 0.3;
-        const wV = sp.warpNoise(pyInvH * coarseScale + 100, pxInvW * coarseScale + 100) * 0.7
-                  + sp.warpNoise(pyInvH * fineScale + 150, pxInvW * fineScale + 150) * 0.3;
-        wdu = du + sp.warpAmp * 0.22 * wU;
-        wdv = dv + sp.warpAmp * 0.22 * wV;
+        const wU = sp.warpNoise(pxInvW * circ_coarseScale, pyInvH * circ_coarseScale) * 0.7
+                  + sp.warpNoise(pxInvW * circ_fineScale + 50, pyInvH * circ_fineScale + 50) * 0.3;
+        const wV = sp.warpNoise(pyInvH * circ_coarseScale + 100, pxInvW * circ_coarseScale + 100) * 0.7
+                  + sp.warpNoise(pyInvH * circ_fineScale + 150, pxInvW * circ_fineScale + 150) * 0.3;
+        wdu = du + circ_warpFactor * wU;
+        wdv = dv + circ_warpFactor * wV;
         dist = Math.sqrt(wdu * wdu + wdv * wdv);
       } else {
         const result = shapedDistance(du, dv, sp, px, py, w, h);
@@ -436,9 +453,8 @@ function stampCrater(
       // Skip slump computation for craters with negligible slump
       let slumpDist = dist;
       if (hasSlump) {
-        const slumpShift = c.slumpStrength * 0.08;
-        const slumpDu = wdu + Math.cos(c.slumpAngle) * slumpShift;
-        const slumpDv = wdv + Math.sin(c.slumpAngle) * slumpShift;
+        const slumpDu = wdu + slumpCos * slumpShift;
+        const slumpDv = wdv + slumpSin * slumpShift;
         slumpDist = Math.sqrt(slumpDu * slumpDu + slumpDv * slumpDv);
       }
 
@@ -500,10 +516,9 @@ function stampCrater(
         delta = effectiveRimH * 0.05 * Math.max(0, falloff);
       }
 
-      const mask = edgeMask[py * w + wpx];
+      const idx = rowOff + wpx;
+      const mask = edgeMask[idx];
       delta *= mask;
-
-      const idx = py * w + wpx;
       if (delta < 0) {
         // Allow overlapping craters to stack deeper (minimum -0.3 for realistic depth)
         // Previous clamping to 0 prevented natural multi-impact basins
@@ -547,13 +562,18 @@ function stampEjectaRays(
   for (let r = 0; r < rayCount; r++) {
     const angle = rand() * Math.PI * 2;
     const rayWidth = c.radius * (0.06 + rand() * 0.08);
+    // Pre-compute trig per ray instead of per step
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
+    const invPhysAspect = 1 / physicalAspect;
 
     const steps = Math.floor(rayLength * w * 0.5);
+    const invSteps = 1 / steps;
     for (let s = 0; s < steps; s++) {
-      const t = s / steps;
+      const t = s * invSteps;
       const dist = c.radius * 0.8 + t * rayLength;
-      const ru = c.cu + Math.cos(angle) * dist;
-      const rv = c.cv + Math.sin(angle) * dist / physicalAspect;
+      const ru = c.cu + cosAngle * dist;
+      const rv = c.cv + sinAngle * dist * invPhysAspect;
 
       if (rv < 0.05 || rv > 0.95) continue;
 
@@ -563,11 +583,14 @@ function stampEjectaRays(
 
       const fadeoff = (1 - t) * (1 - t);
       const jitter = rayWidth * w;
-      for (let j = -Math.ceil(jitter); j <= Math.ceil(jitter); j++) {
-        const wpx = ((px + j) % w + w) % w;
-        const idx = py * w + wpx;
-        const mask = edgeMask[idx];
-        hmap[idx] = Math.min(1, hmap[idx] + rayBrightness * fadeoff * mask);
+      const jCeil = Math.ceil(jitter);
+      const pyRow = py * w;
+      for (let j = -jCeil; j <= jCeil; j++) {
+        let wpx = (px + j) % w;
+        if (wpx < 0) wpx += w;
+        const idx = pyRow + wpx;
+        hmap[idx] = hmap[idx] + rayBrightness * fadeoff * edgeMask[idx];
+        if (hmap[idx] > 1) hmap[idx] = 1;
       }
 
       if (rand() < 0.03 * ejectaStrength) {
@@ -2064,10 +2087,10 @@ export function buildHeightmap(
       }
       smoothTemp[rowOff + MAP_W - 1] = hmap[rowOff + MAP_W - 2] * 0.25 + hmap[rowOff + MAP_W - 1] * 0.5 + hmap[rowOff] * 0.25;
     }
-    // Vertical pass
+    // Vertical pass — use ternary instead of Math.max/Math.min
     for (let y = 0; y < MAP_H; y++) {
-      const yA = Math.max(0, y - 1);
-      const yB = Math.min(MAP_H - 1, y + 1);
+      const yA = y > 0 ? y - 1 : 0;
+      const yB = y < MAP_H - 1 ? y + 1 : MAP_H - 1;
       const rowA = yA * MAP_W, rowC = y * MAP_W, rowB = yB * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
         smoothResult[rowC + x] = smoothTemp[rowA + x] * 0.25 + smoothTemp[rowC + x] * 0.5 + smoothTemp[rowB + x] * 0.25;
@@ -2082,19 +2105,22 @@ export function buildHeightmap(
   // Ensures the heightmap wraps seamlessly around the ring circumference
   // Uses hermite blending in a thin strip at both edges
   {
-    const seamWidth = Math.max(4, Math.round(MAP_W * 0.008)); // ~0.8% of width = ~32px
+    const seamWidth = Math.max(4, Math.round(MAP_W * 0.008));
+    const invSeamWidth = 1 / seamWidth;
     for (let y = 0; y < MAP_H; y++) {
       const row = y * MAP_W;
       for (let dx = 0; dx < seamWidth; dx++) {
-        const t = dx / seamWidth;
-        const blend = t * t * (3 - 2 * t); // hermite smooth step
+        const t = dx * invSeamWidth;
+        const blend = t * t * (3 - 2 * t);
+        const oneMinusBlend = 1 - blend;
         const leftIdx = row + dx;
         const rightIdx = row + MAP_W - 1 - dx;
-        const avg = hmap[leftIdx] * (1 - blend) + hmap[rightIdx] * blend;
-        const avgR = hmap[rightIdx] * (1 - blend) + hmap[leftIdx] * blend;
-        // Blend toward each other at the seam
-        hmap[leftIdx] = hmap[leftIdx] * blend + avg * (1 - blend);
-        hmap[rightIdx] = hmap[rightIdx] * blend + avgR * (1 - blend);
+        const lv = hmap[leftIdx];
+        const rv = hmap[rightIdx];
+        const avg = lv * oneMinusBlend + rv * blend;
+        const avgR = rv * oneMinusBlend + lv * blend;
+        hmap[leftIdx] = lv * blend + avg * oneMinusBlend;
+        hmap[rightIdx] = rv * blend + avgR * oneMinusBlend;
       }
     }
   }
@@ -2489,12 +2515,16 @@ function getSharedHalfHmap(hmap: Float32Array, w: number, h: number): Float32Arr
     _sharedHalfH = hh;
   }
   const half = _sharedHalfHmap;
+  const hm1 = h - 1;
   for (let y = 0; y < hh; y++) {
     const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
+    const sy1 = sy + 1 < h ? sy + 1 : hm1;
+    const rowSy = sy * w;
+    const rowSy1 = sy1 * w;
+    const dstRow = y * hw;
     for (let x = 0; x < hw; x++) {
       const sx = x * 2;
-      half[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
+      half[dstRow + x] = (hmap[rowSy + sx] + hmap[rowSy + sx + 1] + hmap[rowSy1 + sx] + hmap[rowSy1 + sx + 1]) * 0.25;
     }
   }
   return half;
