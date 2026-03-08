@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
