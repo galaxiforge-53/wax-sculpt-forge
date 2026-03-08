@@ -587,6 +587,28 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     thicknessMm: debouncedParams.thickness,
   }), [debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness]);
 
+  // ── Freeze terrain support ──
+  // When frozen, cache the aspect/dims at freeze time so terrain doesn't regenerate
+  const frozenAspectRef = useRef<number | null>(null);
+  const frozenDimsRef = useRef<typeof ringDims | null>(null);
+  
+  const isFrozen = !!lunarTexture?.frozen;
+  
+  // When freeze is toggled ON, snapshot current values
+  useEffect(() => {
+    if (isFrozen && frozenAspectRef.current === null) {
+      frozenAspectRef.current = physicalAspect;
+      frozenDimsRef.current = ringDims;
+    } else if (!isFrozen) {
+      frozenAspectRef.current = null;
+      frozenDimsRef.current = null;
+    }
+  }, [isFrozen, physicalAspect, ringDims]);
+  
+  // Use frozen values if terrain is frozen, otherwise use live values
+  const effectiveAspect = isFrozen && frozenAspectRef.current !== null ? frozenAspectRef.current : physicalAspect;
+  const effectiveDims = isFrozen && frozenDimsRef.current !== null ? frozenDimsRef.current : ringDims;
+
   // Async texture generation with progress tracking + debounce
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -595,6 +617,13 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   // Debounce all lunar params so rapid slider drags don't spam regeneration
   const debouncedLunar = useDebouncedValue(lunarTexture, isMobile ? 400 : 250);
+
+  // Build a stable key for the lunar params (excluding frozen flag itself)
+  const lunarParamsKey = useMemo(() => {
+    if (!debouncedLunar) return "";
+    const { frozen, ...rest } = debouncedLunar;
+    return JSON.stringify(rest);
+  }, [debouncedLunar]);
 
   useEffect(() => {
     if (!debouncedLunar?.enabled) {
@@ -614,8 +643,8 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
     generateLunarSurfaceMapsAsync(
       debouncedLunar,
-      physicalAspect,
-      ringDims,
+      effectiveAspect,
+      effectiveDims,
       (progress) => {
         if (genIdRef.current !== genId) return;
         setGenProgress(progress);
@@ -634,7 +663,9 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         if (genIdRef.current === genId) setGenProgress(null);
       }, 1200);
     });
-  }, [debouncedLunar, physicalAspect, ringDims]);
+    // When frozen, only regenerate if lunar params (excluding frozen) change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lunarParamsKey, effectiveAspect, effectiveDims]);
 
   // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
   // Smaller rings → stronger normals per-texel; larger rings → softer

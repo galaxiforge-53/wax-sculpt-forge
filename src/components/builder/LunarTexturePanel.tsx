@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
@@ -517,11 +517,34 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
 
       {state.enabled && (
         <div className="space-y-3 pt-1">
-          {/* Crater count badge */}
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground bg-secondary/50 rounded px-2 py-1">
-            <Sparkles className="w-3 h-3 text-primary" />
-            <span>{craterCount.toLocaleString()} craters generated</span>
+          {/* Freeze & crater count row */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground bg-secondary/50 rounded px-2 py-1 flex-1">
+              <Sparkles className="w-3 h-3 text-primary" />
+              <span>{craterCount.toLocaleString()} craters generated</span>
+            </div>
+            <Button
+              size="sm"
+              variant={state.frozen ? "default" : "outline"}
+              onClick={() => patch({ frozen: !state.frozen })}
+              className={cn(
+                "h-7 px-2.5 gap-1.5 text-[10px]",
+                state.frozen && "bg-primary/90 hover:bg-primary"
+              )}
+              title={state.frozen ? "Terrain is frozen — ring size/shape changes won't regenerate surface" : "Freeze terrain to lock current surface while adjusting ring dimensions"}
+            >
+              <Snowflake className={cn("w-3 h-3", state.frozen && "animate-pulse")} />
+              {state.frozen ? "Frozen" : "Freeze"}
+            </Button>
           </div>
+
+          {/* Frozen info banner */}
+          {state.frozen && (
+            <div className="flex items-center gap-2 text-[10px] text-primary/80 bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-2">
+              <Snowflake className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Terrain is frozen. Adjust ring size, width, or thickness without regenerating the surface.</span>
+            </div>
+          )}
 
           {/* Presets — visual grid with thumbnails */}
           <div className="space-y-1.5">
