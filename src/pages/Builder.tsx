@@ -381,7 +381,7 @@ function BuilderInner() {
         )}
 
         {/* Viewport */}
-        <div className="flex-1 p-0 sm:p-1 relative builder-viewport-bg">
+        <div ref={viewportContainerRef} className="flex-1 p-0 sm:p-1 relative builder-viewport-bg">
           <ViewportErrorBoundary>
             <RingViewport
               ref={viewportRef}
