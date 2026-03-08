@@ -235,25 +235,19 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
   const stlGenIdRef = useRef(0);
 
+  // Debounce lunar texture changes for STL mesh too
+  const debouncedStlLunar = useDebouncedValue(lunarTexture, 300);
+
   useEffect(() => {
-    if (!lunarTexture?.enabled) {
+    if (!debouncedStlLunar?.enabled) {
       setLunarMaps(null);
       return;
     }
     const genId = ++stlGenIdRef.current;
-    generateLunarSurfaceMapsAsync(lunarTexture, physicalAspect, undefined, () => {}).then((maps) => {
+    generateLunarSurfaceMapsAsync(debouncedStlLunar, physicalAspect, undefined, () => {}).then((maps) => {
       if (stlGenIdRef.current === genId) setLunarMaps(maps);
     });
-  }, [
-    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
-    lunarTexture?.craterDensity, lunarTexture?.craterSize,
-    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
-    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
-    lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
-    lunarTexture?.erosion, lunarTexture?.terrainRoughness,
-    lunarTexture?.craterVariation,
-    physicalAspect,
-  ]);
+  }, [debouncedStlLunar, physicalAspect]);
 
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
