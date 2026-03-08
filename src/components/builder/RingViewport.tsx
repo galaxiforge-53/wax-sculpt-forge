@@ -428,11 +428,11 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
   // Production tuning: reduced max segments for better frame rates without visible quality loss
   const isPreview = qualityTier === "preview";
   const radSegs = hasLunar
-    ? (isMobile ? (isPreview ? 96 : 192) : (isPreview ? 192 : 512))
-    : (isMobile ? (isPreview ? 32 : 48) : (isPreview ? 48 : 96));
+    ? (isMobile ? (isPreview ? 64 : 128) : (isPreview ? 128 : 384))
+    : (isMobile ? (isPreview ? 24 : 48) : (isPreview ? 48 : 96));
   const profileSteps = hasLunar
-    ? (isMobile ? (isPreview ? 24 : 48) : (isPreview ? 48 : 128))
-    : (isMobile ? (isPreview ? 8 : 12) : (isPreview ? 12 : 24));
+    ? (isMobile ? (isPreview ? 16 : 32) : (isPreview ? 32 : 96))
+    : (isMobile ? (isPreview ? 6 : 12) : (isPreview ? 12 : 24));
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];
