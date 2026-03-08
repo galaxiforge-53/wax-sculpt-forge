@@ -929,7 +929,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
@@ -942,12 +942,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3 + wearRoughnessBoost * 1.5)}
+        roughness={Math.max(0.02, Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3 + wearRoughnessBoost * 1.5 - polishRoughnessReduction * 0.8))}
         metalness={mc.metalness}
-        envMapIntensity={mc.envMapIntensity * 0.8}
-        clearcoat={Math.max(0, 0.4 * (1 - wearClearcoatLoss * 0.5))}
-        clearcoatRoughness={0.03 + wearFactor * 0.1}
-        reflectivity={mc.reflectivity}
+        envMapIntensity={mc.envMapIntensity * (0.8 + polishEnvBoost * 0.3)}
+        clearcoat={Math.min(1, Math.max(0, 0.4 * (1 - wearClearcoatLoss * 0.5) + polishClearcoatBoost * 0.4))}
+        clearcoatRoughness={Math.max(0.01, 0.03 + wearFactor * 0.1 - polishFactor * 0.02)}
+        reflectivity={Math.min(1, mc.reflectivity + polishReflectivityBoost * 0.5)}
         ior={mc.ior}
         side={THREE.FrontSide}
       />
