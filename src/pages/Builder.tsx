@@ -466,6 +466,7 @@ function BuilderInner() {
               wearPreview={wearPreview}
               polishPreview={polishPreview}
               detailBoost={detailBoost}
+              thicknessHeatmap={thicknessHeatmap}
               turntableSpeed={turntableSpeed}
               bgPreset={bgPreset}
             />

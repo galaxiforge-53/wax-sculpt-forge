@@ -2025,6 +2025,26 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </div>
           </div>
         )}
+        {/* Thickness heatmap legend */}
+        {thicknessHeatmap && (
+          <div className="absolute bottom-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200">
+            <div className="flex flex-col gap-1.5 px-3 py-2 bg-card/90 backdrop-blur-sm border border-border/60 rounded-lg shadow-lg">
+              <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Thickness Map</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-24 h-2.5 rounded-sm" style={{
+                  background: "linear-gradient(to right, #ff0000, #ff8800, #ffff00, #00ff4d, #0055ff)"
+                }} />
+              </div>
+              <div className="flex justify-between text-[7px] text-muted-foreground w-24">
+                <span>Thin (risk)</span>
+                <span>Thick (safe)</span>
+              </div>
+              <span className="text-[7px] text-destructive/70">
+                {"Red < 1.2mm = casting risk"}
+              </span>
+            </div>
+          </div>
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
