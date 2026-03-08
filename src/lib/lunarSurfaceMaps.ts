@@ -995,21 +995,20 @@ function applyValhallaConcentric(
   const centerV = 0.3 + rng() * 0.4;
   const ringCount = 4 + Math.floor(rng() * 4);
   const ringAmp = 0.03 * depthScale;
+  const ringPhaseScale = ringCount * Math.PI * 8;
+  const invW = 1 / w;
+  const invH = 1 / h;
 
   for (let y = 0; y < h; y++) {
+    const dv = y * invH - centerV;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      let du = (x / w - centerU);
-      // Wrap around circumference
+      let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
       if (du < -0.5) du += 1;
-      const dv = (y / h - centerV);
       const dist = Math.sqrt(du * du + dv * dv);
-
-      // Concentric sine waves
-      const ringPhase = dist * ringCount * Math.PI * 8;
-      const ringVal = Math.sin(ringPhase) * Math.exp(-dist * 4);
-
-      const idx = y * w + x;
+      const ringVal = Math.sin(dist * ringPhaseScale) * Math.exp(-dist * 4);
+      const idx = rowOff + x;
       hmap[idx] += ringVal * ringAmp * edgeMask[idx];
     }
   }
