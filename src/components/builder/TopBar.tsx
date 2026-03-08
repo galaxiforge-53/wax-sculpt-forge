@@ -239,6 +239,11 @@ export default function TopBar({
                 <DropdownMenuItem onClick={onSave} disabled={isSaving} className="text-xs">
                   <Save className="h-3.5 w-3.5 mr-2" /> {isSaving ? "Saving…" : "Save"}
                 </DropdownMenuItem>
+                {onShare && (
+                  <DropdownMenuItem onClick={onShare} disabled={isSharing} className="text-xs">
+                    <Share2 className="h-3.5 w-3.5 mr-2" /> {isSharing ? "Sharing…" : "Share"}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={onExport} className="text-xs">
                   <Send className="h-3.5 w-3.5 mr-2" /> Send to GalaxiForge
                 </DropdownMenuItem>
