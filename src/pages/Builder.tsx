@@ -695,7 +695,7 @@ function BuilderInner() {
                         value={ringPosition[idx].toFixed(2)}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
-                          const next: [number, number, number] = [...ringPosition];
+                          const next = [...ringPosition] as [number, number, number];
                           next[idx] = v;
                           setRingPosition(next);
                         }}
