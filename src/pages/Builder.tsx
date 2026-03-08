@@ -64,6 +64,7 @@ function BuilderInner() {
   const [wearPreview, setWearPreview] = useState(0);
   const [polishPreview, setPolishPreview] = useState(0);
   const [detailBoost, setDetailBoost] = useState(0);
+  const [thicknessHeatmap, setThicknessHeatmap] = useState(false);
   const [turntableSpeed, setTurntableSpeed] = useState(0);
   const [bgPreset, setBgPreset] = useState<BackgroundPreset>("dark-studio");
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
