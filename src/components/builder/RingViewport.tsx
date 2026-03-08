@@ -13,6 +13,7 @@ import { ImageTerrainState } from "@/types/imageTerrain";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, disposeLunarMaps, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
+import { generateImageTerrainMaps, disposeImageTerrainMaps, type ImageTerrainMapSet } from "@/lib/imageTerrainEngine";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
