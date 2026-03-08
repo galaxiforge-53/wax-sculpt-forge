@@ -1031,8 +1031,8 @@ function applyDustFill(
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH2;
-    const dustRowMask = edgeMask[rowOff]; // row-constant
-    if (dustRowMask < 0.001) continue; // skip edge rows
+    const dustRowMask = edgeRow[y];
+    if (dustRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       if (hmap[idx] >= fillLevel) continue;
