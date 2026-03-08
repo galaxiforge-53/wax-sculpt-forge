@@ -353,22 +353,40 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
             className="bg-card/95 backdrop-blur-xl border-t border-border overflow-hidden pointer-events-auto"
           >
             {/* Drag handle + close */}
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50">
-              <button onClick={cycleHeight} className="p-1 -ml-1 text-muted-foreground">
-                <GripHorizontal className="w-5 h-5" />
-              </button>
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-display">
+            <div
+              className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 cursor-grab active:cursor-grabbing touch-none"
+              onPointerDown={(e) => {
+                const startY = e.clientY;
+                const startHeight = panelHeight;
+                const onMove = (moveE: PointerEvent) => {
+                  const dy = startY - moveE.clientY;
+                  if (startHeight === "half" && dy > 60) setPanelHeight("full");
+                  else if (startHeight === "half" && dy < -60) setPanelHeight("collapsed");
+                  else if (startHeight === "full" && dy < -60) setPanelHeight("half");
+                };
+                const onUp = () => {
+                  window.removeEventListener("pointermove", onMove);
+                  window.removeEventListener("pointerup", onUp);
+                };
+                window.addEventListener("pointermove", onMove);
+                window.addEventListener("pointerup", onUp);
+              }}
+            >
+              <div className="flex-1 flex justify-center">
+                <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-display absolute left-1/2 -translate-x-1/2">
                 {TABS.find((t) => t.id === activeTab)?.label}
               </span>
               <button
                 onClick={() => setPanelHeight("collapsed")}
-                className="p-1 -mr-1 text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1 -mr-1 text-muted-foreground hover:text-foreground transition-colors relative z-10"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
             <ScrollArea className="h-[calc(100%-36px)]">
-              <div className="p-3 pb-4">
+              <div className="p-3 pb-8">
                 {contentMap[activeTab]()}
               </div>
             </ScrollArea>
