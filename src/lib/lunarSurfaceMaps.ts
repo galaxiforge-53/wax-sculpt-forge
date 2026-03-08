@@ -1859,7 +1859,9 @@ function buildMapsFromHeightmap(
   aspect: number,
   craterCount: number,
 ): LunarSurfaceMapSet {
-  const normalCanvas = heightmapToNormalCanvas(hmap, w, h, 2.5, aspect);
+  // Normal map strength scales with intensity: low intensity → subtle normals, high → sharp
+  const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
+  const normalCanvas = heightmapToNormalCanvas(hmap, w, h, normalStrength, aspect);
   const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail);
   const aoCanvas = heightmapToAOCanvas(hmap, w, h);
   const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed);
