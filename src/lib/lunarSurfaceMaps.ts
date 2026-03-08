@@ -2082,11 +2082,11 @@ export function buildHeightmap(
       const vCoord96 = yNorm * 96 * aspectCorrection;
       const vCoord200 = yNorm * 200 * aspectCorrection;
       const rowOff = y * MAP_W;
+      const regRowMask = edgeMask[rowOff]; // row-constant — hoist to skip 4096 lookups per row
+      if (regRowMask < 0.01) continue; // skip entire edge rows
 
       for (let x = 0; x < MAP_W; x++) {
         const idx = rowOff + x;
-        const mask = edgeMask[idx];
-        if (mask < 0.01) continue;
 
         const uNorm = x * invMapW;
 
@@ -2111,7 +2111,7 @@ export function buildHeightmap(
         const rv = -(uNorm * 200) * sinA + vCoord200 * cosA;
         const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
 
-        hmap[idx] += (regN + fineN * fineStrength + grain + scratch) * mask;
+        hmap[idx] += (regN + fineN * fineStrength + grain + scratch) * regRowMask;
       }
     }
   }
