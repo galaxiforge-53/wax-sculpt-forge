@@ -903,20 +903,25 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
+        roughness={Math.max(0.02, Math.min(1,
+          (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness)
+          + finishRoughMod + wearRoughnessBoost - polishRoughnessReduction
+        ))}
         metalness={mc.metalness}
         normalMap={lunarMaps?.normalMap ?? null}
         roughnessMap={lunarMaps?.roughnessMap ?? null}
         aoMap={lunarMaps?.aoMap ?? null}
         aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) : 0}
         normalScale={normalScale}
-        envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15)}
-        clearcoat={Math.max(0, (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss))}
-        clearcoatRoughness={mc.clearcoatRoughness + wearFactor * 0.15}
-        reflectivity={mc.reflectivity}
+        envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15 + polishEnvBoost)}
+        clearcoat={Math.min(1, Math.max(0,
+          (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss) + polishClearcoatBoost
+        ))}
+        clearcoatRoughness={Math.max(0.01, mc.clearcoatRoughness + wearFactor * 0.15 - polishFactor * 0.08)}
+        reflectivity={Math.min(1, mc.reflectivity + polishReflectivityBoost)}
         sheen={mc.sheen + wearSheenBoost}
         sheenColor={mc.sheenColor}
-        sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1)}
+        sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1 - polishFactor * 0.05)}
         ior={mc.ior}
         displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
         displacementScale={dispScale}
