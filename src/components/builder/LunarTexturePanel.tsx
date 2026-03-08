@@ -15,6 +15,7 @@ import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { estimateCraterCount } from "@/lib/lunarSurfaceMaps";
 import AdvancedTerrainEditor from "./AdvancedTerrainEditor";
+import SeedExplorer from "./SeedExplorer";
 
 // ── Helper: build a full LunarTextureState from partial overrides ──
 const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
