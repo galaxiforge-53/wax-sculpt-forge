@@ -337,7 +337,7 @@ function stampCrater(
   h: number,
   c: CraterStamp,
   rimSharpness: number,
-  edgeMask: Float32Array,
+  edgeRow: Float32Array,
   warpNoise: (x: number, y: number) => number,
   warpAmp: number,
   hasCentralPeak: boolean,
