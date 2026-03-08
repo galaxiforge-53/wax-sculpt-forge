@@ -516,10 +516,9 @@ function stampCrater(
         delta = effectiveRimH * 0.05 * Math.max(0, falloff);
       }
 
-      const mask = edgeMask[py * w + wpx];
+      const idx = rowOff + wpx;
+      const mask = edgeMask[idx];
       delta *= mask;
-
-      const idx = py * w + wpx;
       if (delta < 0) {
         // Allow overlapping craters to stack deeper (minimum -0.3 for realistic depth)
         // Previous clamping to 0 prevented natural multi-impact basins
