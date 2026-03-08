@@ -1779,54 +1779,43 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   const microFactor = microDetail / 100;
   const grainRng = seededRng(7777 + Math.round(microDetail));
 
-  // Compute at half resolution
   const halfRough = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
     const sy = y * 2;
+    const sy1 = Math.min(sy + 1, h - 1);
     for (let x = 0; x < hw; x++) {
       const sx = x * 2;
-      // 2×2 box filter downsample of heightmap
-      const hVal = (
-        hmap[sy * w + sx] +
-        hmap[sy * w + sx + 1] +
-        hmap[Math.min(sy + 1, h - 1) * w + sx] +
-        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
-      ) * 0.25;
+      const hVal = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
       let roughness = 0.92 - (hVal - 0.5) * 0.9;
-      if (microFactor > 0) {
-        roughness += (grainRng() - 0.5) * 0.12 * microFactor;
-      }
-      halfRough[y * hw + x] = Math.max(0.2, Math.min(1.0, roughness));
+      if (microFactor > 0) roughness += (grainRng() - 0.5) * 0.12 * microFactor;
+      halfRough[y * hw + x] = roughness < 0.2 ? 0.2 : roughness > 1.0 ? 1.0 : roughness;
     }
   }
 
-  // Bilinear upscale to full resolution
   const img = ctx.createImageData(w, h);
+  const buf32 = new Uint32Array(img.data.buffer);
   for (let y = 0; y < h; y++) {
     const fy = (y / h) * (hh - 1);
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
     const iy0 = Math.min(iy, hh - 1);
-    const iy1 = Math.min(iy + 1, hh - 1);
+    const iy1c = Math.min(iy + 1, hh - 1);
+    const yy = (h - 1 - y);
+    const outRow = yy * w;
     for (let x = 0; x < w; x++) {
       const fx = (x / w) * (hw - 1);
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
       const ix0 = ((ix) % hw + hw) % hw;
-      const ix1 = ((ix + 1) % hw + hw) % hw;
+      const ix1c = ((ix + 1) % hw + hw) % hw;
 
-      const v = Math.round((
+      const v = (
         halfRough[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfRough[iy0 * hw + ix1] * fx1 * (1 - fy1) +
-        halfRough[iy1 * hw + ix0] * (1 - fx1) * fy1 +
-        halfRough[iy1 * hw + ix1] * fx1 * fy1
-      ) * 255);
-      const yy = (h - 1 - y);
-      const idx = (yy * w + x) * 4;
-      img.data[idx] = v;
-      img.data[idx + 1] = v;
-      img.data[idx + 2] = v;
-      img.data[idx + 3] = 255;
+        halfRough[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
+        halfRough[iy1c * hw + ix0] * (1 - fx1) * fy1 +
+        halfRough[iy1c * hw + ix1c] * fx1 * fy1
+      ) * 255 + 0.5 | 0;
+      buf32[outRow + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
   ctx.putImageData(img, 0, 0);
