@@ -48,9 +48,62 @@ export interface LunarTextureState {
   // ── v7 symmetry fields ──
   symmetry?: SymmetryMode;      // how many times the pattern repeats around the ring
   symmetryBlend?: number;       // 0–100, how smoothly mirrored sections blend (0 = hard edge, 100 = gradient)
+  // ── v8 surface zones ──
+  zones?: SurfaceZone[];        // multiple texture zones across the ring width
+  zonesEnabled?: boolean;       // whether to use multi-zone rendering
 }
 
 export type SymmetryMode = "none" | "2" | "3" | "4" | "6" | "8";
+
+/** A surface zone defines texture properties for a portion of the ring's width */
+export interface SurfaceZone {
+  id: string;
+  name: string;
+  startV: number;              // 0–1, where this zone starts along the width
+  endV: number;                // 0–1, where this zone ends
+  intensity: number;           // 0–100, texture intensity for this zone
+  craterDensity: CraterDensity;
+  craterSize: CraterSize;
+  smoothness: number;          // 0–100, how smooth (0 = full texture, 100 = polished)
+  blendWidth: number;          // 0–50, percentage of zone width to blend at edges
+}
+
+export type ZonePreset = "center-smooth" | "edges-smooth" | "thirds" | "gradient" | "custom";
+
+export const DEFAULT_ZONE: SurfaceZone = {
+  id: "zone-1",
+  name: "Full Surface",
+  startV: 0,
+  endV: 1,
+  intensity: 100,
+  craterDensity: "med",
+  craterSize: "med",
+  smoothness: 0,
+  blendWidth: 10,
+};
+
+export const ZONE_PRESETS: Record<ZonePreset, SurfaceZone[]> = {
+  "center-smooth": [
+    { id: "z1", name: "Top Edge", startV: 0, endV: 0.25, intensity: 100, craterDensity: "med", craterSize: "med", smoothness: 0, blendWidth: 15 },
+    { id: "z2", name: "Center Band", startV: 0.25, endV: 0.75, intensity: 0, craterDensity: "low", craterSize: "small", smoothness: 100, blendWidth: 15 },
+    { id: "z3", name: "Bottom Edge", startV: 0.75, endV: 1, intensity: 100, craterDensity: "med", craterSize: "med", smoothness: 0, blendWidth: 15 },
+  ],
+  "edges-smooth": [
+    { id: "z1", name: "Top Edge", startV: 0, endV: 0.2, intensity: 0, craterDensity: "low", craterSize: "small", smoothness: 100, blendWidth: 10 },
+    { id: "z2", name: "Center", startV: 0.2, endV: 0.8, intensity: 100, craterDensity: "med", craterSize: "med", smoothness: 0, blendWidth: 10 },
+    { id: "z3", name: "Bottom Edge", startV: 0.8, endV: 1, intensity: 0, craterDensity: "low", craterSize: "small", smoothness: 100, blendWidth: 10 },
+  ],
+  "thirds": [
+    { id: "z1", name: "Top Third", startV: 0, endV: 0.33, intensity: 100, craterDensity: "high", craterSize: "small", smoothness: 0, blendWidth: 8 },
+    { id: "z2", name: "Middle Third", startV: 0.33, endV: 0.66, intensity: 50, craterDensity: "med", craterSize: "med", smoothness: 50, blendWidth: 8 },
+    { id: "z3", name: "Bottom Third", startV: 0.66, endV: 1, intensity: 100, craterDensity: "high", craterSize: "small", smoothness: 0, blendWidth: 8 },
+  ],
+  "gradient": [
+    { id: "z1", name: "Heavy Top", startV: 0, endV: 0.5, intensity: 100, craterDensity: "high", craterSize: "med", smoothness: 0, blendWidth: 25 },
+    { id: "z2", name: "Light Bottom", startV: 0.5, endV: 1, intensity: 30, craterDensity: "low", craterSize: "small", smoothness: 60, blendWidth: 25 },
+  ],
+  "custom": [],
+};
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   enabled: false,
