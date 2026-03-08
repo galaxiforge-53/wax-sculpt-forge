@@ -1738,6 +1738,17 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             </div>
           </div>
         )}
+        {/* Wear preview indicator */}
+        {wearPreview > 0 && (
+          <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200" style={{ top: isRotationLocked ? '3.5rem' : '0.75rem' }}>
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/15 backdrop-blur-sm border border-accent/30 rounded-lg">
+              <svg className="w-3.5 h-3.5 text-accent-foreground/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-[10px] font-medium text-accent-foreground/70">Wear Preview {wearPreview}%</span>
+            </div>
+          </div>
+        )}
         {/* Inspection mode vignette overlay */}
         {insp && (
           <div
