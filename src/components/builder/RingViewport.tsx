@@ -572,11 +572,11 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
-    const outerDiam = params.innerDiameter + 2 * params.thickness;
+    const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
     const circumference = Math.PI * outerDiam;
-    const width = params.width;
+    const width = debouncedParams.width;
     return width > 0 ? circumference / width : 1;
-  }, [params.innerDiameter, params.thickness, params.width]);
+  }, [debouncedParams.innerDiameter, debouncedParams.thickness, debouncedParams.width]);
 
   // Ring dimensions for surface-area-aware texture scaling
   const ringDims = useMemo(() => ({
