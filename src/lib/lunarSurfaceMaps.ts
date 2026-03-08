@@ -753,7 +753,11 @@ export function buildHeightmap(
   // ─── 5) Erosion pass ──
   applyErosion(hmap, MAP_W, MAP_H, erosionFactor);
 
-  // ─── 6) Micro-pitting layer ──
+  // ─── 5b) Planet-specific terrain passes ──
+  const terrainType: TerrainType = lunar.terrainType ?? "generic";
+  applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeMask, lunar.seed, depthScale, rand, physicalAspect);
+
+
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
     const pitCount = Math.floor(microPitCount * microFactor);
