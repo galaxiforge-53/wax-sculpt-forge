@@ -63,8 +63,8 @@ function BuilderInner() {
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
   const viewportContainerRef = useRef<HTMLDivElement>(null);
+  const [compareSnapshot, setCompareSnapshot] = useState<DesignSnapshot | null>(null);
   const [guidedMode, setGuidedMode] = useState(() => {
-    // Show guided mode for new users (no prior project or template)
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
     const hasProject = !!sessionStorage.getItem("openProjectId");
     return !hasTemplate && !hasProject;
