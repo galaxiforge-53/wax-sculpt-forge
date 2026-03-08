@@ -1669,31 +1669,32 @@ export function buildHeightmap(
     applySurfaceMasks(hmap, MAP_W, MAP_H, lunar.masks, lunar.maskMode ?? "include", lunar.seed);
   }
 
-  // ─── 12) Smooth edges final pass ──
-  // Separable horizontal + vertical blur for better cache coherence
-  // Previous 3×3 non-separable kernel required diagonal reads; separable is ~2× faster
+  // ─── 12) Smooth edges final pass (reuses erosion pooled buffers) ──
   if (lunar.smoothEdges) {
-    const smoothTemp = new Float32Array(hmap.length);
-    // Horizontal pass — reads are contiguous in memory
+    const len = MAP_W * MAP_H;
+    if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
+    if (!_erosionBuf2 || _erosionBuf2.length !== len) _erosionBuf2 = new Float32Array(len);
+    const smoothTemp = _erosionBuf1;
+    const smoothResult = _erosionBuf2;
+    // Horizontal pass
     for (let y = 0; y < MAP_H; y++) {
       const rowOff = y * MAP_W;
-      for (let x = 0; x < MAP_W; x++) {
-        const xl = ((x - 1) % MAP_W + MAP_W) % MAP_W;
-        const xr = ((x + 1) % MAP_W + MAP_W) % MAP_W;
-        smoothTemp[rowOff + x] = hmap[rowOff + xl] * 0.25 + hmap[rowOff + x] * 0.5 + hmap[rowOff + xr] * 0.25;
+      smoothTemp[rowOff] = hmap[rowOff + MAP_W - 1] * 0.25 + hmap[rowOff] * 0.5 + hmap[rowOff + 1] * 0.25;
+      for (let x = 1; x < MAP_W - 1; x++) {
+        smoothTemp[rowOff + x] = hmap[rowOff + x - 1] * 0.25 + hmap[rowOff + x] * 0.5 + hmap[rowOff + x + 1] * 0.25;
       }
+      smoothTemp[rowOff + MAP_W - 1] = hmap[rowOff + MAP_W - 2] * 0.25 + hmap[rowOff + MAP_W - 1] * 0.5 + hmap[rowOff] * 0.25;
     }
-    // Vertical pass on horizontally-blurred data
-    const smoothResult = new Float32Array(hmap.length);
+    // Vertical pass
     for (let y = 0; y < MAP_H; y++) {
-      const yAbove = Math.max(0, y - 1);
-      const yBelow = Math.min(MAP_H - 1, y + 1);
+      const yA = Math.max(0, y - 1);
+      const yB = Math.min(MAP_H - 1, y + 1);
+      const rowA = yA * MAP_W, rowC = y * MAP_W, rowB = yB * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
-        smoothResult[y * MAP_W + x] = smoothTemp[yAbove * MAP_W + x] * 0.25 + smoothTemp[y * MAP_W + x] * 0.5 + smoothTemp[yBelow * MAP_W + x] * 0.25;
+        smoothResult[rowC + x] = smoothTemp[rowA + x] * 0.25 + smoothTemp[rowC + x] * 0.5 + smoothTemp[rowB + x] * 0.25;
       }
     }
-    // Blend 40% smoothed for subtle effect
-    for (let i = 0; i < hmap.length; i++) {
+    for (let i = 0; i < len; i++) {
       hmap[i] = hmap[i] * 0.6 + smoothResult[i] * 0.4;
     }
   }
