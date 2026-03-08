@@ -1944,7 +1944,8 @@ export function generateLunarSurfaceMapsAsync(
 
       setTimeout(() => {
         onProgress({ stage: "normal", label: "Computing normal map…", craterCount, percent: 55 });
-        const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, 2.5, aspect);
+        const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
+        const normalCanvas = heightmapToNormalCanvas(hmap, MAP_W, MAP_H, normalStrength, aspect);
         const normalMap = new THREE.CanvasTexture(normalCanvas);
         setupDataTexture(normalMap);
 
