@@ -1747,6 +1747,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
             {/* Measurement dimension guides */}
             <MeasurementOverlay params={params} visible={viewMode === "wax-print" || !!showMeasurements} />
+
+            {/* Cross-section dimension annotations */}
+            <CrossSectionAnnotations params={params} cutawayMode={cutawayMode} engraving={engraving} />
           </group>
 
           {/* Environment bed — printer bed or workbench */}
