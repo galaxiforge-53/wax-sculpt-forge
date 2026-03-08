@@ -296,6 +296,13 @@ export default function BuilderSidebar({
                 onChange={onLunarChange}
                 onApplyPreset={onApplyLunarPreset}
                 onRandomize={onRandomizeLunar}
+                ringThickness={params.thickness}
+                onEnhanceSummary={(summary) => {
+                  toast({
+                    title: "✨ Surface Enhanced",
+                    description: summary.slice(0, 3).join(" · "),
+                  });
+                }}
               />
               <div className="border-t border-border/40 mt-3 pt-3">
                 <SubLabel>Inlays</SubLabel>
