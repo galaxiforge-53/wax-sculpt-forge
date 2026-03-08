@@ -2105,19 +2105,22 @@ export function buildHeightmap(
   // Ensures the heightmap wraps seamlessly around the ring circumference
   // Uses hermite blending in a thin strip at both edges
   {
-    const seamWidth = Math.max(4, Math.round(MAP_W * 0.008)); // ~0.8% of width = ~32px
+    const seamWidth = Math.max(4, Math.round(MAP_W * 0.008));
+    const invSeamWidth = 1 / seamWidth;
     for (let y = 0; y < MAP_H; y++) {
       const row = y * MAP_W;
       for (let dx = 0; dx < seamWidth; dx++) {
-        const t = dx / seamWidth;
-        const blend = t * t * (3 - 2 * t); // hermite smooth step
+        const t = dx * invSeamWidth;
+        const blend = t * t * (3 - 2 * t);
+        const oneMinusBlend = 1 - blend;
         const leftIdx = row + dx;
         const rightIdx = row + MAP_W - 1 - dx;
-        const avg = hmap[leftIdx] * (1 - blend) + hmap[rightIdx] * blend;
-        const avgR = hmap[rightIdx] * (1 - blend) + hmap[leftIdx] * blend;
-        // Blend toward each other at the seam
-        hmap[leftIdx] = hmap[leftIdx] * blend + avg * (1 - blend);
-        hmap[rightIdx] = hmap[rightIdx] * blend + avgR * (1 - blend);
+        const lv = hmap[leftIdx];
+        const rv = hmap[rightIdx];
+        const avg = lv * oneMinusBlend + rv * blend;
+        const avgR = rv * oneMinusBlend + lv * blend;
+        hmap[leftIdx] = lv * blend + avg * oneMinusBlend;
+        hmap[rightIdx] = rv * blend + avgR * oneMinusBlend;
       }
     }
   }
