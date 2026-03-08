@@ -1234,22 +1234,41 @@ function applySurfaceZones(
   // Sort zones by startV for predictable processing
   const sortedZones = [...zones].sort((a, b) => a.startV - b.startV);
 
+  // Pre-compute zone parameters to avoid repeated divisions in the inner loop
+  const numZones = sortedZones.length;
+  const zStartV = new Float64Array(numZones);
+  const zEndV = new Float64Array(numZones);
+  const zBlendRegion = new Float64Array(numZones);
+  const zIntensity = new Float64Array(numZones);
+  const zSmoothness = new Float64Array(numZones);
+
+  for (let z = 0; z < numZones; z++) {
+    const zone = sortedZones[z];
+    zStartV[z] = zone.startV;
+    zEndV[z] = zone.endV;
+    const zoneWidth = zone.endV - zone.startV;
+    zBlendRegion[z] = (zone.blendWidth / 100) * zoneWidth;
+    zIntensity[z] = zone.intensity / 100;
+    zSmoothness[z] = zone.smoothness / 100;
+  }
+
+  const invH = 1 / h;
+
   for (let y = 0; y < h; y++) {
-    const v = y / h; // 0 to 1 along the ring width
+    const v = y * invH;
+    const rowOff = y * w;
 
-    // Find which zone(s) this row belongs to
-    let zoneInfluence = 1.0; // Default: full texture intensity
-    let smoothnessFactor = 0; // 0 = full texture, 1 = completely smooth
+    // Pre-compute zone influence for this entire row (v is constant)
+    let zoneInfluence = 1.0;
+    let smoothnessFactor = 0;
 
-    for (const zone of sortedZones) {
-      if (v < zone.startV || v > zone.endV) continue;
+    for (let z = 0; z < numZones; z++) {
+      if (v < zStartV[z] || v > zEndV[z]) continue;
 
-      const zoneWidth = zone.endV - zone.startV;
-      const blendRegion = (zone.blendWidth / 100) * zoneWidth;
-      const posInZone = v - zone.startV;
-      const distFromEnd = zone.endV - v;
+      const blendRegion = zBlendRegion[z];
+      const posInZone = v - zStartV[z];
+      const distFromEnd = zEndV[z] - v;
 
-      // Calculate blend factor at zone edges
       let edgeBlend = 1.0;
       if (blendRegion > 0) {
         if (posInZone < blendRegion) {
@@ -1259,28 +1278,19 @@ function applySurfaceZones(
         }
       }
 
-      // Apply zone's intensity and smoothness
-      const zoneIntensity = (zone.intensity / 100) * edgeBlend;
-      const zoneSmoothness = (zone.smoothness / 100) * edgeBlend;
-
-      // Blend with existing influence (for overlapping zones)
-      zoneInfluence = zoneInfluence * (1 - edgeBlend) + zoneIntensity * edgeBlend;
-      smoothnessFactor = smoothnessFactor * (1 - edgeBlend) + zoneSmoothness * edgeBlend;
+      const zInt = zIntensity[z] * edgeBlend;
+      const zSmooth = zSmoothness[z] * edgeBlend;
+      zoneInfluence = zoneInfluence * (1 - edgeBlend) + zInt * edgeBlend;
+      smoothnessFactor = smoothnessFactor * (1 - edgeBlend) + zSmooth * edgeBlend;
     }
 
-    // Apply zone effects to this row
+    // Apply zone effects to entire row (avoiding per-pixel zone lookup)
+    const invSmooth = 1 - smoothnessFactor;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const original = hmap[idx];
-
-      // Reduce texture intensity based on zone settings
-      // As smoothness increases, flatten toward 0.5 (neutral height)
-      const flattened = 0.5 + (original - 0.5) * (1 - smoothnessFactor);
-
-      // Apply intensity reduction
-      const final = 0.5 + (flattened - 0.5) * zoneInfluence;
-
-      hmap[idx] = final;
+      const flattened = 0.5 + (original - 0.5) * invSmooth;
+      hmap[idx] = 0.5 + (flattened - 0.5) * zoneInfluence;
     }
   }
 }
