@@ -687,6 +687,18 @@ function BuilderInner() {
                       </p>
                     </div>
                   </div>
+                  {/* Thickness heatmap toggle */}
+                  <button
+                    onClick={() => setThicknessHeatmap(v => !v)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${thicknessHeatmap
+                        ? "bg-destructive/20 text-destructive border border-destructive/40 shadow-[0_0_8px_hsl(var(--destructive)/0.2)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title="Thickness heatmap — shows thin/thick areas for casting safety"
+                  >
+                    <Thermometer className="w-3 h-3" />
+                  </button>
                   <button
                     onClick={() => {
                       setShowPrinterBed((v) => !v);
