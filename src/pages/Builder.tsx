@@ -254,6 +254,37 @@ function BuilderInner() {
     setForgeModalOpen(true);
   };
 
+  const handleShare = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please sign in to share designs.", variant: "destructive" });
+      return;
+    }
+    setIsSharing(true);
+    try {
+      const castStages = ["POUR", "QUENCH", "FINISH"];
+      const captureMode: ViewMode = castStages.includes(pipelineState.currentStage) ? "cast" : viewMode;
+      const previews = await capturePreviewsAsync(captureMode);
+      const pkg = generateDesignPackage();
+      pkg.previews = previews;
+      const anglePrev = previews.find((p) => p.id === "angle");
+      const thumbnail = anglePrev?.dataUrl ?? previews[0]?.dataUrl ?? null;
+      const name = currentProjectName || "Shared Ring Design";
+
+      const { shareUrl } = await createShareLink(user.id, name, pkg, thumbnail);
+
+      await navigator.clipboard.writeText(shareUrl);
+      toast({
+        title: "Share Link Copied! 🔗",
+        description: "Anyone with this link can view and customize your design.",
+      });
+    } catch (err: any) {
+      console.error("Share error:", err);
+      toast({ title: "Share Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   const guidedContent = (
     <GuidedWorkflow
       params={params}
