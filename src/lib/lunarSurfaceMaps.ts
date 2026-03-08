@@ -197,27 +197,25 @@ function lerp(a: number, b: number, t: number) { return a + t * (b - a); }
 // This mask is always MAP_W × MAP_H and only depends on dimensions,
 // so we build it once and reuse across all heightmap generations.
 
-let _cachedEdgeMask: Float32Array | null = null;
-let _cachedEdgeMaskW = 0;
-let _cachedEdgeMaskH = 0;
+// Edge mask is row-constant — store as a 1D per-row array (4KB vs 16MB).
+// Every consumer indexes by row: edgeRow[y] instead of edgeMask[y*w].
+let _cachedEdgeRow: Float32Array | null = null;
+let _cachedEdgeRowH = 0;
 
-function buildEdgeMask(w: number, h: number): Float32Array {
-  if (_cachedEdgeMask && _cachedEdgeMaskW === w && _cachedEdgeMaskH === h) {
-    return _cachedEdgeMask;
+function buildEdgeRow(h: number): Float32Array {
+  if (_cachedEdgeRow && _cachedEdgeRowH === h) {
+    return _cachedEdgeRow;
   }
-  const mask = new Float32Array(w * h);
+  const row = new Float32Array(h);
+  const invHm1 = 1 / (h - 1);
   for (let y = 0; y < h; y++) {
-    const v = y / (h - 1);
-    const edgeDist = Math.min(v, 1 - v);
-    const m = smoothstep(0.0, 0.18, edgeDist);
-    // Fill entire row with same value (row-constant mask)
-    const rowStart = y * w;
-    mask.fill(m, rowStart, rowStart + w);
+    const v = y * invHm1;
+    const edgeDist = v < 0.5 ? v : 1 - v;
+    row[y] = smoothstep(0.0, 0.18, edgeDist);
   }
-  _cachedEdgeMask = mask;
-  _cachedEdgeMaskW = w;
-  _cachedEdgeMaskH = h;
-  return mask;
+  _cachedEdgeRow = row;
+  _cachedEdgeRowH = h;
+  return row;
 }
 
 // ── Crater shape distance function ────────────────────────────────
@@ -339,7 +337,7 @@ function stampCrater(
   h: number,
   c: CraterStamp,
   rimSharpness: number,
-  edgeMask: Float32Array,
+  edgeRow: Float32Array,
   warpNoise: (x: number, y: number) => number,
   warpAmp: number,
   hasCentralPeak: boolean,
@@ -410,8 +408,7 @@ function stampCrater(
 
   for (let py = y0; py <= y1; py++) {
     const rowOff = py * w;
-    // Edge mask is row-constant — hoist to avoid per-pixel lookups on 16MB array
-    const rowMask = edgeMask[rowOff];
+    const rowMask = edgeRow[py];
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
@@ -429,7 +426,14 @@ function stampCrater(
 
       let dist: number, wdu: number, wdv: number;
 
-      if (isCircular) {
+      // Skip expensive domain warp for small craters (tier 3+) — they're too small
+      // for warp to be perceptible. Saves ~4 noise calls × ~160M pixels.
+      if (c.tier >= 3) {
+        // Simple Euclidean — no warp noise
+        dist = Math.sqrt(du * du + dv * dv);
+        wdu = du;
+        wdv = dv;
+      } else if (isCircular) {
         // Fast path for circular craters: skip shape transformation, only do domain warp
         const pxInvW = px * invW;
         const pyInvH = py * invH;
@@ -549,7 +553,7 @@ function stampEjectaRays(
   h: number,
   c: CraterStamp,
   rand: () => number,
-  edgeMask: Float32Array,
+  edgeRow: Float32Array,
   secondaryStamps: CraterStamp[],
   physicalAspect: number = 1,
   ejectaStrength: number = 0.5,
@@ -589,7 +593,7 @@ function stampEjectaRays(
       const jitter = rayWidth * w;
       const jCeil = Math.ceil(jitter);
       const pyRow = py * w;
-      const ejectaRowMask = edgeMask[pyRow]; // row-constant
+      const ejectaRowMask = edgeRow[py];
       for (let j = -jCeil; j <= jCeil; j++) {
         let wpx = (px + j) % w;
         if (wpx < 0) wpx += w;
@@ -627,7 +631,7 @@ function stampEjectaRays(
 // ── Maria fill pass ──────────────────────────────────────────────
 // Simulates dark smooth plains that fill low-lying areas
 
-function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeMask: Float32Array, seed: number) {
+function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeRow: Float32Array, seed: number) {
   if (mariaFactor <= 0) return;
 
   // Approximate percentile via random sampling (O(k) instead of O(n log n) full sort)
@@ -650,8 +654,8 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH6;
-    const mariaRowMask = edgeMask[rowOff]; // row-constant
-    if (mariaRowMask < 0.001) continue; // skip edge rows entirely
+    const mariaRowMask = edgeRow[y];
+    if (mariaRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       const hVal = hmap[idx];
@@ -667,7 +671,7 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
 // ── Highland ridges pass ─────────────────────────────────────────
 // Adds raised ridge networks using directional fBm
 
-function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeMask: Float32Array, seed: number, depthScale: number, physicalAspect: number = 1) {
+function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeRow: Float32Array, seed: number, depthScale: number, physicalAspect: number = 1) {
   if (ridgeFactor <= 0) return;
 
   const ridgeNoise = makeNoise2D(seed + 7500);
@@ -679,8 +683,8 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   for (let y = 0; y < h; y++) {
     const v = y * invH;
     const rowOff = y * w;
-    const ridgeRowMask = edgeMask[rowOff]; // row-constant
-    if (ridgeRowMask < 0.01) continue; // skip entire edge rows — eliminates ~4096 iterations per skipped row
+    const ridgeRowMask = edgeRow[y];
+    if (ridgeRowMask < 0.01) continue;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       const u = x * invW;
@@ -781,7 +785,7 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
 function applyTerrainType(
   hmap: Float32Array, w: number, h: number,
   terrainType: TerrainType,
-  edgeMask: Float32Array, seed: number,
+  edgeRow: Float32Array, seed: number,
   depthScale: number, rand: () => number,
   physicalAspect: number,
 ) {
@@ -789,31 +793,31 @@ function applyTerrainType(
 
   switch (terrainType) {
     case "mercurian":
-      applyLobateScarps(hmap, w, h, edgeMask, seed, depthScale);
+      applyLobateScarps(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "phobos":
-      applyPhobosGrooves(hmap, w, h, edgeMask, seed, depthScale, rand);
+      applyPhobosGrooves(hmap, w, h, edgeRow, seed, depthScale, rand);
       break;
 
     case "europa":
-      applyIceFractures(hmap, w, h, edgeMask, seed, depthScale);
+      applyIceFractures(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "lunar":
-      applyLunarRayBrightening(hmap, w, h, edgeMask, seed, depthScale);
+      applyLunarRayBrightening(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "martian":
-      applyDustFill(hmap, w, h, edgeMask, seed, depthScale);
+      applyDustFill(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "callisto":
-      applyValhallaConcentric(hmap, w, h, edgeMask, seed, depthScale);
+      applyValhallaConcentric(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "titan":
-      applyOrganicDunes(hmap, w, h, edgeMask, seed, depthScale);
+      applyOrganicDunes(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "deimos":
@@ -821,7 +825,7 @@ function applyTerrainType(
       break;
 
     case "asteroid":
-      applyAsteroidRubble(hmap, w, h, edgeMask, seed, depthScale, rand, physicalAspect);
+      applyAsteroidRubble(hmap, w, h, edgeRow, seed, depthScale, rand, physicalAspect);
       break;
   }
 }
@@ -830,7 +834,7 @@ function applyTerrainType(
 
 function applyLobateScarps(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const scarpNoise = makeNoise2D(seed + 10001);
   const scarpCount = 3 + Math.floor(seededRng(seed + 10002)() * 4);
@@ -867,11 +871,12 @@ function applyLobateScarps(
         const idx = py * w + wpx;
         const dist = Math.abs(dy) / halfWidthPx;
 
+        const eMask = edgeRow[py];
         if (dy < 0) {
           const rise = (1 - dist) * (1 - dist);
-          hmap[idx] += scarpHeight * rise * edgeMask[idx] * fadeT;
+          hmap[idx] += scarpHeight * rise * eMask * fadeT;
         } else {
-          hmap[idx] += scarpHeight * 0.3 * (1 - dist) * edgeMask[idx] * fadeT;
+          hmap[idx] += scarpHeight * 0.3 * (1 - dist) * eMask * fadeT;
         }
       }
     }
@@ -882,7 +887,7 @@ function applyLobateScarps(
 
 function applyPhobosGrooves(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
   rand: () => number,
 ) {
   const grooveCount = 8 + Math.floor(rand() * 12);
@@ -910,7 +915,7 @@ function applyPhobosGrooves(
         const idx = py * w + x;
         const dist = Math.abs(dy) * invWidthPx;
         const profile = (1 - dist * dist);
-        hmap[idx] -= grooveDepth * profile * edgeMask[idx];
+        hmap[idx] -= grooveDepth * profile * edgeRow[py];
       }
     }
   }
@@ -920,7 +925,7 @@ function applyPhobosGrooves(
 
 function applyIceFractures(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const fractureRng = seededRng(seed + 12001);
   const fractureNoise = makeNoise2D(seed + 12002);
@@ -961,11 +966,12 @@ function applyIceFractures(
         const idx = py * w + wpx;
         const dist = Math.abs(dy) * invWidthPx;
 
+        const eFrac = edgeRow[py];
         if (dist < 1.0) {
-          hmap[idx] -= depth * (1 - dist * dist) * edgeMask[idx];
+          hmap[idx] -= depth * (1 - dist * dist) * eFrac;
         } else if (dist < 2.0) {
           const ridgeDist = dist - 1.0;
-          hmap[idx] += ridgeHeight * (1 - ridgeDist) * (1 - ridgeDist) * edgeMask[idx];
+          hmap[idx] += ridgeHeight * (1 - ridgeDist) * (1 - ridgeDist) * eFrac;
         }
       }
     }
@@ -979,7 +985,7 @@ function applyIceFractures(
 
 function applyLunarRayBrightening(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const rayNoise = makeNoise2D(seed + 13001);
   const rayAmp = 0.015 * depthScale;
@@ -989,8 +995,8 @@ function applyLunarRayBrightening(
   for (let y = 0; y < h; y++) {
     const v05 = y * invH * 0.5;
     const rowOff = y * w;
-    const rayRowMask = edgeMask[rowOff]; // row-constant
-    if (rayRowMask < 0.001) continue; // skip edge rows
+    const rayRowMask = edgeRow[y];
+    if (rayRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const u3 = x * invW * 3;
       const n = rayNoise(u3, v05);
@@ -1006,7 +1012,7 @@ function applyLunarRayBrightening(
 
 function applyDustFill(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const dustNoise = makeNoise2D(seed + 14001);
   const sampleCount = 2000;
@@ -1025,8 +1031,8 @@ function applyDustFill(
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH2;
-    const dustRowMask = edgeMask[rowOff]; // row-constant
-    if (dustRowMask < 0.001) continue; // skip edge rows
+    const dustRowMask = edgeRow[y];
+    if (dustRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       if (hmap[idx] >= fillLevel) continue;
@@ -1042,7 +1048,7 @@ function applyDustFill(
 
 function applyValhallaConcentric(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const rng = seededRng(seed + 15001);
   const centerU = 0.3 + rng() * 0.4;
@@ -1069,8 +1075,8 @@ function applyValhallaConcentric(
     const dv = y * invH - centerV;
     const dv2 = dv * dv;
     const rowOff = y * w;
-    const valhallaRowMask = edgeMask[rowOff]; // row-constant
-    if (valhallaRowMask < 0.001) continue; // skip edge rows
+    const valhallaRowMask = edgeRow[y];
+    if (valhallaRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
@@ -1087,7 +1093,7 @@ function applyValhallaConcentric(
 
 function applyOrganicDunes(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const duneNoise = makeNoise2D(seed + 16001);
   const duneNoise2 = makeNoise2D(seed + 16002);
@@ -1101,8 +1107,8 @@ function applyOrganicDunes(
     const v3 = v * 3;
     const v5 = v * 5;
     const rowOff = y * w;
-    const duneRowMask = edgeMask[rowOff]; // row-constant — hoist to avoid per-pixel lookups
-    if (duneRowMask < 0.001) continue; // skip edge rows entirely
+    const duneRowMask = edgeRow[y];
+    if (duneRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const u = x * invW;
       const u8 = u * 8;
@@ -1121,7 +1127,7 @@ function applyOrganicDunes(
 
 function applyAsteroidRubble(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
   rand: () => number, physicalAspect: number,
 ) {
   const rubbleNoise = makeNoise2D(seed + 17001);
@@ -1136,8 +1142,8 @@ function applyAsteroidRubble(
     const vn10 = y * invH_rubble * 10 * aspectCorr;
     const vn35 = y * invH_rubble * 35 * aspectCorr;
     const rowOff = y * w;
-    const rubbleRowMask = edgeMask[rowOff]; // row-constant
-    if (rubbleRowMask < 0.01) continue; // skip entire edge rows
+    const rubbleRowMask = edgeRow[y];
+    if (rubbleRowMask < 0.01) continue;
 
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
@@ -1185,7 +1191,7 @@ function applyAsteroidRubble(
         const falloff = 1 - d * d;
         const ff = falloff > 0 ? falloff : 0;
         const idx = rowOff + wpx;
-        hmap[idx] += bh * ff * ff * edgeMask[idx];
+        hmap[idx] += bh * ff * ff * edgeRow[py];
       }
     }
   }
@@ -1224,7 +1230,7 @@ function applyAsteroidRubble(
         const falloff = 1 - d2 * invPxR2;
         if (falloff <= 0) continue;
         const idx = rowOff + wpx;
-        hmap[idx] -= pd * falloff * edgeMask[idx];
+        hmap[idx] -= pd * falloff * edgeRow[py];
       }
     }
   }
@@ -1647,7 +1653,7 @@ export function buildHeightmap(
   const layerMedium = (lunar.layerMediumImpacts ?? 50) / 50;
   const layerMicro = (lunar.layerMicroPitting ?? 50) / 50;
 
-  const edgeMask = buildEdgeMask(MAP_W, MAP_H);
+  const edgeRow = buildEdgeRow(MAP_H);
 
   // ─── 1) fBm base terrain layer (computed at half-res, then upscaled) ──
   // 6-octave fBm is the most expensive per-pixel operation. Since it produces
@@ -1682,7 +1688,7 @@ export function buildHeightmap(
       const row0 = iy0 * halfW;
       const row1 = iy1 * halfW;
       const outRow = y * MAP_W;
-      const baseRowMask = edgeMask[outRow]; // row-constant — hoist to avoid 4096 lookups per row
+      const baseRowMask = edgeRow[y];
       for (let x = 0; x < MAP_W; x++) {
         const fx = x * invMapW_halfW;
         const ix = Math.floor(fx);
@@ -1700,7 +1706,7 @@ export function buildHeightmap(
   }
 
   // ─── 1b) Highland ridges layer ──
-  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeMask, lunar.seed, depthScale, physicalAspect);
+  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeRow, lunar.seed, depthScale, physicalAspect);
 
   // ─── 2) Domain warp noise ──
   const warpNoise = makeNoise2D(lunar.seed + 1234);
@@ -1827,7 +1833,7 @@ export function buildHeightmap(
     const hasPeak = s.tier <= 1;
     const hasTerraces = s.tier === 0;
     stampCrater(
-      hmap, MAP_W, MAP_H, s, rimSharp, edgeMask, warpNoise, warpAmp,
+      hmap, MAP_W, MAP_H, s, rimSharp, edgeRow, warpNoise, warpAmp,
       hasPeak, hasTerraces, physicalAspect,
       shapeMode, ovalElong, floorNoise,
     );
@@ -1835,7 +1841,7 @@ export function buildHeightmap(
     // Ejecta rays for mega + hero
     if (s.tier <= 1) {
       stampEjectaRays(
-        hmap, MAP_W, MAP_H, s, rand, edgeMask, secondaryStamps,
+        hmap, MAP_W, MAP_H, s, rand, edgeRow, secondaryStamps,
         physicalAspect, ejectaFactor, shapeMode, ovalElong, globalOvalAngle,
       );
     }
@@ -1844,7 +1850,7 @@ export function buildHeightmap(
   // Stamp secondary impact chains from ejecta
   for (const sec of secondaryStamps) {
     stampCrater(
-      hmap, MAP_W, MAP_H, sec, rimSharp, edgeMask, warpNoise, warpAmp,
+      hmap, MAP_W, MAP_H, sec, rimSharp, edgeRow, warpNoise, warpAmp,
       false, false, physicalAspect,
       shapeMode, ovalElong, floorNoise,
     );
@@ -1917,7 +1923,7 @@ export function buildHeightmap(
   }
 
   // ─── 4) Maria fill pass ──
-  applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeMask, lunar.seed);
+  applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeRow, lunar.seed);
 
   // ─── 5) Erosion pass — age-dependent: large old craters erode more, small fresh stay sharp ──
   // First pass: global erosion for base weathering
@@ -1997,7 +2003,7 @@ export function buildHeightmap(
 
   // ─── 5b) Planet-specific terrain passes ──
   const terrainType: TerrainType = lunar.terrainType ?? "generic";
-  applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeMask, lunar.seed, depthScale, rand, physicalAspect);
+  applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeRow, lunar.seed, depthScale, rand, physicalAspect);
 
 
   // ─── 6) Combined micro-detail pass (pits + regolith + grain in one traversal) ──
@@ -2032,7 +2038,7 @@ export function buildHeightmap(
       const invPxR2 = 1 / pxR2;
       for (let py = y0; py <= y1; py++) {
         const rowOff_pit = py * MAP_W;
-        const pitRowMask = edgeMask[rowOff_pit]; // row-constant
+        const pitRowMask = edgeRow[py];
         const dv = (py - pvH) * aspectRatio;
         const dv2 = dv * dv;
         if (dv2 > pxR2) continue;
@@ -2099,8 +2105,8 @@ export function buildHeightmap(
       const vCoord96 = yNorm * 96 * aspectCorrection;
       const vCoord200 = yNorm * 200 * aspectCorrection;
       const rowOff = y * MAP_W;
-      const regRowMask = edgeMask[rowOff]; // row-constant — hoist to skip 4096 lookups per row
-      if (regRowMask < 0.01) continue; // skip entire edge rows
+      const regRowMask = edgeRow[y];
+      if (regRowMask < 0.01) continue;
 
       for (let x = 0; x < MAP_W; x++) {
         const idx = rowOff + x;
