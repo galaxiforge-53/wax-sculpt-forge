@@ -573,53 +573,56 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   }
 }
 
-// ── Erosion pass ──────────────────────────────────────────────────
+// ── Erosion pass (with pooled temp buffers) ──────────────────────
+
+// Module-level buffer pool to avoid repeated allocation of large Float32Arrays
+let _erosionBuf1: Float32Array | null = null;
+let _erosionBuf2: Float32Array | null = null;
 
 function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: number) {
   if (erosionFactor <= 0) return;
 
-  // Separable box blur — O(n*2k) instead of O(n*k²)
+  const len = w * h;
+  // Reuse pooled buffers if right size, otherwise allocate
+  if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
+  if (!_erosionBuf2 || _erosionBuf2.length !== len) _erosionBuf2 = new Float32Array(len);
+  const temp = _erosionBuf1;
+  const blurred = _erosionBuf2;
+
   const kernelR = Math.max(1, Math.round(2 + erosionFactor * 4));
   const kernelSize = kernelR * 2 + 1;
-  const temp = new Float32Array(hmap.length);
+  const invKernel = 1 / kernelSize;
 
   // Horizontal pass
   for (let y = 0; y < h; y++) {
     let sum = 0;
-    // Initialize window
     for (let kx = -kernelR; kx <= kernelR; kx++) {
-      const sx = ((kx % w) + w) % w;
-      sum += hmap[y * w + sx];
+      sum += hmap[y * w + ((kx % w) + w) % w];
     }
-    temp[y * w + 0] = sum / kernelSize;
+    temp[y * w] = sum * invKernel;
     for (let x = 1; x < w; x++) {
-      const addX = ((x + kernelR) % w + w) % w;
-      const removeX = ((x - kernelR - 1) % w + w) % w;
-      sum += hmap[y * w + addX] - hmap[y * w + removeX];
-      temp[y * w + x] = sum / kernelSize;
+      sum += hmap[y * w + ((x + kernelR) % w + w) % w] - hmap[y * w + ((x - kernelR - 1) % w + w) % w];
+      temp[y * w + x] = sum * invKernel;
     }
   }
 
   // Vertical pass
-  const blurred = new Float32Array(hmap.length);
   for (let x = 0; x < w; x++) {
     let sum = 0;
     for (let ky = -kernelR; ky <= kernelR; ky++) {
-      const sy = Math.max(0, Math.min(h - 1, ky));
-      sum += temp[sy * w + x];
+      sum += temp[Math.max(0, Math.min(h - 1, ky)) * w + x];
     }
-    blurred[x] = sum / kernelSize;
+    blurred[x] = sum * invKernel;
     for (let y = 1; y < h; y++) {
-      const addY = Math.min(h - 1, y + kernelR);
-      const removeY = Math.max(0, y - kernelR - 1);
-      sum += temp[addY * w + x] - temp[removeY * w + x];
-      blurred[y * w + x] = sum / kernelSize;
+      sum += temp[Math.min(h - 1, y + kernelR) * w + x] - temp[Math.max(0, y - kernelR - 1) * w + x];
+      blurred[y * w + x] = sum * invKernel;
     }
   }
 
   const blend = erosionFactor * 0.6;
-  for (let i = 0; i < hmap.length; i++) {
-    hmap[i] = lerp(hmap[i], blurred[i], blend);
+  const oneMinusBlend = 1 - blend;
+  for (let i = 0; i < len; i++) {
+    hmap[i] = hmap[i] * oneMinusBlend + blurred[i] * blend;
   }
 }
 
