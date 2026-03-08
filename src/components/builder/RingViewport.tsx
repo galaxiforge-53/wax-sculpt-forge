@@ -332,14 +332,15 @@ function LunarSTLMesh({ params, viewMode, metalPreset, finishPreset, lunarTextur
 }
 
 // ── Build solid ring geometry with separate outer, inner, and cap surfaces ──
-function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean) {
+function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMobile: boolean = false) {
   const innerR = params.innerDiameter / 2 / 10;
   const outerR = innerR + params.thickness / 10;
   const halfW = params.width / 2 / 10;
   const bevel = params.bevelSize / 10;
 
-  const radSegs = hasLunar ? 768 : 128;
-  const profileSteps = hasLunar ? 192 : 32;
+  // Adaptive segments: lower on mobile to keep frame rates smooth
+  const radSegs = hasLunar ? (isMobile ? 256 : 768) : (isMobile ? 64 : 128);
+  const profileSteps = hasLunar ? (isMobile ? 64 : 192) : (isMobile ? 16 : 32);
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];
