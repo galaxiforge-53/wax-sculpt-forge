@@ -183,6 +183,7 @@ export default function Export() {
       );
 
       // 2. Upload STL to storage
+      setSubmitStep("uploading-stl");
       const stlPath = `${basePath}/ring-${confirmSize}US-${pkg.parameters.width}mm.stl`;
       const { error: stlErr } = await supabase.storage
         .from("production-assets")
