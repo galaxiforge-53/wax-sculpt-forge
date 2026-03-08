@@ -985,8 +985,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedImgTerrain]);
 
-  // ── Choose active surface maps: image terrain takes priority over lunar ──
-  const activeMaps = hasImageTerrain && imgTerrainMaps ? imgTerrainMaps : lunarMaps;
+  // ── Choose active surface maps: blend or prioritize ──
+  const planetaryBlend = imageTerrain?.planetaryBlend ?? 0;
+  const shouldBlend = hasImageTerrain && imgTerrainMaps && hasLunar && lunarMaps && planetaryBlend > 0;
+  const activeMaps = shouldBlend ? imgTerrainMaps : (hasImageTerrain && imgTerrainMaps ? imgTerrainMaps : lunarMaps);
   const hasActiveSurface = hasLunar || hasImageTerrain;
 
   // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
