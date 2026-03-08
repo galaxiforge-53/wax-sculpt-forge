@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Shield,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
