@@ -132,7 +132,40 @@ function makeNoise2D(seed: number) {
 
 // ── fBm ───────────────────────────────────────────────────────────
 
+// Optimized fBm with unrolled common octave counts (4, 5, 6)
+// Avoids loop overhead + branch prediction misses on 50M+ calls
 function fbm(noise: (x: number, y: number) => number, x: number, y: number, octaves: number, lacunarity: number, gain: number): number {
+  // Unrolled fast paths for most common octave counts
+  if (octaves === 4 && lacunarity === 2.0 && gain === 0.5) {
+    const n0 = noise(x, y);
+    const n1 = noise(x * 2, y * 2) * 0.5;
+    const n2 = noise(x * 4, y * 4) * 0.25;
+    const n3 = noise(x * 8, y * 8) * 0.125;
+    return (n0 + n1 + n2 + n3) / 1.875;
+  }
+  if (octaves === 6 && lacunarity === 2.0 && gain === 0.5) {
+    const n0 = noise(x, y);
+    const n1 = noise(x * 2, y * 2) * 0.5;
+    const n2 = noise(x * 4, y * 4) * 0.25;
+    const n3 = noise(x * 8, y * 8) * 0.125;
+    const n4 = noise(x * 16, y * 16) * 0.0625;
+    const n5 = noise(x * 32, y * 32) * 0.03125;
+    return (n0 + n1 + n2 + n3 + n4 + n5) / 1.96875;
+  }
+  if (octaves === 5) {
+    let sum = 0, amp = 1, freq = 1, maxAmp = 0;
+    sum += noise(x, y); maxAmp += 1;
+    amp *= gain; freq *= lacunarity;
+    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
+    amp *= gain; freq *= lacunarity;
+    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
+    amp *= gain; freq *= lacunarity;
+    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
+    amp *= gain; freq *= lacunarity;
+    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
+    return sum / maxAmp;
+  }
+  // General fallback
   let sum = 0, amp = 1, freq = 1, maxAmp = 0;
   for (let i = 0; i < octaves; i++) {
     sum += noise(x * freq, y * freq) * amp;
