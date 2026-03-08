@@ -68,6 +68,7 @@ export function useRingDesign() {
   const [inlays, setInlays] = useState<InlayChannel[]>([]);
   const [lunarTexture, setLunarTextureRaw] = useState<LunarTextureState>(DEFAULT_LUNAR_TEXTURE);
   const [engraving, setEngravingRaw] = useState<EngravingState>(DEFAULT_ENGRAVING);
+  const [imageTerrain, setImageTerrainRaw] = useState<ImageTerrainState>(DEFAULT_IMAGE_TERRAIN);
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     type: "dent",
     radiusMm: 1.2,
