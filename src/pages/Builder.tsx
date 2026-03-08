@@ -35,6 +35,7 @@ import SEOHead from "@/components/SEOHead";
 import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
 import PreferencesPanel from "@/components/builder/PreferencesPanel";
 import { cn } from "@/lib/utils";
+import { useAutosave, loadAutosave, clearAutosave } from "@/hooks/useAutosave";
 
 function BuilderInner() {
   const navigate = useNavigate();
