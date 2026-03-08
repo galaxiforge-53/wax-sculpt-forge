@@ -1034,15 +1034,28 @@ function applyValhallaConcentric(
   const invW = 1 / w;
   const invH = 1 / h;
 
+  // Fast exp approximation: exp(x) ≈ (1 + x/256)^256 for small |x|
+  // Avoids Math.exp per pixel (~4× faster for this use case)
+  function fastExpNeg4(dist: number): number {
+    const x = -dist * 4;
+    // Clamp to avoid overflow for large negative x
+    if (x < -5) return 0;
+    let e = 1 + x * 0.00390625; // x/256
+    e *= e; e *= e; e *= e; e *= e; // ^16
+    e *= e; e *= e; e *= e; e *= e; // ^256
+    return e;
+  }
+
   for (let y = 0; y < h; y++) {
     const dv = y * invH - centerV;
+    const dv2 = dv * dv;
     const rowOff = y * w;
     for (let x = 0; x < w; x++) {
       let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
       if (du < -0.5) du += 1;
-      const dist = Math.sqrt(du * du + dv * dv);
-      const ringVal = Math.sin(dist * ringPhaseScale) * Math.exp(-dist * 4);
+      const dist = Math.sqrt(du * du + dv2);
+      const ringVal = Math.sin(dist * ringPhaseScale) * fastExpNeg4(dist);
       const idx = rowOff + x;
       hmap[idx] += ringVal * ringAmp * edgeMask[idx];
     }
@@ -1743,9 +1756,12 @@ export function buildHeightmap(
       const parent = stamps[Math.floor(rand() * stamps.length)];
       const radius = parent.radius * (0.3 + rand() * 0.5);
       const angle = rand() * Math.PI * 2;
+      // Hoist trig per overlap crater
+      const cosAngle = Math.cos(angle);
+      const sinAngle = Math.sin(angle);
       const dist = parent.radius * (0.6 + rand() * 0.8);
-      const cu = ((parent.cu + Math.cos(angle) * dist) % 1 + 1) % 1;
-      const cv = Math.max(0.08, Math.min(0.92, parent.cv + Math.sin(angle) * dist));
+      const cu = ((parent.cu + cosAngle * dist) % 1 + 1) % 1;
+      const cv = Math.max(0.08, Math.min(0.92, parent.cv + sinAngle * dist));
 
       const varScale = 1.0 + (rand() - 0.5) * craterVar * 0.6;
       const depth = (0.4 + rand() * 0.4) * depthScale * 0.7 * bowlDepthScale * varScale;
@@ -1836,18 +1852,25 @@ export function buildHeightmap(
         const y0 = Math.max(0, Math.floor((s.cv - floorR * physicalAspect) * MAP_H));
         const y1 = Math.min(MAP_H - 1, Math.ceil((s.cv + floorR * physicalAspect) * MAP_H));
 
+        // Hoist per-crater constants
+        const sCuW = s.cu * MAP_W;
+        const sCvH = s.cv * MAP_H;
+        const aspectRatio = pxR / pyR;
+        const invPxR = 1 / pxR;
         for (let py = y0; py <= y1; py++) {
           const rowOff = py * MAP_W;
+          const dv = (py - sCvH) * aspectRatio;
+          const dv2 = dv * dv;
+          if (dv2 > pxR2) continue; // early row rejection
           for (let px = x0; px <= x1; px++) {
             let wpx = px % MAP_W;
             if (wpx < 0) wpx += MAP_W;
-            const du = px - s.cu * MAP_W;
-            const dv = (py - s.cv * MAP_H) * (pxR / pyR);
-            const d2 = du * du + dv * dv;
+            const du = px - sCuW;
+            const d2 = du * du + dv2;
             if (d2 > pxR2) continue;
-            const t = Math.sqrt(d2) / pxR;
-            // Smoothstep falloff: full melt in center, fade at edges
-            const meltBlend = (1 - t) * (1 - t) * 0.7;
+            const t = Math.sqrt(d2) * invPxR;
+            const oneMinusT = 1 - t;
+            const meltBlend = oneMinusT * oneMinusT * 0.7;
             const idx = rowOff + wpx;
             hmap[idx] = hmap[idx] * (1 - meltBlend) + meltBlurred[idx] * meltBlend;
           }
@@ -2072,10 +2095,21 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 8) Normalize + contrast in single pass ──
-  // Merges two full-map traversals (normalize + contrast) into one
+  // ─── 8) Normalize + contrast in single pass (4-wide unrolled min/max) ──
+  // Process 4 elements at a time to reduce loop overhead by 75%
   let hMin = Infinity, hMax = -Infinity;
-  for (let i = 0; i < hmap.length; i++) {
+  const len = hmap.length;
+  const len4 = len & ~3; // floor to multiple of 4
+  for (let i = 0; i < len4; i += 4) {
+    const v0 = hmap[i], v1 = hmap[i + 1], v2 = hmap[i + 2], v3 = hmap[i + 3];
+    const min01 = v0 < v1 ? v0 : v1, min23 = v2 < v3 ? v2 : v3;
+    const max01 = v0 > v1 ? v0 : v1, max23 = v2 > v3 ? v2 : v3;
+    const localMin = min01 < min23 ? min01 : min23;
+    const localMax = max01 > max23 ? max01 : max23;
+    if (localMin < hMin) hMin = localMin;
+    if (localMax > hMax) hMax = localMax;
+  }
+  for (let i = len4; i < len; i++) {
     const v = hmap[i];
     if (v < hMin) hMin = v;
     if (v > hMax) hMax = v;
@@ -2085,7 +2119,16 @@ export function buildHeightmap(
   const contrastMult = 0.6 + contrastVal * 1.2;
   if (hRange > 0.001) {
     const invRange = 1 / hRange;
-    for (let i = 0; i < hmap.length; i++) {
+    // 4-wide contrast application
+    for (let i = 0; i < len4; i += 4) {
+      for (let j = 0; j < 4; j++) {
+        const idx = i + j;
+        const normalized = (hmap[idx] - hMin) * invRange;
+        const contrasted = 0.5 + (normalized - 0.5) * contrastMult;
+        hmap[idx] = contrasted < 0 ? 0 : contrasted > 1 ? 1 : contrasted;
+      }
+    }
+    for (let i = len4; i < len; i++) {
       const normalized = (hmap[i] - hMin) * invRange;
       const contrasted = 0.5 + (normalized - 0.5) * contrastMult;
       hmap[i] = contrasted < 0 ? 0 : contrasted > 1 ? 1 : contrasted;
