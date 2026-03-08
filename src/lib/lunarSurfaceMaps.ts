@@ -1456,6 +1456,11 @@ export function buildHeightmap(
     applySurfaceZones(hmap, MAP_W, MAP_H, lunar.zones);
   }
 
+  // ─── 11) Apply surface masks ──
+  if (lunar.masksEnabled && lunar.masks && lunar.masks.length > 0) {
+    applySurfaceMasks(hmap, MAP_W, MAP_H, lunar.masks, lunar.maskMode ?? "include", lunar.seed);
+  }
+
   return { hmap, craterCount: totalCraterCount };
 }
 
