@@ -856,6 +856,38 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               <p className="text-[8px] text-muted-foreground/40">How dramatic crater depth/height differences appear</p>
             </div>
 
+            {/* ── Layer Mix ── */}
+            <div className="border-t border-border/30 mt-3 pt-2">
+              <p className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/50 mb-2 font-display">Layer Mix</p>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] text-muted-foreground">Large Craters</Label>
+                  <span className="text-[10px] font-mono text-primary/80">{state.layerLargeCraters ?? 50}%</span>
+                </div>
+                <Slider value={[state.layerLargeCraters ?? 50]} onValueChange={([v]) => patch({ layerLargeCraters: v })} min={0} max={100} step={1} />
+                <p className="text-[8px] text-muted-foreground/40">Mega and hero-scale impact basins</p>
+              </div>
+
+              <div className="space-y-1.5 mt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] text-muted-foreground">Medium Impacts</Label>
+                  <span className="text-[10px] font-mono text-primary/80">{state.layerMediumImpacts ?? 50}%</span>
+                </div>
+                <Slider value={[state.layerMediumImpacts ?? 50]} onValueChange={([v]) => patch({ layerMediumImpacts: v })} min={0} max={100} step={1} />
+                <p className="text-[8px] text-muted-foreground/40">Mid-size and small crater population</p>
+              </div>
+
+              <div className="space-y-1.5 mt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] text-muted-foreground">Micro Pitting</Label>
+                  <span className="text-[10px] font-mono text-primary/80">{state.layerMicroPitting ?? 50}%</span>
+                </div>
+                <Slider value={[state.layerMicroPitting ?? 50]} onValueChange={([v]) => patch({ layerMicroPitting: v })} min={0} max={100} step={1} />
+                <p className="text-[8px] text-muted-foreground/40">Micro pits, regolith grain, and fine surface texture</p>
+              </div>
+            </div>
+
             <div className="space-y-1.5 mt-2">
               <div className="flex items-center justify-between">
                 <Label className="text-[10px] text-muted-foreground">Crater Overlap</Label>
