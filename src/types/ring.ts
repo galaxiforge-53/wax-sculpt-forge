@@ -68,4 +68,7 @@ export const DEFAULT_RING: RingParameters = {
   grooveCount: 0,
   grooveDepth: 0.3,
   bevelSize: 0.3,
+  interiorCurvature: 40,
+  comfortFitDepth: 50,
+  interiorProfile: "comfort-dome",
 };
