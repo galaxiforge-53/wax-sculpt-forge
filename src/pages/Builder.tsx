@@ -1023,6 +1023,23 @@ function BuilderInner() {
         params={params}
       />
 
+      <StudioRenderPanel
+        open={studioRenderOpen}
+        onClose={() => setStudioRenderOpen(false)}
+        viewportRef={viewportRef}
+        viewMode={viewMode}
+        metalPreset={metalPreset}
+        finishPreset={finishPreset}
+        params={params}
+        lighting={lighting}
+        onLightingChange={setLighting}
+        bgPreset={bgPreset}
+        onBgPresetChange={setBgPreset}
+        onCameraPreset={(angle) => setCameraPreset(angle)}
+        turntableSpeed={turntableSpeed}
+        onTurntableSpeedChange={setTurntableSpeed}
+      />
+
       {/* Preferences Sheet */}
       <Sheet open={prefsOpen} onOpenChange={setPrefsOpen}>
         <SheetContent side="right" className="w-[320px] sm:w-[360px] overflow-y-auto">
