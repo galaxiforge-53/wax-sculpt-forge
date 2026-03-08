@@ -1,6 +1,7 @@
+import React from "react";
 import { Canvas, useThree, ThreeEvent, useLoader, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows, Text } from "@react-three/drei";
-import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback, useState, useEffect, Suspense } from "react";
+import { useMemo, forwardRef, useImperativeHandle, useRef, useCallback, useState, useEffect, Suspense, memo } from "react";
 import * as THREE from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 import { RingParameters, ViewMode, MetalPreset, FinishPreset, ToolType } from "@/types/ring";
