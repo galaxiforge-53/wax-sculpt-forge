@@ -108,6 +108,7 @@ interface RingMeshProps {
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   stampSettings?: StampSettings;
   lunarTexture?: LunarTextureState;
+  wearPreview?: number; // 0–100, simulates polishing/wear softening
 }
 
 // ── Physically-based metal material configs ───────────────────────
