@@ -163,6 +163,28 @@ export default function Export() {
   const [confirmFinish, setConfirmFinish] = useState<FinishPreset>("polished");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [savingDesign, setSavingDesign] = useState(false);
+
+  const handleSaveDesign = async () => {
+    if (!pkg) return;
+    setSavingDesign(true);
+    try {
+      const name = pkg.id || "Untitled Design";
+      if (user) {
+        await saveCloudDesign({ name, design_package: pkg });
+        toast({ title: "Saved to Cloud ☁️", description: `"${name}" saved to your library.` });
+      } else {
+        const id = `PRJ-${Date.now().toString(36).toUpperCase()}`;
+        const now = new Date().toISOString();
+        saveProject({ id, name, createdAt: now, updatedAt: now, designPackage: pkg });
+        toast({ title: "Saved Locally", description: `"${name}" saved. Sign in to sync to cloud.` });
+      }
+    } catch (err: any) {
+      toast({ title: "Save Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingDesign(false);
+    }
+  };
 
   useEffect(() => {
     const raw = sessionStorage.getItem("designPackage");
