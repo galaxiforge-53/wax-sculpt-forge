@@ -1107,8 +1107,8 @@ function applyOrganicDunes(
     const v3 = v * 3;
     const v5 = v * 5;
     const rowOff = y * w;
-    const duneRowMask = edgeMask[rowOff]; // row-constant — hoist to avoid per-pixel lookups
-    if (duneRowMask < 0.001) continue; // skip edge rows entirely
+    const duneRowMask = edgeRow[y];
+    if (duneRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const u = x * invW;
       const u8 = u * 8;
