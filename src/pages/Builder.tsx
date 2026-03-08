@@ -881,6 +881,18 @@ function BuilderInner() {
         finishPreset={finishPreset}
         params={params}
       />
+
+      {/* Preferences Sheet */}
+      <Sheet open={prefsOpen} onOpenChange={setPrefsOpen}>
+        <SheetContent side="right" className="w-[320px] sm:w-[360px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-display text-primary">Preferences</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <PreferencesPanel prefs={prefs} onUpdate={updatePrefs} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
