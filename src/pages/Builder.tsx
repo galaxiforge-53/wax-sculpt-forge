@@ -595,6 +595,7 @@ function BuilderInner() {
               stampSettings={stampSettings}
               inlays={inlays}
               lunarTexture={lunarTexture}
+              imageTerrain={imageTerrain}
               engraving={engraving}
               cameraPreset={cameraPreset}
               onPresetApplied={() => setCameraPreset(null)}
