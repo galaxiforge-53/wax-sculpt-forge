@@ -408,13 +408,17 @@ function stampCrater(
 
       const idx = py * w + wpx;
       if (delta < 0) {
-        hmap[idx] = Math.max(0, Math.min(1, hmap[idx] + delta));
+        // Allow overlapping craters to stack deeper (minimum -0.3 for realistic depth)
+        // Previous clamping to 0 prevented natural multi-impact basins
+        hmap[idx] = Math.max(-0.3, hmap[idx] + delta);
       } else {
+        // Rim accumulation: newer rims partially overwrite older terrain
+        // Larger overlap factor means more aggressive stacking
         const target = 0.5 + delta;
         if (target > hmap[idx]) {
-          hmap[idx] = Math.min(1, hmap[idx] + delta * 0.7);
+          hmap[idx] = Math.min(1.2, hmap[idx] + delta * 0.7);
         } else {
-          hmap[idx] = Math.min(1, hmap[idx] + delta * 0.15);
+          hmap[idx] = Math.min(1.2, hmap[idx] + delta * 0.15);
         }
       }
     }
@@ -501,9 +505,16 @@ function stampEjectaRays(
 function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: number, edgeMask: Float32Array, seed: number) {
   if (mariaFactor <= 0) return;
 
-  // Find height threshold — maria fills below median
-  const sorted = Float32Array.from(hmap).sort();
-  const threshold = sorted[Math.floor(sorted.length * (0.35 + mariaFactor * 0.15))];
+  // Approximate percentile via random sampling (O(k) instead of O(n log n) full sort)
+  // Sampling 2000 points gives <2% error on 4M-pixel maps
+  const sampleCount = 2000;
+  const sampleRng = seededRng(seed + 6500);
+  const samples = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    samples[i] = hmap[Math.floor(sampleRng() * hmap.length)];
+  }
+  samples.sort();
+  const threshold = samples[Math.floor(sampleCount * (0.35 + mariaFactor * 0.15))];
 
   const mariaNoise = makeNoise2D(seed + 6000);
   const mariaStrength = mariaFactor * 0.7;
@@ -828,8 +839,15 @@ function applyDustFill(
 ) {
   // Wind-driven dust fills craters unevenly
   const dustNoise = makeNoise2D(seed + 14001);
-  const sorted = Float32Array.from(hmap).sort();
-  const fillLevel = sorted[Math.floor(sorted.length * 0.45)];
+  // Approximate percentile via random sampling (O(k) instead of O(n log n))
+  const sampleCount = 2000;
+  const sampleRng = seededRng(seed + 14500);
+  const samples = new Float32Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    samples[i] = hmap[Math.floor(sampleRng() * hmap.length)];
+  }
+  samples.sort();
+  const fillLevel = samples[Math.floor(sampleCount * 0.45)];
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -1412,20 +1430,24 @@ export function buildHeightmap(
 
       const pxR = pr * MAP_W;
       const pyR = pr * MAP_H * physicalAspect;
-      const x0 = Math.max(0, Math.floor((pu - pr * 1.2) * MAP_W));
-      const x1 = Math.min(MAP_W - 1, Math.ceil((pu + pr * 1.2) * MAP_W));
+      // Use wrapping for x (seamless circumference) and clamping for y (ring width edges)
+      const x0 = Math.floor((pu - pr * 1.2) * MAP_W);
+      const x1 = Math.ceil((pu + pr * 1.2) * MAP_W);
       const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * MAP_H));
       const y1 = Math.min(MAP_H - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * MAP_H));
 
       for (let py = y0; py <= y1; py++) {
         for (let px = x0; px <= x1; px++) {
+          // Wrap x for seamless circumference
+          let wpx = px % MAP_W;
+          if (wpx < 0) wpx += MAP_W;
           const du = (px - pu * MAP_W) / pxR;
           const dv = (py - pv * MAP_H) / pyR;
           const d = Math.sqrt(du * du + dv * dv);
           if (d > 1.0) continue;
           const falloff = 1 - d * d;
-          const mask = edgeMask[py * MAP_W + px];
-          hmap[py * MAP_W + px] -= pd * falloff * mask;
+          const mask = edgeMask[py * MAP_W + wpx];
+          hmap[py * MAP_W + wpx] -= pd * falloff * mask;
         }
       }
     }
@@ -1472,7 +1494,21 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 8) Depth contrast boost ──
+  // ─── 8) Normalize heightmap range then apply depth contrast ──
+  // After allowing extended range (-0.3 to 1.2) for realistic overlap stacking,
+  // remap back to 0–1 before contrast and downstream passes
+  let hMin = Infinity, hMax = -Infinity;
+  for (let i = 0; i < hmap.length; i++) {
+    if (hmap[i] < hMin) hMin = hmap[i];
+    if (hmap[i] > hMax) hMax = hmap[i];
+  }
+  const hRange = hMax - hMin;
+  if (hRange > 0.001) {
+    for (let i = 0; i < hmap.length; i++) {
+      hmap[i] = (hmap[i] - hMin) / hRange;
+    }
+  }
+
   const contrastVal = (lunar.terrainContrast ?? 60) / 100; // 0–1
   // Map 0–1 to a contrast multiplier: 0→0.6 (flat), 0.5→1.0 (neutral), 1.0→1.8 (dramatic)
   const contrastMult = 0.6 + contrastVal * 1.2;
