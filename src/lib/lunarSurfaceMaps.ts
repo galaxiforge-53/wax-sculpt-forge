@@ -594,16 +594,19 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   const ridgeNoise = makeNoise2D(seed + 7500);
   const ridgeAmp = ridgeFactor * 0.08 * depthScale;
   const aspectCorr = physicalAspect / (w / h);
+  const invW = 12 / w;
+  const invH = 12 / h * aspectCorr;
 
   for (let y = 0; y < h; y++) {
+    const v = y * invH;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const mask = edgeMask[idx];
-      if (mask < 0.01) continue; // skip fully masked edge pixels
-      const u = x / w * 12;
-      const v = y / h * 12 * aspectCorr;
+      if (mask < 0.01) continue;
+      const u = x * invW;
       const n = Math.abs(fbm(ridgeNoise, u, v, 4, 2.2, 0.5));
-      const ridge = (1.0 - n * 2.0);
+      const ridge = 1.0 - n * 2.0;
       if (ridge > 0) {
         hmap[idx] += ridge * ridgeAmp * mask;
       }
