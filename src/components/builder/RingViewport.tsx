@@ -464,23 +464,33 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     thicknessMm: params.thickness,
   }), [params.innerDiameter, params.width, params.thickness]);
 
-  // Async texture generation with progress tracking
+  // Async texture generation with progress tracking + debounce
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const genIdRef = useRef(0);
+  const prevMapsRef = useRef<LunarSurfaceMapSet | null>(null);
+
+  // Debounce all lunar params so rapid slider drags don't spam regeneration
+  const debouncedLunar = useDebouncedValue(lunarTexture, isMobile ? 400 : 250);
 
   useEffect(() => {
-    if (!lunarTexture?.enabled) {
+    if (!debouncedLunar?.enabled) {
+      // Dispose previous maps
+      if (prevMapsRef.current) {
+        disposeLunarMaps(prevMapsRef.current);
+        prevMapsRef.current = null;
+      }
       setLunarMaps(null);
       setGenProgress(null);
       onGenProgress?.(null);
+      return;
     }
     const genId = ++genIdRef.current;
     setGenProgress({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
     onGenProgress?.({ stage: "heightmap", label: "Preparing…", craterCount: 0, percent: 0 });
 
     generateLunarSurfaceMapsAsync(
-      lunarTexture,
+      debouncedLunar,
       physicalAspect,
       ringDims,
       (progress) => {
@@ -490,25 +500,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       },
     ).then((maps) => {
       if (genIdRef.current !== genId) return;
+      // Dispose previous maps to free GPU memory
+      if (prevMapsRef.current && prevMapsRef.current !== maps) {
+        disposeLunarMaps(prevMapsRef.current);
+      }
+      prevMapsRef.current = maps;
       setLunarMaps(maps);
       // Clear progress after brief delay to show completion
       setTimeout(() => {
         if (genIdRef.current === genId) setGenProgress(null);
       }, 1200);
     });
-  }, [
-    lunarTexture?.enabled, lunarTexture?.seed, lunarTexture?.intensity,
-    lunarTexture?.craterDensity, lunarTexture?.craterSize,
-    lunarTexture?.microDetail, lunarTexture?.rimSharpness,
-    lunarTexture?.overlapIntensity, lunarTexture?.smoothEdges,
-    lunarTexture?.rimHeight, lunarTexture?.bowlDepth,
-    lunarTexture?.erosion, lunarTexture?.terrainRoughness,
-    lunarTexture?.craterVariation,
-    lunarTexture?.craterShape, lunarTexture?.ovalElongation, lunarTexture?.ovalAngle,
-    lunarTexture?.mariaFill, lunarTexture?.highlandRidges,
-    lunarTexture?.craterFloorTexture, lunarTexture?.ejectaStrength,
-    physicalAspect, ringDims,
-  ]);
+  }, [debouncedLunar, physicalAspect, ringDims]);
 
   // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
   // Smaller rings → stronger normals per-texel; larger rings → softer
