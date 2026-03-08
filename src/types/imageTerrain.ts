@@ -168,6 +168,7 @@ export const DEFAULT_IMAGE_TERRAIN: ImageTerrainState = {
   contrast: 100,
   smoothing: 2,
   threshold: 50,
+  planetaryBlend: 0,
   offsetU: 0,
   offsetV: 0,
   invert: false,
