@@ -1966,7 +1966,7 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
 // Albedo is a very low-frequency property (subtle stone color variation).
 // Computing fBm at half-res eliminates ~3M redundant noise evaluations.
 
-function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed: number): HTMLCanvasElement {
+function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed: number, sharedHalf?: Float32Array): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -1977,15 +1977,8 @@ function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed:
   const stoneNoise = makeNoise2D(seed + 7000);
   const grainRng = seededRng(seed + 8000);
 
-  const halfHmap = new Float32Array(hw * hh);
-  for (let y = 0; y < hh; y++) {
-    const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
-    for (let x = 0; x < hw; x++) {
-      const sx = x * 2;
-      halfHmap[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
-    }
-  }
+  // Use shared half-res if provided
+  const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
   const halfAlbedo = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
