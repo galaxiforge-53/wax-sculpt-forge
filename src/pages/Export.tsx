@@ -578,7 +578,7 @@ export default function Export() {
             </motion.div>
           )}
 
-          {submitStep === "submitting" && (
+          {(submitStep === "submitting" || submitStep === "uploading-stl" || submitStep === "uploading-previews") && (
             <motion.div
               key="submitting"
               initial={{ opacity: 0 }}
@@ -587,7 +587,18 @@ export default function Export() {
               className="bg-card border border-border rounded-xl p-8 text-center space-y-4"
             >
               <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
-              <p className="text-sm text-muted-foreground">Submitting your design to Galaxy Forge…</p>
+              <p className="text-sm text-muted-foreground">
+                {submitStep === "submitting" && "Generating manufacturing STL…"}
+                {submitStep === "uploading-stl" && "Uploading STL model…"}
+                {submitStep === "uploading-previews" && "Uploading preview images…"}
+              </p>
+              <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground/60">
+                <span className={submitStep === "submitting" ? "text-primary" : "text-muted-foreground"}>① Generate</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className={submitStep === "uploading-stl" ? "text-primary" : "text-muted-foreground"}>② STL Upload</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className={submitStep === "uploading-previews" ? "text-primary" : "text-muted-foreground"}>③ Previews</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
