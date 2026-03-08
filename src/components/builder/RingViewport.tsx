@@ -1910,6 +1910,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               onAddWaxMark={onAddWaxMark}
               stampSettings={stampSettings}
               lunarTexture={lunarTexture}
+              wearPreview={wearPreview}
               onGenProgress={handleGenProgress}
             />
 
