@@ -2003,7 +2003,7 @@ export function buildHeightmap(
 
   // ─── 5b) Planet-specific terrain passes ──
   const terrainType: TerrainType = lunar.terrainType ?? "generic";
-  applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeMask, lunar.seed, depthScale, rand, physicalAspect);
+  applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeRow, lunar.seed, depthScale, rand, physicalAspect);
 
 
   // ─── 6) Combined micro-detail pass (pits + regolith + grain in one traversal) ──
