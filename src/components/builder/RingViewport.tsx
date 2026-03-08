@@ -1900,6 +1900,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
           <OrbitControls
             enablePan={false}
+            enableRotate={!isRotationLocked}
             minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
             maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
             autoRotate={false}
@@ -1907,10 +1908,15 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             dampingFactor={isMobile ? 0.12 : 0.08}
             rotateSpeed={isMobile ? 0.5 : 1.0}
             zoomSpeed={isMobile ? 0.7 : 1.0}
-            touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+            touches={{ ONE: isRotationLocked ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0}
             maxPolarAngle={Math.PI}
           />
+
+          {/* Rotation lock indicator */}
+          {isRotationLocked && (
+            <></> // Indicator rendered outside Canvas in the parent div
+          )}
 
           {/* Camera preset animator */}
           {cameraPreset && (
