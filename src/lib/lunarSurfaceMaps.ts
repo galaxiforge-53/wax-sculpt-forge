@@ -1127,7 +1127,7 @@ function applyOrganicDunes(
 
 function applyAsteroidRubble(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
   rand: () => number, physicalAspect: number,
 ) {
   const rubbleNoise = makeNoise2D(seed + 17001);
