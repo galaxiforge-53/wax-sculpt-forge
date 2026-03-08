@@ -2069,7 +2069,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             );
           })()}
 
-          <Environment preset={lighting.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity)} />
+          <Environment preset={activeBg.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity * activeBg.envIntensityMul)} />
           <OrbitControls
             enablePan={false}
             enableRotate={!isRotationLocked && turntableSpeed === 0}
