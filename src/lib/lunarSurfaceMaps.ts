@@ -956,9 +956,7 @@ function applyDustFill(
   hmap: Float32Array, w: number, h: number,
   edgeMask: Float32Array, seed: number, depthScale: number,
 ) {
-  // Wind-driven dust fills craters unevenly
   const dustNoise = makeNoise2D(seed + 14001);
-  // Approximate percentile via random sampling (O(k) instead of O(n log n))
   const sampleCount = 2000;
   const sampleRng = seededRng(seed + 14500);
   const samples = new Float32Array(sampleCount);
@@ -967,17 +965,21 @@ function applyDustFill(
   }
   samples.sort();
   const fillLevel = samples[Math.floor(sampleCount * 0.45)];
+  const invFillLevel = 1 / Math.max(0.01, fillLevel);
+  const fillTarget = fillLevel * 0.9;
+  const invW4 = 4 / w;
+  const invH2 = 2 / h;
 
   for (let y = 0; y < h; y++) {
+    const rowOff = y * w;
+    const vCoord = y * invH2;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
-      if (hmap[idx] < fillLevel) {
-        const depth = (fillLevel - hmap[idx]) / Math.max(0.01, fillLevel);
-        // Wind direction bias — dust accumulates on one side
-        const windBias = 0.5 + 0.5 * dustNoise(x / w * 4, y / h * 2);
-        const fill = depth * 0.6 * windBias;
-        hmap[idx] = lerp(hmap[idx], fillLevel * 0.9, fill * edgeMask[idx]);
-      }
+      const idx = rowOff + x;
+      if (hmap[idx] >= fillLevel) continue;
+      const depth = (fillLevel - hmap[idx]) * invFillLevel;
+      const windBias = 0.5 + 0.5 * dustNoise(x * invW4, vCoord);
+      const fill = depth * 0.6 * windBias;
+      hmap[idx] = hmap[idx] + (fillTarget - hmap[idx]) * fill * edgeMask[idx];
     }
   }
 }
