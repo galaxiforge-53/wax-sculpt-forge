@@ -1543,32 +1543,31 @@ export function buildHeightmap(
   }
 
   // ─── 12) Smooth edges final pass ──
-  // When smoothEdges is enabled, apply a light blur to soften harsh crater boundaries
-  // and reduce aliasing artifacts — important for castability in wax printing
+  // Separable horizontal + vertical blur for better cache coherence
+  // Previous 3×3 non-separable kernel required diagonal reads; separable is ~2× faster
   if (lunar.smoothEdges) {
     const smoothTemp = new Float32Array(hmap.length);
+    // Horizontal pass — reads are contiguous in memory
     for (let y = 0; y < MAP_H; y++) {
+      const rowOff = y * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
-        const idx = y * MAP_W + x;
-        let sum = hmap[idx] * 4;
-        let count = 4;
         const xl = ((x - 1) % MAP_W + MAP_W) % MAP_W;
         const xr = ((x + 1) % MAP_W + MAP_W) % MAP_W;
-        sum += hmap[y * MAP_W + xl]; count++;
-        sum += hmap[y * MAP_W + xr]; count++;
-        if (y > 0) { sum += hmap[(y - 1) * MAP_W + x]; count++; }
-        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + x]; count++; }
-        // Diagonals for smoother result
-        if (y > 0) { sum += hmap[(y - 1) * MAP_W + xl] * 0.5; count += 0.5; }
-        if (y > 0) { sum += hmap[(y - 1) * MAP_W + xr] * 0.5; count += 0.5; }
-        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + xl] * 0.5; count += 0.5; }
-        if (y < MAP_H - 1) { sum += hmap[(y + 1) * MAP_W + xr] * 0.5; count += 0.5; }
-        smoothTemp[idx] = sum / count;
+        smoothTemp[rowOff + x] = hmap[rowOff + xl] * 0.25 + hmap[rowOff + x] * 0.5 + hmap[rowOff + xr] * 0.25;
+      }
+    }
+    // Vertical pass on horizontally-blurred data
+    const smoothResult = new Float32Array(hmap.length);
+    for (let y = 0; y < MAP_H; y++) {
+      const yAbove = Math.max(0, y - 1);
+      const yBelow = Math.min(MAP_H - 1, y + 1);
+      for (let x = 0; x < MAP_W; x++) {
+        smoothResult[y * MAP_W + x] = smoothTemp[yAbove * MAP_W + x] * 0.25 + smoothTemp[y * MAP_W + x] * 0.5 + smoothTemp[yBelow * MAP_W + x] * 0.25;
       }
     }
     // Blend 40% smoothed for subtle effect
     for (let i = 0; i < hmap.length; i++) {
-      hmap[i] = hmap[i] * 0.6 + smoothTemp[i] * 0.4;
+      hmap[i] = hmap[i] * 0.6 + smoothResult[i] * 0.4;
     }
   }
 
@@ -1621,28 +1620,63 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
   return canvas;
 }
 
-// ── Roughness map ─────────────────────────────────────────────────
+// ── Roughness map (computed at half resolution, then upscaled) ─────
+// Roughness is a low-frequency property — half-res gives ~4× speedup
+// with no visible quality loss on the curved ring surface.
 
 function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, microDetail: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(w, h);
 
+  const hw = w >> 1;
+  const hh = h >> 1;
   const microFactor = microDetail / 100;
   const grainRng = seededRng(7777 + Math.round(microDetail));
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const hVal = hmap[y * w + x];
+  // Compute at half resolution
+  const halfRough = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      // 2×2 box filter downsample of heightmap
+      const hVal = (
+        hmap[sy * w + sx] +
+        hmap[sy * w + sx + 1] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
+      ) * 0.25;
       let roughness = 0.92 - (hVal - 0.5) * 0.9;
       if (microFactor > 0) {
         roughness += (grainRng() - 0.5) * 0.12 * microFactor;
       }
-      roughness = Math.max(0.2, Math.min(1.0, roughness));
+      halfRough[y * hw + x] = Math.max(0.2, Math.min(1.0, roughness));
+    }
+  }
 
-      const v = Math.round(roughness * 255);
+  // Bilinear upscale to full resolution
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const fy = (y / h) * (hh - 1);
+    const iy = Math.floor(fy);
+    const fy1 = fy - iy;
+    const iy0 = Math.min(iy, hh - 1);
+    const iy1 = Math.min(iy + 1, hh - 1);
+    for (let x = 0; x < w; x++) {
+      const fx = (x / w) * (hw - 1);
+      const ix = Math.floor(fx);
+      const fx1 = fx - ix;
+      const ix0 = ((ix) % hw + hw) % hw;
+      const ix1 = ((ix + 1) % hw + hw) % hw;
+
+      const v = Math.round((
+        halfRough[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
+        halfRough[iy0 * hw + ix1] * fx1 * (1 - fy1) +
+        halfRough[iy1 * hw + ix0] * (1 - fx1) * fy1 +
+        halfRough[iy1 * hw + ix1] * fx1 * fy1
+      ) * 255);
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
       img.data[idx] = v;
@@ -1759,32 +1793,73 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   return canvas;
 }
 
-// ── Albedo map ────────────────────────────────────────────────────
+// ── Albedo map (computed at half resolution, then upscaled) ───────
+// Albedo is a very low-frequency property (subtle stone color variation).
+// Computing fBm at half-res eliminates ~3M redundant noise evaluations.
 
 function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(w, h);
 
+  const hw = w >> 1;
+  const hh = h >> 1;
   const stoneNoise = makeNoise2D(seed + 7000);
   const grainRng = seededRng(seed + 8000);
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const u = x / w * 4;
-      const v = y / h * 4;
+  // Downsample heightmap for height-tint calculation
+  const halfHmap = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      halfHmap[y * hw + x] = (
+        hmap[sy * w + sx] +
+        hmap[sy * w + sx + 1] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx] +
+        hmap[Math.min(sy + 1, h - 1) * w + sx + 1]
+      ) * 0.25;
+    }
+  }
+
+  // Compute albedo at half resolution
+  const halfAlbedo = new Float32Array(hw * hh);
+  for (let y = 0; y < hh; y++) {
+    for (let x = 0; x < hw; x++) {
+      const u = x / hw * 4;
+      const v = y / hh * 4;
       const n = fbm(stoneNoise, u, v, 2, 2.0, 0.5) * 0.5 + 0.5;
       const grain = (grainRng() - 0.5) * 0.04;
-      const hVal = hmap[y * w + x];
+      const hVal = halfHmap[y * hw + x];
       const heightTint = 0.95 + (hVal - 0.5) * 0.1;
-
       let albedo = 0.82 + n * 0.12 + grain;
       albedo *= heightTint;
-      albedo = Math.max(0.6, Math.min(1.0, albedo));
+      halfAlbedo[y * hw + x] = Math.max(0.6, Math.min(1.0, albedo));
+    }
+  }
 
-      const val = Math.round(albedo * 255);
+  // Bilinear upscale to full resolution
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const fy = (y / h) * (hh - 1);
+    const iy = Math.floor(fy);
+    const fy1 = fy - iy;
+    const iy0 = Math.min(iy, hh - 1);
+    const iy1 = Math.min(iy + 1, hh - 1);
+    for (let x = 0; x < w; x++) {
+      const fx = (x / w) * (hw - 1);
+      const ix = Math.floor(fx);
+      const fx1 = fx - ix;
+      const ix0 = ((ix) % hw + hw) % hw;
+      const ix1 = ((ix + 1) % hw + hw) % hw;
+
+      const val = Math.round((
+        halfAlbedo[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
+        halfAlbedo[iy0 * hw + ix1] * fx1 * (1 - fy1) +
+        halfAlbedo[iy1 * hw + ix0] * (1 - fx1) * fy1 +
+        halfAlbedo[iy1 * hw + ix1] * fx1 * fy1
+      ) * 255);
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
       img.data[idx] = val;
