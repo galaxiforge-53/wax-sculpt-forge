@@ -1513,11 +1513,20 @@ function applySurfaceMasks(
         // Inline shape computation (avoids function call overhead per pixel per mask)
         switch (mask.shape) {
           case "circle": {
-            const hw = mask.width / 2;
-            const hh = mask.height / 2;
-            const dist = Math.sqrt((ru / hw) * (ru / hw) + (rv / hh) * (rv / hh));
-            if (dist < 1 - featherNorm) value = 1;
-            else if (dist < 1) value = 1 - (dist - (1 - featherNorm)) / featherNorm;
+            // Eliminate sqrt for majority of pixels via squared-distance comparison
+            const invHW = 2 / mask.width;
+            const invHH = 2 / mask.height;
+            const ruN = ru * invHW, rvN = rv * invHH;
+            const dist2 = ruN * ruN + rvN * rvN;
+            const featherStart = 1 - featherNorm;
+            const featherStart2 = featherStart * featherStart;
+            if (dist2 < featherStart2) {
+              value = 1; // clearly inside — no sqrt needed
+            } else if (dist2 < 1) {
+              // In feather zone — need sqrt for precise falloff
+              const dist = Math.sqrt(dist2);
+              value = 1 - (dist - featherStart) / featherNorm;
+            }
             break;
           }
           case "rectangle": {
