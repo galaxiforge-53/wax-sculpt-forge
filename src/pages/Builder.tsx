@@ -27,6 +27,7 @@ import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
 import SmartSuggestions from "@/components/builder/SmartSuggestions";
+import CompareView, { DesignSnapshot } from "@/components/builder/CompareView";
 import { Button } from "@/components/ui/button";
 import SEOHead from "@/components/SEOHead";
 import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
