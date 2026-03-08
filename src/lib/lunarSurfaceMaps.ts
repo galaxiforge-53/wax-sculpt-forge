@@ -990,10 +990,10 @@ export function buildHeightmap(
     }
   }
 
-  addCraters(megaCount, megaRadMin, megaRadMax, 1.2, 0);
-  addCraters(heroCount, heroRadMin, heroRadMax, 1.0, 1);
-  addCraters(medCount, medRadMin, medRadMax, 0.8, 2);
-  addCraters(smallCount, smallRadMin, smallRadMax, 0.6, 3);
+  addCraters(megaCount, megaRadMin, megaRadMax, 1.2 * layerLarge, 0);
+  addCraters(heroCount, heroRadMin, heroRadMax, 1.0 * layerLarge, 1);
+  addCraters(medCount, medRadMin, medRadMax, 0.8 * layerMedium, 2);
+  addCraters(smallCount, smallRadMin, smallRadMax, 0.6 * layerMedium, 3);
 
   // Overlap pass
   if (overlapFactor > 0) {
