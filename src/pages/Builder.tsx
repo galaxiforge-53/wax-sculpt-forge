@@ -596,16 +596,21 @@ function BuilderInner() {
             </div>
           )}
 
-          <div className="absolute top-2 left-2 flex gap-1 z-10">
+          <div className={cn(
+            "absolute top-2 left-2 flex gap-1 z-10",
+            isMobile && "flex-wrap max-w-[60%]"
+          )}>
             {CAMERA_BUTTONS.map((cam) => (
               <button
                 key={cam.id}
                 onClick={() => setCameraPreset(cam.id)}
-                className={`px-2.5 py-1 text-[10px] font-medium rounded-md backdrop-blur-xl transition-all
-                  ${cameraPreset === cam.id
+                className={cn(
+                  "px-2.5 py-1 text-[10px] font-medium rounded-md backdrop-blur-xl transition-all touch-target",
+                  cameraPreset === cam.id
                     ? "bg-primary/20 text-primary border border-primary/30 shadow-sm shadow-primary/10"
-                    : "bg-card/60 text-muted-foreground border border-builder-divider hover:bg-card/80 hover:text-foreground"
-                  }`}
+                    : "bg-card/60 text-muted-foreground border border-builder-divider hover:bg-card/80 hover:text-foreground",
+                  isMobile && "px-3 py-1.5 text-[11px]"
+                )}
               >
                 {cam.label}
               </button>
