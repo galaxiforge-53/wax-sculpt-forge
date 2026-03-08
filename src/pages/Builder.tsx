@@ -147,6 +147,22 @@ function BuilderInner() {
         setCurrentProjectId(project.id);
         setCurrentProjectName(project.name);
       }
+      return;
+    }
+
+    // Shared design via link
+    const sharedPkg = sessionStorage.getItem("sharedDesignPackage");
+    if (sharedPkg) {
+      const sharedName = sessionStorage.getItem("sharedDesignName");
+      sessionStorage.removeItem("sharedDesignPackage");
+      sessionStorage.removeItem("sharedDesignName");
+      try {
+        restoreDesign(JSON.parse(sharedPkg));
+        setCurrentProjectName(sharedName || "Shared Design");
+        toast({ title: "Shared Design Loaded", description: `"${sharedName}" is ready to customize.` });
+      } catch (e) {
+        console.error("Failed to load shared design:", e);
+      }
     }
   }, []);
 
