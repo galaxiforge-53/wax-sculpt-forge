@@ -408,6 +408,7 @@ function BuilderInner() {
               ringPosition={ringPosition}
               ringRotation={ringRotation}
               showPrinterBed={showPrinterBed}
+              rotationLocked={rotationLocked}
             />
           </ViewportErrorBoundary>
 
