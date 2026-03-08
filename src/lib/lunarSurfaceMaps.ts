@@ -1560,34 +1560,41 @@ export function buildHeightmap(
     const halfW = MAP_W >> 1;
     const halfH = MAP_H >> 1;
     const halfBase = new Float32Array(halfW * halfH);
+    const invHalfW8 = 8 / halfW;
+    const invHalfH8 = 8 * aspectCorrection / halfH;
     for (let y = 0; y < halfH; y++) {
-      const v = (y / halfH) * 8 * aspectCorrection;
+      const v = y * invHalfH8;
+      const rowOff = y * halfW;
       for (let x = 0; x < halfW; x++) {
-        const u = (x / halfW) * 8;
-        halfBase[y * halfW + x] = fbm(baseNoise, u, v, 6, 2.0, 0.5) * baseAmp;
+        halfBase[rowOff + x] = fbm(baseNoise, x * invHalfW8, v, 6, 2.0, 0.5) * baseAmp;
       }
     }
-    // Bilinear upscale to full resolution and add to heightmap
+    // Bilinear upscale with pre-computed reciprocals and row caching
+    const invMapH_halfH = (halfH - 1) / MAP_H;
+    const invMapW_halfW = (halfW - 1) / MAP_W;
+    const halfHm1 = halfH - 1;
     for (let y = 0; y < MAP_H; y++) {
-      const fy = (y / MAP_H) * (halfH - 1);
+      const fy = y * invMapH_halfH;
       const iy = Math.floor(fy);
       const fy1 = fy - iy;
-      const iy0 = Math.min(iy, halfH - 1);
-      const iy1 = Math.min(iy + 1, halfH - 1);
+      const fy0 = 1 - fy1;
+      const iy0 = iy < halfHm1 ? iy : halfHm1;
+      const iy1 = iy + 1 < halfH ? iy + 1 : halfHm1;
+      const row0 = iy0 * halfW;
+      const row1 = iy1 * halfW;
+      const outRow = y * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
-        const fx = (x / MAP_W) * (halfW - 1);
+        const fx = x * invMapW_halfW;
         const ix = Math.floor(fx);
         const fx1 = fx - ix;
-        const ix0 = ((ix) % halfW + halfW) % halfW;
-        const ix1 = ((ix + 1) % halfW + halfW) % halfW;
-        const val = (
-          halfBase[iy0 * halfW + ix0] * (1 - fx1) * (1 - fy1) +
-          halfBase[iy0 * halfW + ix1] * fx1 * (1 - fy1) +
-          halfBase[iy1 * halfW + ix0] * (1 - fx1) * fy1 +
-          halfBase[iy1 * halfW + ix1] * fx1 * fy1
-        );
-        const mask = edgeMask[y * MAP_W + x];
-        hmap[y * MAP_W + x] += val * mask;
+        const fx0 = 1 - fx1;
+        const ix0 = ix % halfW;
+        const ix1 = (ix + 1) % halfW;
+        const val = halfBase[row0 + ix0] * fx0 * fy0 +
+          halfBase[row0 + ix1] * fx1 * fy0 +
+          halfBase[row1 + ix0] * fx0 * fy1 +
+          halfBase[row1 + ix1] * fx1 * fy1;
+        hmap[outRow + x] += val * edgeMask[outRow + x];
       }
     }
   }
