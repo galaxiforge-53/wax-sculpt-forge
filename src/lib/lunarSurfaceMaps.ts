@@ -1013,13 +1013,15 @@ function applyDustFill(
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH2;
+    const dustRowMask = edgeMask[rowOff]; // row-constant
+    if (dustRowMask < 0.001) continue; // skip edge rows
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       if (hmap[idx] >= fillLevel) continue;
       const depth = (fillLevel - hmap[idx]) * invFillLevel;
       const windBias = 0.5 + 0.5 * dustNoise(x * invW4, vCoord);
       const fill = depth * 0.6 * windBias;
-      hmap[idx] = hmap[idx] + (fillTarget - hmap[idx]) * fill * edgeMask[idx];
+      hmap[idx] = hmap[idx] + (fillTarget - hmap[idx]) * fill * dustRowMask;
     }
   }
 }
