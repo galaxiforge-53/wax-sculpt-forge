@@ -532,6 +532,8 @@ function BuilderInner() {
       onApplyTemplate={applyTemplate}
       engraving={engraving}
       onEngravingChange={setEngraving}
+      imageTerrain={imageTerrain}
+      onImageTerrainChange={setImageTerrain}
       metalPreset={metalPreset}
       finishPreset={finishPreset}
       onViewModeChange={setViewMode}
