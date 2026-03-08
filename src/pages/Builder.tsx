@@ -536,6 +536,17 @@ function BuilderInner() {
                     <Search className="w-3 h-3" />
                   </button>
                   <button
+                    onClick={() => setLoupeActive((v) => !v)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${loupeActive
+                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title="Magnifier loupe — scroll to zoom"
+                  >
+                    <ZoomIn className="w-3 h-3" />
+                  </button>
+                  <button
                     onClick={() => {
                       setShowPrinterBed((v) => !v);
                       if (!showPrinterBed) setRingRotation([Math.PI / 2, 0, 0]);
