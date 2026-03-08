@@ -92,6 +92,57 @@ const RING_SIZES = Object.keys(RING_SIZE_MAP).map(Number);
 
 type SubmitStep = "review" | "confirm" | "submitting" | "uploading-stl" | "uploading-previews" | "done";
 
+// ── Action Card component ────────────────────────────────────────
+
+function ActionCard({ icon: Icon, title, description, buttonLabel, onClick, disabled, loading, locked, variant = "outline", highlight }: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  locked?: boolean;
+  variant?: "primary" | "secondary" | "outline";
+  highlight?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "rounded-xl border p-4 sm:p-5 flex flex-col gap-3 transition-all",
+      highlight ? "border-primary/40 bg-primary/5 ring-1 ring-primary/10" : "border-border bg-card/50",
+      disabled && "opacity-60"
+    )}>
+      <div className="flex items-center gap-2.5">
+        <div className={cn(
+          "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+          highlight ? "bg-primary/15" : "bg-secondary"
+        )}>
+          {locked ? <Lock className="w-4 h-4 text-muted-foreground" /> : <Icon className={cn("w-4 h-4", highlight ? "text-primary" : "text-foreground")} />}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{title}</p>
+          <p className="text-[10px] text-muted-foreground leading-snug">{description}</p>
+        </div>
+      </div>
+      <Button
+        onClick={onClick}
+        disabled={disabled}
+        size="sm"
+        className={cn(
+          "w-full mt-auto gap-1.5",
+          variant === "primary" && "bg-primary text-primary-foreground hover:bg-primary/90",
+          variant === "secondary" && "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          variant === "outline" && "border border-border bg-transparent text-foreground hover:bg-secondary/50"
+        )}
+        variant={variant === "outline" ? "outline" : variant === "secondary" ? "secondary" : "default"}
+      >
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icon className="w-3.5 h-3.5" />}
+        <span dangerouslySetInnerHTML={{ __html: buttonLabel }} />
+      </Button>
+    </div>
+  );
+}
+
 // ── Main Export page ─────────────────────────────────────────────
 
 export default function Export() {
