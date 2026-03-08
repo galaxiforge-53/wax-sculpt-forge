@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { useRingDesign } from "@/hooks/useRingDesign";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect, useRef, useState } from "react";
@@ -21,16 +22,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock, ArrowLeftRight } from "lucide-react";
 import InspectionLoupe from "@/components/builder/InspectionLoupe";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
 import RenderGalleryModal from "@/components/builder/RenderGalleryModal";
 import SmartSuggestions from "@/components/builder/SmartSuggestions";
+import CompareView, { DesignSnapshot } from "@/components/builder/CompareView";
 import { Button } from "@/components/ui/button";
 import SEOHead from "@/components/SEOHead";
 import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
 import PreferencesPanel from "@/components/builder/PreferencesPanel";
+import { cn } from "@/lib/utils";
 
 function BuilderInner() {
   const navigate = useNavigate();
@@ -62,8 +65,8 @@ function BuilderInner() {
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
   const viewportContainerRef = useRef<HTMLDivElement>(null);
+  const [compareSnapshot, setCompareSnapshot] = useState<DesignSnapshot | null>(null);
   const [guidedMode, setGuidedMode] = useState(() => {
-    // Show guided mode for new users (no prior project or template)
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
     const hasProject = !!sessionStorage.getItem("openProjectId");
     return !hasTemplate && !hasProject;
@@ -131,6 +134,22 @@ function BuilderInner() {
         description: result.summary.slice(0, 3).join(" · "),
       });
     }, 400);
+  };
+
+  const handleCaptureSnapshot = () => {
+    const snap: DesignSnapshot = {
+      id: crypto.randomUUID(),
+      label: currentProjectName || "Current Design",
+      capturedAt: new Date().toISOString(),
+      params: { ...params },
+      viewMode,
+      metalPreset,
+      finishPreset,
+      lunarTexture: { ...lunarTexture },
+      engraving: { ...engraving },
+    };
+    setCompareSnapshot(snap);
+    toast({ title: "📸 Snapshot Captured", description: "Make changes, then compare side-by-side" });
   };
 
   const embed = isEmbedMode();
@@ -703,6 +722,18 @@ function BuilderInner() {
                     <Camera className="w-3 h-3" />
                   </button>
                   <button
+                    onClick={handleCaptureSnapshot}
+                    className={cn(
+                      "px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1",
+                      compareSnapshot
+                        ? "bg-primary/30 text-primary border border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    )}
+                    title={compareSnapshot ? "Re-capture snapshot for comparison" : "Capture snapshot to compare"}
+                  >
+                    <ArrowLeftRight className="w-3 h-3" />
+                  </button>
+                  <button
                     onClick={() => setPrefsOpen(true)}
                     className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
                       bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
@@ -848,7 +879,7 @@ function BuilderInner() {
           )}
 
           {/* Desktop guided mode toggle — bottom-left overlay */}
-          {!isMobile && !guidedMode && (
+          {!isMobile && !guidedMode && !compareSnapshot && (
             <div className="absolute bottom-3 left-3 z-10">
               <Button
                 size="sm"
@@ -860,6 +891,23 @@ function BuilderInner() {
               </Button>
             </div>
           )}
+
+          {/* Compare view overlay */}
+          <AnimatePresence>
+            {compareSnapshot && (
+              <CompareView
+                currentParams={params}
+                currentViewMode={viewMode}
+                currentMetal={metalPreset}
+                currentFinish={finishPreset}
+                currentLunar={lunarTexture}
+                currentEngraving={engraving}
+                lighting={lighting}
+                snapshot={compareSnapshot}
+                onClose={() => setCompareSnapshot(null)}
+              />
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Desktop sidebar */}
