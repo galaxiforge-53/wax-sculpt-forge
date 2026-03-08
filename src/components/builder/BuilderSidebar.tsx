@@ -18,6 +18,7 @@ import EngravingPanel from "./EngravingPanel";
 import TemplatesPanel from "./TemplatesPanel";
 import AIAssistantPanel from "./AIAssistantPanel";
 import LightingStudioPanel from "./LightingStudioPanel";
+import PresetManager from "./PresetManager";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Collapsible,
