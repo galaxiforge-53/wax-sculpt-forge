@@ -871,11 +871,12 @@ function applyLobateScarps(
         const idx = py * w + wpx;
         const dist = Math.abs(dy) / halfWidthPx;
 
+        const eMask = edgeRow[py];
         if (dy < 0) {
           const rise = (1 - dist) * (1 - dist);
-          hmap[idx] += scarpHeight * rise * edgeMask[idx] * fadeT;
+          hmap[idx] += scarpHeight * rise * eMask * fadeT;
         } else {
-          hmap[idx] += scarpHeight * 0.3 * (1 - dist) * edgeMask[idx] * fadeT;
+          hmap[idx] += scarpHeight * 0.3 * (1 - dist) * eMask * fadeT;
         }
       }
     }
