@@ -834,7 +834,7 @@ function applyTerrainType(
 
 function applyLobateScarps(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const scarpNoise = makeNoise2D(seed + 10001);
   const scarpCount = 3 + Math.floor(seededRng(seed + 10002)() * 4);
