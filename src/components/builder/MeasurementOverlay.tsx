@@ -11,7 +11,7 @@ interface MeasurementOverlayProps {
 }
 
 /** Subtle 3D dimension guides rendered inside the Canvas */
-export default function MeasurementOverlay({ params, visible }: MeasurementOverlayProps) {
+export default function MeasurementOverlay({ params, visible, sizeStandard = "US", dimensionUnit = "mm" }: MeasurementOverlayProps) {
   const innerR = params.innerDiameter / 2 / 10;
   const outerR = innerR + params.thickness / 10;
   const width = params.width / 10;
