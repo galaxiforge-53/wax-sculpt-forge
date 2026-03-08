@@ -20,6 +20,7 @@ const Auth = lazy(() => import("./pages/Auth"));
 const AccessCode = lazy(() => import("./pages/AccessCode"));
 const Admin = lazy(() => import("./pages/Admin"));
 const DesignLibrary = lazy(() => import("./pages/DesignLibrary"));
+const SharedDesign = lazy(() => import("./pages/SharedDesign"));
 
 const queryClient = new QueryClient();
 
