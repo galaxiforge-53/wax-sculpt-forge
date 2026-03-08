@@ -20,7 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand } from "lucide-react";
+import { Settings2, Eye, RotateCcw, Wand2, Camera, Sparkles, RotateCw, Move, RefreshCw, Printer, Search, ZoomIn, Lock, Unlock, Ruler, Circle, Hand, Clock } from "lucide-react";
 import InspectionLoupe from "@/components/builder/InspectionLoupe";
 import MobileBuilderPanel from "@/components/builder/MobileBuilderPanel";
 import AIGenerateOverlay from "@/components/builder/AIGenerateOverlay";
@@ -54,6 +54,7 @@ function BuilderInner() {
   const [showPrinterBed, setShowPrinterBed] = useState(false);
   const [rotationLocked, setRotationLocked] = useState(false);
   const [scaleReference, setScaleReference] = useState<ScaleReferenceType>("none");
+  const [wearPreview, setWearPreview] = useState(0);
   const [renderGalleryOpen, setRenderGalleryOpen] = useState(false);
   const [loupeActive, setLoupeActive] = useState(false);
   const [loupeZoom, setLoupeZoom] = useState(3);
@@ -412,6 +413,7 @@ function BuilderInner() {
               showPrinterBed={showPrinterBed}
               rotationLocked={rotationLocked}
               scaleReference={scaleReference}
+              wearPreview={wearPreview}
             />
           </ViewportErrorBoundary>
 
@@ -613,6 +615,46 @@ function BuilderInner() {
                       >
                         <Hand className="w-3 h-3" /> Ring Finger
                       </button>
+                    </div>
+                  </div>
+                  {/* Wear Preview dropdown */}
+                  <div className="relative group">
+                    <button
+                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                        ${wearPreview > 0
+                          ? "bg-accent/30 text-accent-foreground border border-accent/40 shadow-[0_0_8px_hsl(var(--accent)/0.3)]"
+                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                        }`}
+                      title="Wear & aging preview"
+                    >
+                      <Clock className="w-3 h-3" />
+                    </button>
+                    <div className="absolute top-full right-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-3 min-w-[160px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-2">
+                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Wear Preview</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={wearPreview}
+                          onChange={(e) => setWearPreview(Number(e.target.value))}
+                          className="flex-1 h-1 accent-primary"
+                        />
+                        <span className="text-[10px] font-mono text-primary w-8 text-right">{wearPreview}%</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {[0, 25, 50, 75, 100].map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setWearPreview(v)}
+                            className={`flex-1 px-1 py-0.5 text-[8px] rounded transition-colors ${wearPreview === v ? "bg-primary/20 text-primary" : "bg-secondary/30 text-muted-foreground hover:text-foreground"}`}
+                          >
+                            {v === 0 ? "New" : v === 25 ? "1yr" : v === 50 ? "5yr" : v === 75 ? "10yr" : "20yr"}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[7px] text-muted-foreground/50">Simulates edge softening and surface wear over time</p>
                     </div>
                   </div>
                   <button
