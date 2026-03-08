@@ -564,6 +564,29 @@ export default function Export() {
                   <span className="text-muted-foreground">Width × Thickness</span>
                   <span className="text-foreground font-mono">{pkg.parameters.width}mm × {pkg.parameters.thickness}mm</span>
                 </div>
+                <div className="border-t border-border/40 mt-2 pt-2">
+                  <p className="text-[9px] uppercase tracking-wider text-muted-foreground/50 font-display mb-1">Package Contents</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span className="text-muted-foreground">STL Model</span>
+                    <span className="text-primary font-mono text-[10px]">
+                      {stlResult ? `${stlResult.triangleCount.toLocaleString()} triangles · ${stlResult.fileSizeKB} KB` : "Will generate"}
+                    </span>
+                    <span className="text-muted-foreground">Shrinkage</span>
+                    <span className="text-foreground font-mono text-[10px]">
+                      {confirmMetal === "gold" || confirmMetal === "rose-gold"
+                        ? `Gold ×${SHRINKAGE_PROFILES.gold.factor}`
+                        : confirmMetal === "silver"
+                        ? `Silver ×${SHRINKAGE_PROFILES.silver.factor}`
+                        : "None (1:1)"}
+                    </span>
+                    <span className="text-muted-foreground">Preview Images</span>
+                    <span className="text-foreground font-mono text-[10px]">
+                      {(pkg.previews?.length ?? 0)} angle{(pkg.previews?.length ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                    <span className="text-muted-foreground">Design Package</span>
+                    <span className="text-primary font-mono text-[10px]">Full JSON spec</span>
+                  </div>
+                </div>
               </div>
 
               {/* Actions */}
