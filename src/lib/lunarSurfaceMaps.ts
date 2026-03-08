@@ -2087,10 +2087,10 @@ export function buildHeightmap(
       }
       smoothTemp[rowOff + MAP_W - 1] = hmap[rowOff + MAP_W - 2] * 0.25 + hmap[rowOff + MAP_W - 1] * 0.5 + hmap[rowOff] * 0.25;
     }
-    // Vertical pass
+    // Vertical pass — use ternary instead of Math.max/Math.min
     for (let y = 0; y < MAP_H; y++) {
-      const yA = Math.max(0, y - 1);
-      const yB = Math.min(MAP_H - 1, y + 1);
+      const yA = y > 0 ? y - 1 : 0;
+      const yB = y < MAP_H - 1 ? y + 1 : MAP_H - 1;
       const rowA = yA * MAP_W, rowC = y * MAP_W, rowB = yB * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
         smoothResult[rowC + x] = smoothTemp[rowA + x] * 0.25 + smoothTemp[rowC + x] * 0.5 + smoothTemp[rowB + x] * 0.25;
