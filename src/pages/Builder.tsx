@@ -449,6 +449,19 @@ function BuilderInner() {
             onZoomChange={setLoupeZoom}
           />
 
+          {/* Smart suggestions overlay */}
+          {!isMobile && (
+            <SmartSuggestions
+              params={params}
+              lunarTexture={lunarTexture}
+              engraving={engraving}
+              castabilityReport={castabilityReport}
+              onUpdateParams={updateParams}
+              onLunarChange={setLunarTexture}
+              onEngravingChange={setEngraving}
+            />
+          )}
+
           {/* Camera presets — top-left */}
           <div className="absolute top-2 left-2 flex gap-1 z-10">
             {CAMERA_BUTTONS.map((cam) => (
