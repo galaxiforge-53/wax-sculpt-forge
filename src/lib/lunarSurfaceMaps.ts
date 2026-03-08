@@ -2258,41 +2258,54 @@ function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed:
   const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
   const halfAlbedo = new Float32Array(hw * hh);
+  const invHW4 = 4 / hw;
+  const invHH4 = 4 / hh;
   for (let y = 0; y < hh; y++) {
+    const v = y * invHH4;
+    const rowOff = y * hw;
     for (let x = 0; x < hw; x++) {
-      const u = x / hw * 4;
-      const v = y / hh * 4;
+      const u = x * invHW4;
       const n = fbm(stoneNoise, u, v, 2, 2.0, 0.5) * 0.5 + 0.5;
       const grain = (grainRng() - 0.5) * 0.04;
-      const hVal = halfHmap[y * hw + x];
+      const hVal = halfHmap[rowOff + x];
       const heightTint = 0.95 + (hVal - 0.5) * 0.1;
       let albedo = (0.82 + n * 0.12 + grain) * heightTint;
-      halfAlbedo[y * hw + x] = albedo < 0.6 ? 0.6 : albedo > 1.0 ? 1.0 : albedo;
+      halfAlbedo[rowOff + x] = albedo < 0.6 ? 0.6 : albedo > 1.0 ? 1.0 : albedo;
     }
   }
 
   const img = ctx.createImageData(w, h);
   const buf32 = new Uint32Array(img.data.buffer);
+  const invH = 1 / h;
+  const invW = 1 / w;
+  const hhm1 = hh - 1;
+  const hwm1 = hw - 1;
+
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * (hh - 1);
+    const fy = y * invH * hhm1;
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
-    const iy0 = Math.min(iy, hh - 1);
-    const iy1c = Math.min(iy + 1, hh - 1);
-    const yy = (h - 1 - y);
+    const fy0 = 1 - fy1;
+    const iy0 = iy < hhm1 ? iy : hhm1;
+    const iy1c = iy + 1 < hh ? iy + 1 : hhm1;
+    const yy = h - 1 - y;
     const outRow = yy * w;
+    const row0 = iy0 * hw;
+    const row1 = iy1c * hw;
+
     for (let x = 0; x < w; x++) {
-      const fx = (x / w) * (hw - 1);
+      const fx = x * invW * hwm1;
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
-      const ix0 = ((ix) % hw + hw) % hw;
-      const ix1c = ((ix + 1) % hw + hw) % hw;
+      const fx0 = 1 - fx1;
+      const ix0 = ix % hw;
+      const ix1c = (ix + 1) % hw;
 
       const val = (
-        halfAlbedo[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfAlbedo[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
-        halfAlbedo[iy1c * hw + ix0] * (1 - fx1) * fy1 +
-        halfAlbedo[iy1c * hw + ix1c] * fx1 * fy1
+        halfAlbedo[row0 + ix0] * fx0 * fy0 +
+        halfAlbedo[row0 + ix1c] * fx1 * fy0 +
+        halfAlbedo[row1 + ix0] * fx0 * fy1 +
+        halfAlbedo[row1 + ix1c] * fx1 * fy1
       ) * 255 + 0.5 | 0;
       buf32[outRow + x] = 0xFF000000 | (val << 16) | (val << 8) | val;
     }
