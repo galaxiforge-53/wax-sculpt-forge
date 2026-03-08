@@ -88,7 +88,6 @@ function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
 // calls invalidate() each frame while damping is still settling.
 function DampingInvalidator() {
   const { invalidate } = useThree();
-  const isInteractingRef = useRef(false);
   const dampingActiveRef = useRef(false);
   const lastCamPosRef = useRef(new THREE.Vector3());
 
@@ -101,8 +100,9 @@ function DampingInvalidator() {
       dampingActiveRef.current = true;
       invalidate();
     } else if (dampingActiveRef.current) {
-      // Camera settled — stop invalidating
+      // One extra frame to ensure final settled state renders
       dampingActiveRef.current = false;
+      invalidate();
     }
   });
 
@@ -2301,6 +2301,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
 
           <Environment preset={activeBg.envPreset} environmentIntensity={insp ? lighting.envIntensity * 2.2 : (sc ? lighting.envIntensity * 1.8 : lighting.envIntensity * activeBg.envIntensityMul)} />
           <OrbitControls
+            makeDefault
             enablePan={false}
             enableRotate={!isRotationLocked && turntableSpeed === 0}
             minDistance={insp ? 0.8 : (isMobile ? 2.0 : 2.0)}
@@ -2314,8 +2315,8 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             touches={{ ONE: isRotationLocked ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0.1}
             maxPolarAngle={Math.PI - 0.1}
-            // Smoother touch feel
-            {...(isMobile ? { enableZoom: true, zoomToCursor: false } : {})}
+            enableZoom
+            {...(isMobile ? { zoomToCursor: false } : {})}
           />
 
           {/* Rotation lock indicator */}
