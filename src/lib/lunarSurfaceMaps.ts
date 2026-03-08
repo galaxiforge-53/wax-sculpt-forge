@@ -1597,7 +1597,7 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   return canvas;
 }
 
-// ── AO map ────────────────────────────────────────────────────────
+// ── AO map (multi-scale for better occlusion quality) ─────────────
 
 function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -1606,23 +1606,45 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number): HTMLCanv
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
 
-  const kernelR = 4;
+  // Multi-scale AO: small kernel for fine detail + large kernel for broad occlusion
+  const kernels = [
+    { radius: 3, step: 1, weight: 0.5 },   // Fine detail AO
+    { radius: 8, step: 2, weight: 0.35 },   // Medium-scale
+    { radius: 16, step: 4, weight: 0.15 },  // Broad occlusion
+  ];
+
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const center = hmap[y * w + x];
-      let higher = 0, samples = 0;
+      let totalAO = 0;
 
-      for (let ky = -kernelR; ky <= kernelR; ky += 2) {
-        for (let kx = -kernelR; kx <= kernelR; kx += 2) {
-          const sy = Math.max(0, Math.min(h - 1, y + ky));
-          const sx = ((x + kx) % w + w) % w;
-          if (hmap[sy * w + sx] > center) higher++;
-          samples++;
+      for (const kernel of kernels) {
+        let higher = 0, samples = 0;
+        let heightDiffSum = 0;
+
+        for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
+          for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
+            const sy = Math.max(0, Math.min(h - 1, y + ky));
+            const sx = ((x + kx) % w + w) % w;
+            const sampleH = hmap[sy * w + sx];
+            if (sampleH > center) {
+              higher++;
+              // Weight by how much higher the neighbor is (deeper bowls = more occlusion)
+              heightDiffSum += (sampleH - center);
+            }
+            samples++;
+          }
         }
+
+        // Combine occlusion count with height difference for more realistic AO
+        const countAO = higher / samples;
+        const heightAO = Math.min(1, heightDiffSum / samples * 8);
+        const kernelAO = countAO * 0.6 + heightAO * 0.4;
+        totalAO += kernelAO * kernel.weight;
       }
 
-      const ao = 1.0 - (higher / samples) * 0.6;
-      const v = Math.round(Math.max(0.3, Math.min(1.0, ao)) * 255);
+      const ao = 1.0 - totalAO * 0.7;
+      const v = Math.round(Math.max(0.2, Math.min(1.0, ao)) * 255);
 
       const yy = (h - 1 - y);
       const idx = (yy * w + x) * 4;
