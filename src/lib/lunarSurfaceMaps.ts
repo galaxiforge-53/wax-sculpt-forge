@@ -1870,18 +1870,22 @@ export function buildHeightmap(
       const rPx2 = rPx * rPx;
       const invR2 = 1 / (rPx2 * 2.25);
 
+      const sCuW = s.cu * MAP_W;
+      const sCvH = s.cv * MAP_H;
+      const rejectD2 = rPx2 * 2.25;
       for (let py = y0; py <= y1; py++) {
         const rowOff = py * MAP_W;
+        const dv = py - sCvH;
+        const dv2 = dv * dv;
+        if (dv2 > rejectD2) continue; // early row rejection
         for (let px = x0; px <= x1; px++) {
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
-          const du = px - s.cu * MAP_W;
-          const dv = py - s.cv * MAP_H;
-          const d2 = du * du + dv * dv;
-          if (d2 > rPx2 * 2.25) continue;
-          const falloff = (1 - d2 * invR2);
+          const du = px - sCuW;
+          const d2 = du * du + dv2;
+          if (d2 > rejectD2) continue;
           const idx = rowOff + wpx;
-          const newVal = falloff * extraErosion;
+          const newVal = (1 - d2 * invR2) * extraErosion;
           if (newVal > ageMask[idx]) ageMask[idx] = newVal;
         }
       }
