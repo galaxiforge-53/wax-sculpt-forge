@@ -321,7 +321,7 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
               min={2}
               max={14}
             />
-            <span className="text-[10px] text-muted-foreground">mm</span>
+            <span className="text-[10px] text-muted-foreground">{dimUnit === "mm" ? "mm" : "in"}</span>
           </div>
         </div>
         <Slider
