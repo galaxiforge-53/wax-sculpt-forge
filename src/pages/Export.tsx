@@ -84,7 +84,7 @@ const RING_SIZES = Object.keys(RING_SIZE_MAP).map(Number);
 
 // ── Submission Steps ─────────────────────────────────────────────
 
-type SubmitStep = "review" | "confirm" | "submitting" | "done";
+type SubmitStep = "review" | "confirm" | "submitting" | "uploading-stl" | "uploading-previews" | "done";
 
 // ── Main Export page ─────────────────────────────────────────────
 
