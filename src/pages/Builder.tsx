@@ -40,6 +40,7 @@ function BuilderInner() {
   const [cameraPreset, setCameraPreset] = useState<SnapshotAngle | null>(null);
   const [showMeasurements, setShowMeasurements] = useState(false);
   const [cutawayMode, setCutawayMode] = useState<CutawayMode>("normal");
+  const [cutawayOffset, setCutawayOffset] = useState(0);
   const [lighting, setLighting] = useState<LightingSettings>(DEFAULT_LIGHTING);
   const [showcaseMode, setShowcaseMode] = useState(false);
   const [inspectionMode, setInspectionMode] = useState(false);
