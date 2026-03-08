@@ -569,6 +569,33 @@ function BuilderInner() {
             </div>
           )}
 
+          {/* Autosave indicator — bottom-right */}
+          {!isMobile && autosaveStatus.lastSaved && (
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-none animate-in fade-in duration-500">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-card/60 backdrop-blur-sm border border-border/30 rounded-md">
+                {autosaveStatus.isSaving ? (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-[8px] text-muted-foreground">Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <div className={cn("w-2 h-2 rounded-full", autosaveStatus.isCloudSynced ? "bg-emerald-500" : "bg-muted-foreground/40")} />
+                    <span className="text-[8px] text-muted-foreground">
+                      {autosaveStatus.isCloudSynced ? "Synced" : "Saved"}{" "}
+                      {(() => {
+                        const ago = (Date.now() - new Date(autosaveStatus.lastSaved!).getTime()) / 1000;
+                        if (ago < 10) return "just now";
+                        if (ago < 60) return `${Math.round(ago)}s ago`;
+                        return `${Math.round(ago / 60)}m ago`;
+                      })()}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="absolute top-2 left-2 flex gap-1 z-10">
             {CAMERA_BUTTONS.map((cam) => (
               <button
