@@ -262,9 +262,18 @@ const PLANETARY_PRESETS: PlanetaryPreset[] = [
       terrainType: "titan",
     }),
   },
+  {
+    name: "Asteroid", emoji: "☄", parent: "Belt", color: "text-stone-500",
+    description: "Irregular rubble-pile body — deep regolith pits, chaotic micro-craters, rough surface with no atmosphere erosion",
+    build: () => preset({
+      intensity: 75, craterDensity: "high", craterSize: "small",
+      microDetail: 80, rimSharpness: 40, overlapIntensity: 70, smoothEdges: false,
+      rimHeight: 35, bowlDepth: 65, erosion: 20, terrainRoughness: 90, craterVariation: 90,
+      craterShape: "organic", highlandRidges: 25, ejectaStrength: 30,
+      terrainType: "asteroid",
+    }),
+  },
 ];
-
-// ── Meteorite Surface Library ─────────────────────────────────────
 
 interface MeteoritePreset {
   name: string;
