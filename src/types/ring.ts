@@ -5,6 +5,8 @@ export type ViewMode = "wax" | "cast" | "wax-print";
 
 export type ToolType = "carve" | "smooth" | "bevel" | "groove" | "measure" | "flatten" | "stamp" | "push" | "sculpt-carve" | "sculpt-smooth";
 
+export type InteriorProfile = "flat" | "comfort-dome" | "european" | "anatomical";
+
 export interface RingParameters {
   size: number; // US ring size 3-16
   innerDiameter: number; // mm
@@ -15,6 +17,10 @@ export interface RingParameters {
   grooveCount: number;
   grooveDepth: number;
   bevelSize: number;
+  // ── Interior controls (optional for backward compat) ──
+  interiorCurvature?: number;    // 0–100, how domed the inner bore surface is (0 = flat cylinder, 100 = deep dome)
+  comfortFitDepth?: number;      // 0–100, how deep the comfort curve extends into the band
+  interiorProfile?: InteriorProfile; // shape of the inner bore cross-section
 }
 
 export interface DesignPreview {
@@ -62,4 +68,7 @@ export const DEFAULT_RING: RingParameters = {
   grooveCount: 0,
   grooveDepth: 0.3,
   bevelSize: 0.3,
+  interiorCurvature: 40,
+  comfortFitDepth: 50,
+  interiorProfile: "comfort-dome",
 };

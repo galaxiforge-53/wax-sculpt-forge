@@ -451,10 +451,44 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
   const outerGeo = new THREE.LatheGeometry(outerPoints, radSegs);
   outerGeo.computeVertexNormals();
 
-  // 2. Inner bore — smooth cylinder (NO lunar texture, just polished inner surface)
-  const innerGeo = new THREE.CylinderGeometry(innerR, innerR, halfW * 2, radSegs, 1, true);
+  // 2. Inner bore — shaped by interiorProfile and curvature controls
+  const interiorProfile = params.interiorProfile ?? "comfort-dome";
+  const curvature = (params.interiorCurvature ?? 40) / 100;  // 0–1
+  const comfortDepth = (params.comfortFitDepth ?? 50) / 100; // 0–1
+  const innerProfileSteps = isMobile ? 32 : 64;
+
+  // Build inner bore profile as a lathe curve
+  const innerPoints: THREE.Vector2[] = [];
+  const maxBulge = params.thickness / 10 * 0.35 * curvature * comfortDepth; // max inward bulge in scene units
+
+  for (let i = 0; i <= innerProfileSteps; i++) {
+    const t = i / innerProfileSteps; // 0 = bottom, 1 = top
+    const y = (t - 0.5) * halfW * 2;
+    let r = innerR;
+
+    if (interiorProfile === "flat" || curvature < 0.01) {
+      // Pure cylinder — no curvature
+      r = innerR;
+    } else if (interiorProfile === "comfort-dome") {
+      // Classic comfort fit: smooth sine dome, max bulge at center
+      const dome = Math.sin(t * Math.PI);
+      r = innerR - maxBulge * dome;
+    } else if (interiorProfile === "european") {
+      // European fit: flatter center, steeper edges — squared sine
+      const dome = Math.pow(Math.sin(t * Math.PI), 2);
+      r = innerR - maxBulge * 0.7 * dome;
+    } else if (interiorProfile === "anatomical") {
+      // Anatomical: asymmetric — slightly more material on top (palm side)
+      const asymmetry = 0.15 * curvature;
+      const dome = Math.sin(t * Math.PI) * (1 + asymmetry * (t - 0.5));
+      r = innerR - maxBulge * dome;
+    }
+
+    innerPoints.push(new THREE.Vector2(Math.max(r, innerR * 0.85), y));
+  }
+
+  const innerGeo = new THREE.LatheGeometry(innerPoints, radSegs);
   // Flip normals inward for inner bore
-  const innerPos = innerGeo.attributes.position;
   const innerNorm = innerGeo.attributes.normal;
   for (let i = 0; i < innerNorm.count; i++) {
     innerNorm.setXYZ(i, -innerNorm.getX(i), -innerNorm.getY(i), -innerNorm.getZ(i));
@@ -469,13 +503,14 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
       arr[i + 2] = tmp;
     }
   }
+  innerGeo.computeVertexNormals();
 
   // 3. End caps — ring-shaped annular discs connecting outer edge to inner bore
-  const capGeoTop = new THREE.RingGeometry(innerR, outerPoints[outerPoints.length - 1].x, radSegs, 1);
+  const capGeoTop = new THREE.RingGeometry(innerPoints[innerPoints.length - 1].x, outerPoints[outerPoints.length - 1].x, radSegs, 1);
   capGeoTop.rotateX(-Math.PI / 2);
   capGeoTop.translate(0, halfW, 0);
 
-  const capGeoBot = new THREE.RingGeometry(innerR, outerPoints[0].x, radSegs, 1);
+  const capGeoBot = new THREE.RingGeometry(innerPoints[0].x, outerPoints[0].x, radSegs, 1);
   capGeoBot.rotateX(Math.PI / 2);
   capGeoBot.translate(0, -halfW, 0);
 
@@ -860,18 +895,33 @@ function EngravingText3D({ params, engraving }: { params: RingParameters; engrav
   const textR = innerR - depthOffset * 0.5;
   const fontSize = engraving.sizeMm / 10;
   const letterSpacing = engraving.spacingMm / 10;
+  const halfW = params.width / 2 / 10;
+
+  // Vertical offset based on placement
+  const placement = engraving.placement ?? "center";
+  let yOffset = 0;
+  if (placement === "top-edge") {
+    yOffset = halfW * 0.6;
+  } else if (placement === "bottom-edge") {
+    yOffset = -halfW * 0.6;
+  } else if (placement === "custom") {
+    yOffset = (engraving.verticalOffsetMm ?? 0) / 10;
+  }
+
+  // Start angle offset (degrees → radians)
+  const startAngleOffset = ((engraving.startAngleDeg ?? 0) * Math.PI) / 180;
 
   const chars = engraving.text.split("");
   const charWidth = fontSize * 0.6 + letterSpacing;
   const totalArc = chars.length * charWidth;
   const circumference = 2 * Math.PI * textR;
   const arcFraction = totalArc / circumference;
-  const startAngle = -arcFraction * Math.PI;
+  const baseStartAngle = -arcFraction * Math.PI + startAngleOffset;
 
   return (
     <group rotation={[Math.PI / 2, 0, 0]}>
       {chars.map((char, i) => {
-        const angle = startAngle + (i + 0.5) * (charWidth / textR);
+        const angle = baseStartAngle + (i + 0.5) * (charWidth / textR);
         const x = Math.cos(angle) * textR;
         const z = Math.sin(angle) * textR;
         const rotY = -angle - Math.PI / 2;
@@ -879,7 +929,7 @@ function EngravingText3D({ params, engraving }: { params: RingParameters; engrav
         return (
           <Text
             key={`${i}-${char}`}
-            position={[x, 0, z]}
+            position={[x, yOffset, z]}
             rotation={[0, rotY, 0]}
             fontSize={fontSize}
             color="#555555"
