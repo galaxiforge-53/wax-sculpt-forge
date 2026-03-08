@@ -1364,12 +1364,15 @@ function applySurfaceZones(
     }
 
     // Apply zone effects to entire row (avoiding per-pixel zone lookup)
-    const invSmooth = 1 - smoothnessFactor;
+    // Algebraic simplification: combining two `0.5 + (x - 0.5) * k` operations:
+    //   flattened = 0.5 + (orig - 0.5) * invSmooth
+    //   result    = 0.5 + (flattened - 0.5) * zoneInfluence
+    //            = 0.5 + (orig - 0.5) * invSmooth * zoneInfluence
+    // => single multiply per pixel instead of two
+    const combinedFactor = (1 - smoothnessFactor) * zoneInfluence;
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
-      const original = hmap[idx];
-      const flattened = 0.5 + (original - 0.5) * invSmooth;
-      hmap[idx] = 0.5 + (flattened - 0.5) * zoneInfluence;
+      hmap[idx] = 0.5 + (hmap[idx] - 0.5) * combinedFactor;
     }
   }
 }
