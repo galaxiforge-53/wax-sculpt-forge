@@ -39,6 +39,10 @@ export interface LunarTextureState {
   // ── v4 fields ──
   terrainType?: TerrainType;    // planet-specific terrain generation mode
   terrainContrast?: number;     // 0–100, how dramatic crater depth/height differences appear (default 60)
+  // ── v5 layer mix fields ──
+  layerLargeCraters?: number;   // 0–100, strength of mega + hero craters (default 50)
+  layerMediumImpacts?: number;  // 0–100, strength of medium + small impacts (default 50)
+  layerMicroPitting?: number;   // 0–100, strength of micro pits + regolith texture (default 50)
 }
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
@@ -65,4 +69,7 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   ejectaStrength: 50,
   terrainType: "generic",
   terrainContrast: 60,
+  layerLargeCraters: 50,
+  layerMediumImpacts: 50,
+  layerMicroPitting: 50,
 };

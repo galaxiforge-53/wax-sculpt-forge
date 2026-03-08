@@ -40,6 +40,9 @@ function cacheKey(lunar: LunarTextureState): string {
     lunar.craterFloorTexture ?? 30, lunar.ejectaStrength ?? 50,
     lunar.terrainType ?? "generic",
     lunar.terrainContrast ?? 60,
+    lunar.layerLargeCraters ?? 50,
+    lunar.layerMediumImpacts ?? 50,
+    lunar.layerMicroPitting ?? 50,
   ].join("-");
 }
 
@@ -901,6 +904,9 @@ export function buildHeightmap(
   const ridgeFactor = (lunar.highlandRidges ?? 0) / 100;
   const floorTexFactor = (lunar.craterFloorTexture ?? 30) / 100;
   const ejectaFactor = (lunar.ejectaStrength ?? 50) / 100;
+  const layerLarge = (lunar.layerLargeCraters ?? 50) / 50;   // 0–2 multiplier (50 = 1.0 = default)
+  const layerMedium = (lunar.layerMediumImpacts ?? 50) / 50;
+  const layerMicro = (lunar.layerMicroPitting ?? 50) / 50;
 
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
@@ -927,24 +933,24 @@ export function buildHeightmap(
   // ─── 2b) Floor texture noise ──
   const floorNoise = makeNoise2D(lunar.seed + 8888);
 
-  // ─── 3) 5-tier crater distribution ──
+  // ─── 3) 5-tier crater distribution (scaled by layer mix) ──
   const densityMul = lunar.craterDensity === "low" ? 0.5 : lunar.craterDensity === "med" ? 1.0 : 1.8;
   const sizeMul = lunar.craterSize === "small" ? 0.6 : lunar.craterSize === "med" ? 1.0 : 1.5;
   const saf = surfaceAreaFactor;
 
-  const megaCount = Math.round((1 + densityMul * 1.5) * Math.max(0.6, Math.min(1.5, saf)));
+  const megaCount = Math.round((1 + densityMul * 1.5) * Math.max(0.6, Math.min(1.5, saf)) * layerLarge);
   const megaRadMin = 0.12 * sizeMul, megaRadMax = 0.22 * sizeMul;
 
-  const heroCount = Math.round((3 + densityMul * 5) * Math.sqrt(saf));
+  const heroCount = Math.round((3 + densityMul * 5) * Math.sqrt(saf) * layerLarge);
   const heroRadMin = 0.06 * sizeMul, heroRadMax = 0.12 * sizeMul;
 
-  const medCount = Math.round((15 + densityMul * 35 * sizeMul) * saf);
+  const medCount = Math.round((15 + densityMul * 35 * sizeMul) * saf * layerMedium);
   const medRadMin = 0.025 * sizeMul, medRadMax = 0.06 * sizeMul;
 
-  const smallCount = Math.round((40 + densityMul * 160) * saf);
+  const smallCount = Math.round((40 + densityMul * 160) * saf * layerMedium);
   const smallRadMin = 0.008, smallRadMax = 0.025 * sizeMul;
 
-  const microPitCount = Math.round((200 + densityMul * 600) * saf);
+  const microPitCount = Math.round((200 + densityMul * 600) * saf * layerMicro);
 
   const stamps: CraterStamp[] = [];
 
@@ -984,10 +990,10 @@ export function buildHeightmap(
     }
   }
 
-  addCraters(megaCount, megaRadMin, megaRadMax, 1.2, 0);
-  addCraters(heroCount, heroRadMin, heroRadMax, 1.0, 1);
-  addCraters(medCount, medRadMin, medRadMax, 0.8, 2);
-  addCraters(smallCount, smallRadMin, smallRadMax, 0.6, 3);
+  addCraters(megaCount, megaRadMin, megaRadMax, 1.2 * layerLarge, 0);
+  addCraters(heroCount, heroRadMin, heroRadMax, 1.0 * layerLarge, 1);
+  addCraters(medCount, medRadMin, medRadMax, 0.8 * layerMedium, 2);
+  addCraters(smallCount, smallRadMin, smallRadMax, 0.6 * layerMedium, 3);
 
   // Overlap pass
   if (overlapFactor > 0) {
@@ -1065,10 +1071,10 @@ export function buildHeightmap(
 
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
-    const pitCount = Math.floor(microPitCount * microFactor);
+    const pitCount = Math.floor(microPitCount * microFactor * layerMicro);
     const pitRadiusMin = 0.001;
     const pitRadiusMax = 0.008;
-    const pitDepth = 0.1 * depthScale * microFactor;
+    const pitDepth = 0.1 * depthScale * microFactor * layerMicro;
 
     for (let i = 0; i < pitCount; i++) {
       const pu = pitRng();
@@ -1100,7 +1106,7 @@ export function buildHeightmap(
   // ─── 7) Regolith micro-texture ──
   if (microFactor > 0) {
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
-    const regolithStrength = microFactor * 0.05 * depthScale;
+    const regolithStrength = microFactor * 0.05 * depthScale * layerMicro;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 48;
@@ -1112,7 +1118,7 @@ export function buildHeightmap(
     }
 
     const fineRegolith = makeNoise2D(lunar.seed + 4444);
-    const fineStrength = microFactor * 0.025 * depthScale;
+    const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 96;
@@ -1124,7 +1130,7 @@ export function buildHeightmap(
     }
 
     const grainRng = seededRng(lunar.seed + 9999);
-    const grainStrength = microFactor * 0.035 * depthScale;
+    const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
     for (let i = 0; i < hmap.length; i++) {
       const mask = edgeMask[i];
       hmap[i] += (grainRng() - 0.5) * grainStrength * mask;
