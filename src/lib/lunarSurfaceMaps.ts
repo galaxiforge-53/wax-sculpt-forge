@@ -956,6 +956,70 @@ function applySymmetry(
   }
 }
 
+// ── Apply surface zones to heightmap ──────────────────────────────
+
+function applySurfaceZones(
+  hmap: Float32Array,
+  w: number,
+  h: number,
+  zones: SurfaceZone[],
+) {
+  if (zones.length === 0) return;
+
+  // Sort zones by startV for predictable processing
+  const sortedZones = [...zones].sort((a, b) => a.startV - b.startV);
+
+  for (let y = 0; y < h; y++) {
+    const v = y / h; // 0 to 1 along the ring width
+
+    // Find which zone(s) this row belongs to
+    let zoneInfluence = 1.0; // Default: full texture intensity
+    let smoothnessFactor = 0; // 0 = full texture, 1 = completely smooth
+
+    for (const zone of sortedZones) {
+      if (v < zone.startV || v > zone.endV) continue;
+
+      const zoneWidth = zone.endV - zone.startV;
+      const blendRegion = (zone.blendWidth / 100) * zoneWidth;
+      const posInZone = v - zone.startV;
+      const distFromEnd = zone.endV - v;
+
+      // Calculate blend factor at zone edges
+      let edgeBlend = 1.0;
+      if (blendRegion > 0) {
+        if (posInZone < blendRegion) {
+          edgeBlend = posInZone / blendRegion;
+        } else if (distFromEnd < blendRegion) {
+          edgeBlend = distFromEnd / blendRegion;
+        }
+      }
+
+      // Apply zone's intensity and smoothness
+      const zoneIntensity = (zone.intensity / 100) * edgeBlend;
+      const zoneSmoothness = (zone.smoothness / 100) * edgeBlend;
+
+      // Blend with existing influence (for overlapping zones)
+      zoneInfluence = zoneInfluence * (1 - edgeBlend) + zoneIntensity * edgeBlend;
+      smoothnessFactor = smoothnessFactor * (1 - edgeBlend) + zoneSmoothness * edgeBlend;
+    }
+
+    // Apply zone effects to this row
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      const original = hmap[idx];
+
+      // Reduce texture intensity based on zone settings
+      // As smoothness increases, flatten toward 0.5 (neutral height)
+      const flattened = 0.5 + (original - 0.5) * (1 - smoothnessFactor);
+
+      // Apply intensity reduction
+      const final = 0.5 + (flattened - 0.5) * zoneInfluence;
+
+      hmap[idx] = final;
+    }
+  }
+}
+
 // ── Build heightmap ───────────────────────────────────────────────
 
 const REF_INNER_DIAM = 18.1;
