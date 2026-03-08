@@ -1573,16 +1573,18 @@ export function buildHeightmap(
       const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * MAP_H));
       const y1 = Math.min(MAP_H - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * MAP_H));
 
+      const pxR2 = pxR * pxR; // squared radius for fast rejection
+
       for (let py = y0; py <= y1; py++) {
         for (let px = x0; px <= x1; px++) {
           // Wrap x for seamless circumference
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
-          const du = (px - pu * MAP_W) / pxR;
-          const dv = (py - pv * MAP_H) / pyR;
-          const d = Math.sqrt(du * du + dv * dv);
-          if (d > 1.0) continue;
-          const falloff = 1 - d * d;
+          const du = (px - pu * MAP_W);
+          const dv = (py - pv * MAP_H) * (pxR / pyR); // aspect-correct to circle space
+          const d2 = du * du + dv * dv;
+          if (d2 > pxR2) continue; // squared distance check — no sqrt needed
+          const falloff = 1 - d2 / pxR2; // d²/r² maps 0→1 to 1→0
           const mask = edgeMask[py * MAP_W + wpx];
           hmap[py * MAP_W + wpx] -= pd * falloff * mask;
         }
