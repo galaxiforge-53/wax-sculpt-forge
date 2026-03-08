@@ -364,6 +364,8 @@ function BuilderInner() {
         onForgeNow={handleForgeNow}
         onEnhance={handleEnhance}
         isEnhancing={isEnhancing}
+        onShare={handleShare}
+        isSharing={isSharing}
       />
 
       <div className="flex flex-1 min-h-0 relative">
