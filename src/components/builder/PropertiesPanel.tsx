@@ -155,6 +155,32 @@ const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
   { value: "smooth-sculpt", label: "Smooth" },
 ];
 
+/** Small SVG icon showing edge cross-section shape */
+function EdgeStyleIcon({ style, active }: { style: EdgeStyle; active: boolean }) {
+  const stroke = active ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))";
+  const w = 24, h = 16;
+  let d = "";
+  switch (style) {
+    case "sharp":
+      d = "M4 14 L4 2 L20 2 L20 14";
+      break;
+    case "soft-bevel":
+      d = "M4 14 L4 5 Q4 2 7 2 L17 2 Q20 2 20 5 L20 14";
+      break;
+    case "rounded":
+      d = "M4 14 L4 8 C4 2 8 2 12 2 C16 2 20 2 20 8 L20 14";
+      break;
+    case "chamfer":
+      d = "M4 14 L4 6 L8 2 L16 2 L20 6 L20 14";
+      break;
+  }
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none">
+      <path d={d} stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange, metalPreset = "silver" }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
 
