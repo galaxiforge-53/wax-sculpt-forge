@@ -15,6 +15,7 @@ import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { estimateCraterCount } from "@/lib/lunarSurfaceMaps";
 import AdvancedTerrainEditor from "./AdvancedTerrainEditor";
+import SeedExplorer from "./SeedExplorer";
 
 // ── Helper: build a full LunarTextureState from partial overrides ──
 const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
@@ -1003,6 +1004,15 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
                 </Button>
               </div>
             </div>
+          </SubSection>
+
+          {/* ── Seed Explorer ── */}
+          <SubSection title="Seed Explorer" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5 flex items-center gap-1">
+              <Dices className="w-3 h-3" />
+              Browse and preview different terrain seeds instantly
+            </p>
+            <SeedExplorer state={state} onChange={onChange} />
           </SubSection>
 
           {/* ── Advanced Terrain Editor ── */}
