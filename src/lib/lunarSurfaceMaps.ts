@@ -1071,10 +1071,10 @@ export function buildHeightmap(
 
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
-    const pitCount = Math.floor(microPitCount * microFactor);
+    const pitCount = Math.floor(microPitCount * microFactor * layerMicro);
     const pitRadiusMin = 0.001;
     const pitRadiusMax = 0.008;
-    const pitDepth = 0.1 * depthScale * microFactor;
+    const pitDepth = 0.1 * depthScale * microFactor * layerMicro;
 
     for (let i = 0; i < pitCount; i++) {
       const pu = pitRng();
