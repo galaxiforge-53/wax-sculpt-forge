@@ -1550,7 +1550,17 @@ interface RingViewportProps {
   scaleReference?: ScaleReferenceType; // Show real-world scale reference objects
   wearPreview?: number; // 0–100, simulates polishing/wear softening
   turntableSpeed?: number; // 0 = off, positive = RPM (e.g. 4 for slow spin)
+  bgPreset?: BackgroundPreset;
 }
+
+export type BackgroundPreset = "dark-studio" | "light-studio" | "cosmic" | "neutral";
+
+export const BG_PRESETS: { id: BackgroundPreset; label: string; icon: string; bgClass: string; envPreset: LightingSettings["envPreset"]; envIntensityMul: number; toneMappingExposure: number }[] = [
+  { id: "dark-studio", label: "Dark Studio", icon: "🌑", bgClass: "bg-forge-dark", envPreset: "studio", envIntensityMul: 1, toneMappingExposure: 0.95 },
+  { id: "light-studio", label: "Light Studio", icon: "☀️", bgClass: "bg-[hsl(220,10%,88%)]", envPreset: "warehouse", envIntensityMul: 1.3, toneMappingExposure: 1.15 },
+  { id: "cosmic", label: "Cosmic", icon: "🌌", bgClass: "bg-[hsl(240,30%,6%)]", envPreset: "night", envIntensityMul: 0.8, toneMappingExposure: 0.85 },
+  { id: "neutral", label: "Neutral", icon: "📦", bgClass: "bg-[hsl(0,0%,75%)]", envPreset: "lobby", envIntensityMul: 1.5, toneMappingExposure: 1.1 },
+];
 
 // ── Clipping plane manager with interactive offset ─────────────────
 function ClipPlaneManager({ mode, offset = 0, params }: { mode: CutawayMode; offset: number; params: RingParameters }) {
