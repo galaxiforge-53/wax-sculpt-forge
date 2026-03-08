@@ -553,7 +553,7 @@ function stampEjectaRays(
   h: number,
   c: CraterStamp,
   rand: () => number,
-  edgeMask: Float32Array,
+  edgeRow: Float32Array,
   secondaryStamps: CraterStamp[],
   physicalAspect: number = 1,
   ejectaStrength: number = 0.5,
