@@ -768,8 +768,9 @@ function ThicknessHeatmapOverlay({ outerGeo, params }: { outerGeo: THREE.LatheGe
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, imageTerrain, wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
+  const hasImageTerrain = !!imageTerrain?.enabled && !!imageTerrain?.imageDataUrl;
   const isMobile = useIsMobile();
   const wearAmount = wearPreview;
   const polishAmount = polishPreview;
