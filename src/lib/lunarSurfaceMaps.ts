@@ -1059,19 +1059,20 @@ function applyAsteroidRubble(
   const aspectCorr = physicalAspect / (w / h);
 
   // 1) Multi-scale rubble texture — chaotic, non-periodic bumps
+  const invW_rubble = 1 / w;
+  const invH_rubble = 1 / h;
   for (let y = 0; y < h; y++) {
-    const vn = y / h;
+    const vn10 = y * invH_rubble * 10 * aspectCorr;
+    const vn35 = y * invH_rubble * 35 * aspectCorr;
+    const rowOff = y * w;
     for (let x = 0; x < w; x++) {
-      const un = x / w;
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const mask = edgeMask[idx];
       if (mask < 0.01) continue;
 
-      // Coarse rubble (large irregular lumps)
-      const coarse = fbm(rubbleNoise, un * 10, vn * 10 * aspectCorr, 4, 2.3, 0.55);
-      // Fine rubble (small angular fragments)
-      const fine = Math.abs(boulderNoise(un * 35, vn * 35 * aspectCorr));
-      // Combined — coarse shapes + sharp angular fragments
+      const un = x * invW_rubble;
+      const coarse = fbm(rubbleNoise, un * 10, vn10, 4, 2.3, 0.55);
+      const fine = Math.abs(boulderNoise(un * 35, vn35));
       const rubble = coarse * 0.6 + (fine - 0.3) * 0.4;
       hmap[idx] += rubble * rubbleAmp * mask;
     }
@@ -1157,62 +1158,63 @@ function applySymmetry(
 ) {
   if (symmetry === "none") return;
 
-  const folds = parseInt(symmetry, 10); // 2, 3, 4, 6, or 8
+  const folds = parseInt(symmetry, 10);
   if (isNaN(folds) || folds < 2) return;
 
   const segmentWidth = w / folds;
+  const segW = Math.ceil(segmentWidth);
   const blendPx = Math.floor((blendPercent / 100) * segmentWidth * 0.5);
+  const invBlendPx = blendPx > 0 ? 1 / blendPx : 0;
+  const segWm1 = segW - 1;
 
-  // Create a copy of the first segment to use as source
-  const sourceSegment = new Float32Array(Math.ceil(segmentWidth) * h);
+  // Copy first segment once
+  const sourceSegment = new Float32Array(segW * h);
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < Math.ceil(segmentWidth); x++) {
-      sourceSegment[y * Math.ceil(segmentWidth) + x] = hmap[y * w + x];
+    const srcRow = y * w;
+    const dstRow = y * segW;
+    for (let x = 0; x < segW; x++) {
+      sourceSegment[dstRow + x] = hmap[srcRow + x];
     }
   }
 
-  // Apply the source segment to all other segments with optional blending
+  // Apply to all other segments
   for (let fold = 1; fold < folds; fold++) {
     const startX = Math.floor(fold * segmentWidth);
-    const mirror = fold % 2 === 1; // Alternate mirroring for seamless look
+    const mirror = fold & 1; // bit test instead of modulo
 
     for (let y = 0; y < h; y++) {
-      for (let localX = 0; localX < Math.ceil(segmentWidth); localX++) {
+      const srcRow = y * segW;
+      const dstRow = y * w;
+      for (let localX = 0; localX < segW; localX++) {
         const targetX = startX + localX;
         if (targetX >= w) continue;
 
-        // Get source position (mirrored if needed)
-        const srcX = mirror
-          ? Math.min(Math.ceil(segmentWidth) - 1, Math.ceil(segmentWidth) - 1 - localX)
-          : localX;
-        const srcIdx = y * Math.ceil(segmentWidth) + srcX;
-        const srcValue = sourceSegment[srcIdx] ?? 0.5;
+        const srcX = mirror ? segWm1 - localX : localX;
+        const srcValue = sourceSegment[srcRow + srcX];
+        const targetIdx = dstRow + targetX;
 
-        const targetIdx = y * w + targetX;
-        const existingValue = hmap[targetIdx];
-
-        // Blend at segment boundaries for smoother transitions
         let blend = 1.0;
         if (blendPx > 0) {
           if (localX < blendPx) {
-            blend = localX / blendPx;
+            blend = localX * invBlendPx;
           } else if (localX > segmentWidth - blendPx) {
-            blend = (segmentWidth - localX) / blendPx;
+            blend = (segmentWidth - localX) * invBlendPx;
           }
         }
 
-        hmap[targetIdx] = existingValue * (1 - blend) + srcValue * blend;
+        hmap[targetIdx] = hmap[targetIdx] * (1 - blend) + srcValue * blend;
       }
     }
   }
 
-  // Ensure seamless wrap at U=0/U=1 boundary
+  // Seamless wrap at U=0/U=1
   if (blendPx > 0) {
     for (let y = 0; y < h; y++) {
+      const row = y * w;
       for (let dx = 0; dx < blendPx; dx++) {
-        const leftIdx = y * w + dx;
-        const rightIdx = y * w + (w - 1 - dx);
-        const t = dx / blendPx;
+        const t = dx * invBlendPx;
+        const leftIdx = row + dx;
+        const rightIdx = row + w - 1 - dx;
         const avg = hmap[leftIdx] * (1 - t * 0.5) + hmap[rightIdx] * (t * 0.5);
         hmap[leftIdx] = avg;
         hmap[rightIdx] = hmap[leftIdx] * (t * 0.5) + hmap[rightIdx] * (1 - t * 0.5);
@@ -1560,34 +1562,41 @@ export function buildHeightmap(
     const halfW = MAP_W >> 1;
     const halfH = MAP_H >> 1;
     const halfBase = new Float32Array(halfW * halfH);
+    const invHalfW8 = 8 / halfW;
+    const invHalfH8 = 8 * aspectCorrection / halfH;
     for (let y = 0; y < halfH; y++) {
-      const v = (y / halfH) * 8 * aspectCorrection;
+      const v = y * invHalfH8;
+      const rowOff = y * halfW;
       for (let x = 0; x < halfW; x++) {
-        const u = (x / halfW) * 8;
-        halfBase[y * halfW + x] = fbm(baseNoise, u, v, 6, 2.0, 0.5) * baseAmp;
+        halfBase[rowOff + x] = fbm(baseNoise, x * invHalfW8, v, 6, 2.0, 0.5) * baseAmp;
       }
     }
-    // Bilinear upscale to full resolution and add to heightmap
+    // Bilinear upscale with pre-computed reciprocals and row caching
+    const invMapH_halfH = (halfH - 1) / MAP_H;
+    const invMapW_halfW = (halfW - 1) / MAP_W;
+    const halfHm1 = halfH - 1;
     for (let y = 0; y < MAP_H; y++) {
-      const fy = (y / MAP_H) * (halfH - 1);
+      const fy = y * invMapH_halfH;
       const iy = Math.floor(fy);
       const fy1 = fy - iy;
-      const iy0 = Math.min(iy, halfH - 1);
-      const iy1 = Math.min(iy + 1, halfH - 1);
+      const fy0 = 1 - fy1;
+      const iy0 = iy < halfHm1 ? iy : halfHm1;
+      const iy1 = iy + 1 < halfH ? iy + 1 : halfHm1;
+      const row0 = iy0 * halfW;
+      const row1 = iy1 * halfW;
+      const outRow = y * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
-        const fx = (x / MAP_W) * (halfW - 1);
+        const fx = x * invMapW_halfW;
         const ix = Math.floor(fx);
         const fx1 = fx - ix;
-        const ix0 = ((ix) % halfW + halfW) % halfW;
-        const ix1 = ((ix + 1) % halfW + halfW) % halfW;
-        const val = (
-          halfBase[iy0 * halfW + ix0] * (1 - fx1) * (1 - fy1) +
-          halfBase[iy0 * halfW + ix1] * fx1 * (1 - fy1) +
-          halfBase[iy1 * halfW + ix0] * (1 - fx1) * fy1 +
-          halfBase[iy1 * halfW + ix1] * fx1 * fy1
-        );
-        const mask = edgeMask[y * MAP_W + x];
-        hmap[y * MAP_W + x] += val * mask;
+        const fx0 = 1 - fx1;
+        const ix0 = ix % halfW;
+        const ix1 = (ix + 1) % halfW;
+        const val = halfBase[row0 + ix0] * fx0 * fy0 +
+          halfBase[row0 + ix1] * fx1 * fy0 +
+          halfBase[row1 + ix0] * fx0 * fy1 +
+          halfBase[row1 + ix1] * fx1 * fy1;
+        hmap[outRow + x] += val * edgeMask[outRow + x];
       }
     }
   }
@@ -1742,6 +1751,63 @@ export function buildHeightmap(
 
   const totalCraterCount = stamps.length + secondaryStamps.length + microPitCount;
 
+  // ─── 3b) Impact melt pooling — smooth flat floors inside large craters ──
+  // Real large craters develop melt sheets that pool on the floor, creating
+  // ultra-smooth patches. We blur the heightmap ONLY inside mega/hero crater bowls.
+  if (stamps.length > 0) {
+    const meltStamps = stamps.filter(s => s.tier <= 1 && s.radius > 0.08);
+    if (meltStamps.length > 0) {
+      const len = MAP_W * MAP_H;
+      if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
+      const meltBlurred = _erosionBuf1;
+
+      // Quick 3×3 blur for melt smoothing
+      for (let y = 0; y < MAP_H; y++) {
+        const yA = y > 0 ? y - 1 : 0;
+        const yB = y < MAP_H - 1 ? y + 1 : MAP_H - 1;
+        const rowA = yA * MAP_W, rowM = y * MAP_W, rowB = yB * MAP_W;
+        for (let x = 0; x < MAP_W; x++) {
+          const xL = x === 0 ? MAP_W - 1 : x - 1;
+          const xR = x === MAP_W - 1 ? 0 : x + 1;
+          meltBlurred[rowM + x] = (
+            hmap[rowA + xL] + hmap[rowA + x] + hmap[rowA + xR] +
+            hmap[rowM + xL] + hmap[rowM + x] + hmap[rowM + xR] +
+            hmap[rowB + xL] + hmap[rowB + x] + hmap[rowB + xR]
+          ) * 0.111111111;
+        }
+      }
+
+      // Apply melt smoothing only inside crater floor regions
+      for (const s of meltStamps) {
+        const floorR = s.radius * 0.55; // inner 55% of crater is the floor
+        const pxR = floorR * MAP_W;
+        const pyR = floorR * MAP_H * physicalAspect;
+        const pxR2 = pxR * pxR;
+        const x0 = Math.floor((s.cu - floorR) * MAP_W);
+        const x1 = Math.ceil((s.cu + floorR) * MAP_W);
+        const y0 = Math.max(0, Math.floor((s.cv - floorR * physicalAspect) * MAP_H));
+        const y1 = Math.min(MAP_H - 1, Math.ceil((s.cv + floorR * physicalAspect) * MAP_H));
+
+        for (let py = y0; py <= y1; py++) {
+          const rowOff = py * MAP_W;
+          for (let px = x0; px <= x1; px++) {
+            let wpx = px % MAP_W;
+            if (wpx < 0) wpx += MAP_W;
+            const du = px - s.cu * MAP_W;
+            const dv = (py - s.cv * MAP_H) * (pxR / pyR);
+            const d2 = du * du + dv * dv;
+            if (d2 > pxR2) continue;
+            const t = Math.sqrt(d2) / pxR;
+            // Smoothstep falloff: full melt in center, fade at edges
+            const meltBlend = (1 - t) * (1 - t) * 0.7;
+            const idx = rowOff + wpx;
+            hmap[idx] = hmap[idx] * (1 - meltBlend) + meltBlurred[idx] * meltBlend;
+          }
+        }
+      }
+    }
+  }
+
   // ─── 4) Maria fill pass ──
   applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeMask, lunar.seed);
 
@@ -1864,8 +1930,9 @@ export function buildHeightmap(
       }
     }
 
-    // ─── 7) Single-pass regolith + grain + directional scratches ──
-    // Previously 3 separate full-map traversals; now combined into one
+    // ─── 7) Half-res regolith fBm + full-res grain/scratches ──
+    // The 5-octave regolith fBm is the most expensive per-pixel op in this section.
+    // Computing at half-res then upscaling saves ~75% of noise lookups (1M vs 4M).
     const regolithNoise = makeNoise2D(lunar.seed + 3333);
     const fineRegolith = makeNoise2D(lunar.seed + 4444);
     const impactNoise = makeNoise2D(lunar.seed + 11111);
@@ -1878,26 +1945,63 @@ export function buildHeightmap(
     const fineStrength = microFactor * 0.025 * depthScale * layerMicro;
     const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
 
-    // Pre-compute reciprocals to avoid repeated division in the 4M-pixel inner loop
+    // Compute coarse regolith at half resolution
+    const halfW_r = MAP_W >> 1;
+    const halfH_r = MAP_H >> 1;
+    const halfRegolith = new Float32Array(halfW_r * halfH_r);
+    const invHalfW_r48 = 48 / halfW_r;
+    const invHalfH_r48 = 48 * aspectCorrection / halfH_r;
+    for (let y = 0; y < halfH_r; y++) {
+      const vCoord = y * invHalfH_r48;
+      const rowOff = y * halfW_r;
+      for (let x = 0; x < halfW_r; x++) {
+        halfRegolith[rowOff + x] = fbm(regolithNoise, x * invHalfW_r48, vCoord, 5, 2.2, 0.45) * regolithStrength;
+      }
+    }
+
+    // Upscale regolith + add full-res fine detail, grain, and scratches
     const invMapW = 1 / MAP_W;
     const invMapH = 1 / MAP_H;
+    const invMapW_halfW = (halfW_r - 1) / MAP_W;
+    const invMapH_halfH = (halfH_r - 1) / MAP_H;
+    const halfHm1_r = halfH_r - 1;
 
     for (let y = 0; y < MAP_H; y++) {
+      // Bilinear interpolation Y weights (constant per row)
+      const fy = y * invMapH_halfH;
+      const iy = Math.floor(fy);
+      const fy1 = fy - iy;
+      const fy0 = 1 - fy1;
+      const iy0 = iy < halfHm1_r ? iy : halfHm1_r;
+      const iy1c = iy + 1 < halfH_r ? iy + 1 : halfHm1_r;
+      const row0 = iy0 * halfW_r;
+      const row1 = iy1c * halfW_r;
+
       const yNorm = y * invMapH;
-      const vCoord48 = yNorm * 48 * aspectCorrection;
       const vCoord96 = yNorm * 96 * aspectCorrection;
       const vCoord200 = yNorm * 200 * aspectCorrection;
       const rowOff = y * MAP_W;
+
       for (let x = 0; x < MAP_W; x++) {
         const idx = rowOff + x;
         const mask = edgeMask[idx];
-        if (mask < 0.01) continue; // Skip fully masked edge pixels
+        if (mask < 0.01) continue;
 
         const uNorm = x * invMapW;
 
-        // Coarse regolith (5 octave fBm)
-        const regN = fbm(regolithNoise, uNorm * 48, vCoord48, 5, 2.2, 0.45);
-        // Fine regolith (single octave)
+        // Upscale coarse regolith via bilinear interpolation
+        const fx = x * invMapW_halfW;
+        const ix = Math.floor(fx);
+        const fx1 = fx - ix;
+        const fx0 = 1 - fx1;
+        const ix0 = ix % halfW_r;
+        const ix1c = (ix + 1) % halfW_r;
+        const regN = halfRegolith[row0 + ix0] * fx0 * fy0 +
+          halfRegolith[row0 + ix1c] * fx1 * fy0 +
+          halfRegolith[row1 + ix0] * fx0 * fy1 +
+          halfRegolith[row1 + ix1c] * fx1 * fy1;
+
+        // Fine regolith (single octave — fast, stays full-res)
         const fineN = fineRegolith(uNorm * 96, vCoord96);
         // Random grain particle
         const grain = (grainRng() - 0.5) * grainStrength;
@@ -1906,7 +2010,7 @@ export function buildHeightmap(
         const rv = -(uNorm * 200) * sinA + vCoord200 * cosA;
         const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
 
-        hmap[idx] += (regN * regolithStrength + fineN * fineStrength + grain + scratch) * mask;
+        hmap[idx] += (regN + fineN * fineStrength + grain + scratch) * mask;
       }
     }
   }
@@ -2329,8 +2433,9 @@ function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number)
     const rowSrc = y * w;
     const rowDst = yy * w;
     for (let x = 0; x < w; x++) {
-      const v = Math.max(0, Math.min(255, hmap[rowSrc + x] * 255 + 0.5)) | 0;
-      // Pack RGBA as single 32-bit write (little-endian: ABGR)
+      // Branchless clamp: multiply then bitwise-or avoids Math.max/Math.min
+      let v = hmap[rowSrc + x] * 255 + 0.5 | 0;
+      v = (v | -(v > 0 ? 1 : 0)) & 0xFF; // clamp 0-255 branchless
       buf32[rowDst + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
