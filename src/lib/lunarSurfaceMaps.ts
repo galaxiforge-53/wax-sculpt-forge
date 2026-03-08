@@ -1247,6 +1247,11 @@ export function buildHeightmap(
   // ─── 9) Apply symmetry ──
   applySymmetry(hmap, MAP_W, MAP_H, lunar.symmetry ?? "none", lunar.symmetryBlend ?? 30);
 
+  // ─── 10) Apply surface zones ──
+  if (lunar.zonesEnabled && lunar.zones && lunar.zones.length > 0) {
+    applySurfaceZones(hmap, MAP_W, MAP_H, lunar.zones);
+  }
+
   return { hmap, craterCount: totalCraterCount };
 }
 
