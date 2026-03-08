@@ -830,32 +830,33 @@ function applyLobateScarps(
     const scarpWidth = 0.008 + scarpRng() * 0.012;
 
     const steps = Math.floor(length * w);
+    const invSteps = 1 / steps;
+    // Hoist trig per scarp — constant across all steps
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
     for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      const u = startU + Math.cos(angle) * t * length;
-      const v = startV + Math.sin(angle) * t * length;
-      // Add wavy perturbation
+      const t = i * invSteps;
+      const u = startU + cosAngle * t * length;
+      const v = startV + sinAngle * t * length;
       const waveOffset = scarpNoise(u * 20, v * 20) * 0.015;
 
       const px = Math.floor(((u % 1 + 1) % 1) * w);
       const halfWidthPx = Math.ceil(scarpWidth * h);
+      const fadeT = 1 - t * 0.3;
 
       for (let dy = -halfWidthPx; dy <= halfWidthPx; dy++) {
         const py = Math.floor((v + waveOffset) * h) + dy;
         if (py < 0 || py >= h) continue;
-        const wpx = ((px % w) + w) % w;
+        let wpx = px % w;
+        if (wpx < 0) wpx += w;
         const idx = py * w + wpx;
         const dist = Math.abs(dy) / halfWidthPx;
 
-        // Sharp step on one side, gradual slope on other
         if (dy < 0) {
-          // Rising scarp face
           const rise = (1 - dist) * (1 - dist);
-          hmap[idx] += scarpHeight * rise * edgeMask[idx] * (1 - t * 0.3);
+          hmap[idx] += scarpHeight * rise * edgeMask[idx] * fadeT;
         } else {
-          // Gentle back-slope
-          const slope = (1 - dist);
-          hmap[idx] += scarpHeight * 0.3 * slope * edgeMask[idx] * (1 - t * 0.3);
+          hmap[idx] += scarpHeight * 0.3 * (1 - dist) * edgeMask[idx] * fadeT;
         }
       }
     }
