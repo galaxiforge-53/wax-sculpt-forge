@@ -96,6 +96,27 @@ function BuilderInner() {
     autoBalance,
   } = useRingDesign();
 
+  const { prefs, updatePrefs } = useUserPreferences();
+  const [prefsOpen, setPrefsOpen] = useState(false);
+
+  // Apply user preferences as initial defaults (only once on mount, before any template/project override)
+  const prefsAppliedRef = useRef(false);
+  useEffect(() => {
+    if (prefsAppliedRef.current) return;
+    const hasTemplate = !!sessionStorage.getItem("applyTemplate");
+    const hasProject = !!sessionStorage.getItem("openProjectId");
+    if (hasTemplate || hasProject) {
+      prefsAppliedRef.current = true;
+      return; // Don't override if loading a template/project
+    }
+    prefsAppliedRef.current = true;
+    setMetalPreset(prefs.defaultMetal);
+    setFinishPreset(prefs.defaultFinish);
+    if (prefs.showMeasurements) setShowMeasurements(true);
+    const lightPreset = LIGHTING_PRESETS.find(p => p.id === prefs.lightingPreset);
+    if (lightPreset?.settings) setLighting({ ...DEFAULT_LIGHTING, ...lightPreset.settings });
+  }, []);
+
   const [isEnhancing, setIsEnhancing] = useState(false);
 
   const handleEnhance = () => {
