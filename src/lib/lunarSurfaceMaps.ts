@@ -1826,7 +1826,7 @@ function heightmapToNormalCanvas(hmap: Float32Array, w: number, h: number, stren
 // Roughness is a low-frequency property — half-res gives ~4× speedup
 // with no visible quality loss on the curved ring surface.
 
-function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, microDetail: number): HTMLCanvasElement {
+function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, microDetail: number, sharedHalf?: Float32Array): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -1837,13 +1837,13 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
   const microFactor = microDetail / 100;
   const grainRng = seededRng(7777 + Math.round(microDetail));
 
+  // Use shared half-res if provided, otherwise compute locally
+  const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
+
   const halfRough = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
-    const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
     for (let x = 0; x < hw; x++) {
-      const sx = x * 2;
-      const hVal = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
+      const hVal = halfHmap[y * hw + x];
       let roughness = 0.92 - (hVal - 0.5) * 0.9;
       if (microFactor > 0) roughness += (grainRng() - 0.5) * 0.12 * microFactor;
       halfRough[y * hw + x] = roughness < 0.2 ? 0.2 : roughness > 1.0 ? 1.0 : roughness;
