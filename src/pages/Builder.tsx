@@ -688,6 +688,14 @@ function BuilderInner() {
                   >
                     <Camera className="w-3 h-3" />
                   </button>
+                  <button
+                    onClick={() => setPrefsOpen(true)}
+                    className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                    title="Designer preferences"
+                  >
+                    <Settings2 className="w-3 h-3" />
+                  </button>
                 </>
               )}
             </div>
