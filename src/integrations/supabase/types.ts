@@ -124,8 +124,10 @@ export type Database = {
           id: string
           metal: string
           notes: string | null
+          preview_urls: Json | null
           ring_size: number
           status: string
+          stl_path: string | null
           updated_at: string
           user_id: string
         }
@@ -137,8 +139,10 @@ export type Database = {
           id?: string
           metal: string
           notes?: string | null
+          preview_urls?: Json | null
           ring_size: number
           status?: string
+          stl_path?: string | null
           updated_at?: string
           user_id: string
         }
@@ -150,8 +154,10 @@ export type Database = {
           id?: string
           metal?: string
           notes?: string | null
+          preview_urls?: Json | null
           ring_size?: number
           status?: string
+          stl_path?: string | null
           updated_at?: string
           user_id?: string
         }
