@@ -159,17 +159,15 @@ function fbm(noise: (x: number, y: number) => number, x: number, y: number, octa
     return (n0 + n1 + n2 + n3 + n4 + n5) / 1.96875;
   }
   if (octaves === 5) {
-    let sum = 0, amp = 1, freq = 1, maxAmp = 0;
-    sum += noise(x, y); maxAmp += 1;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    return sum / maxAmp;
+    // Pre-compute all frequencies and amplitudes (unrolled, no loop)
+    const f1 = lacunarity, g1 = gain;
+    const f2 = f1 * lacunarity, g2 = g1 * gain;
+    const f3 = f2 * lacunarity, g3 = g2 * gain;
+    const f4 = f3 * lacunarity, g4 = g3 * gain;
+    const invMaxAmp = 1 / (1 + g1 + g2 + g3 + g4);
+    return (noise(x, y) + noise(x * f1, y * f1) * g1 +
+            noise(x * f2, y * f2) * g2 + noise(x * f3, y * f3) * g3 +
+            noise(x * f4, y * f4) * g4) * invMaxAmp;
   }
   // General fallback
   let sum = 0, amp = 1, freq = 1, maxAmp = 0;
@@ -245,20 +243,18 @@ function shapedDistance(
   // Apply shape transformation
   switch (sp.shape) {
     case "oval": {
-      // Rotate into oval frame, scale one axis
+      // Pre-compute trig once per call (callers should cache for per-crater use)
       const cos = Math.cos(sp.ovalAngleRad);
       const sin = Math.sin(sp.ovalAngleRad);
       const ru = du * cos + dv * sin;
       const rv = -du * sin + dv * cos;
-      // Elongation: stretch one axis (0.3 to 1.0 ratio)
       const ratio = 1.0 - sp.ovalElongation * 0.7;
-      sdu = ru / Math.max(0.3, ratio);
+      const invRatio = 1 / (ratio > 0.3 ? ratio : 0.3);
+      sdu = ru * invRatio;
       sdv = rv;
-      // Rotate back for warp
-      const cos2 = Math.cos(-sp.ovalAngleRad);
-      const sin2 = Math.sin(-sp.ovalAngleRad);
-      const finalU = sdu * cos2 + sdv * sin2;
-      const finalV = -sdu * sin2 + sdv * cos2;
+      // Rotate back — use negated angle (cos is same, sin negates)
+      const finalU = sdu * cos - sdv * sin;
+      const finalV = sdu * sin + sdv * cos;
       sdu = finalU;
       sdv = finalV;
       break;
@@ -834,32 +830,33 @@ function applyLobateScarps(
     const scarpWidth = 0.008 + scarpRng() * 0.012;
 
     const steps = Math.floor(length * w);
+    const invSteps = 1 / steps;
+    // Hoist trig per scarp — constant across all steps
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
     for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      const u = startU + Math.cos(angle) * t * length;
-      const v = startV + Math.sin(angle) * t * length;
-      // Add wavy perturbation
+      const t = i * invSteps;
+      const u = startU + cosAngle * t * length;
+      const v = startV + sinAngle * t * length;
       const waveOffset = scarpNoise(u * 20, v * 20) * 0.015;
 
       const px = Math.floor(((u % 1 + 1) % 1) * w);
       const halfWidthPx = Math.ceil(scarpWidth * h);
+      const fadeT = 1 - t * 0.3;
 
       for (let dy = -halfWidthPx; dy <= halfWidthPx; dy++) {
         const py = Math.floor((v + waveOffset) * h) + dy;
         if (py < 0 || py >= h) continue;
-        const wpx = ((px % w) + w) % w;
+        let wpx = px % w;
+        if (wpx < 0) wpx += w;
         const idx = py * w + wpx;
         const dist = Math.abs(dy) / halfWidthPx;
 
-        // Sharp step on one side, gradual slope on other
         if (dy < 0) {
-          // Rising scarp face
           const rise = (1 - dist) * (1 - dist);
-          hmap[idx] += scarpHeight * rise * edgeMask[idx] * (1 - t * 0.3);
+          hmap[idx] += scarpHeight * rise * edgeMask[idx] * fadeT;
         } else {
-          // Gentle back-slope
-          const slope = (1 - dist);
-          hmap[idx] += scarpHeight * 0.3 * slope * edgeMask[idx] * (1 - t * 0.3);
+          hmap[idx] += scarpHeight * 0.3 * (1 - dist) * edgeMask[idx] * fadeT;
         }
       }
     }
@@ -883,10 +880,11 @@ function applyPhobosGrooves(
     const angleOffset = (rand() - 0.5) * 0.05; // slight tilt
 
     const widthPx = Math.ceil(grooveWidthV * h);
+    const invWidthPx = 1 / widthPx;
+    const invW = 1 / w;
 
     for (let x = 0; x < w; x++) {
-      const u = x / w;
-      // Wobble the groove path
+      const u = x * invW;
       const wobble = grooveNoise(u * 15, vPos * 10) * 0.02;
       const centerV = vPos + angleOffset * u + wobble;
       const centerPy = Math.floor(centerV * h);
@@ -895,8 +893,7 @@ function applyPhobosGrooves(
         const py = centerPy + dy;
         if (py < 0 || py >= h) continue;
         const idx = py * w + x;
-        const dist = Math.abs(dy) / widthPx;
-        // U-shaped groove profile
+        const dist = Math.abs(dy) * invWidthPx;
         const profile = (1 - dist * dist);
         hmap[idx] -= grooveDepth * profile * edgeMask[idx];
       }
@@ -925,33 +922,35 @@ function applyIceFractures(
 
     const steps = Math.floor(length * w * 0.7);
     const widthPx = Math.ceil(width * h);
+    const invWidthPx = 1 / widthPx;
+    const invSteps = 1 / steps;
+    // Hoist trig per fracture
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
 
     for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      const u = startU + Math.cos(angle) * t * length;
-      const v = startV + Math.sin(angle) * t * length;
+      const t = i * invSteps;
+      const u = startU + cosAngle * t * length;
+      const v = startV + sinAngle * t * length;
       if (v < 0.05 || v > 0.95) continue;
 
-      // Subtle meandering
       const meander = fractureNoise(u * 30, v * 30) * 0.008;
       const px = Math.floor(((u % 1 + 1) % 1) * w);
+      let wpx = px % w;
+      if (wpx < 0) wpx += w;
       const centerPy = Math.floor((v + meander) * h);
 
       for (let dy = -widthPx * 2; dy <= widthPx * 2; dy++) {
         const py = centerPy + dy;
         if (py < 0 || py >= h) continue;
-        const idx = py * w + ((px % w + w) % w);
-        const dist = Math.abs(dy) / widthPx;
+        const idx = py * w + wpx;
+        const dist = Math.abs(dy) * invWidthPx;
 
         if (dist < 1.0) {
-          // Central trench
-          const trenchProfile = (1 - dist * dist);
-          hmap[idx] -= depth * trenchProfile * edgeMask[idx];
+          hmap[idx] -= depth * (1 - dist * dist) * edgeMask[idx];
         } else if (dist < 2.0) {
-          // Raised ridge flanks
-          const ridgeDist = (dist - 1.0);
-          const ridgeProfile = (1 - ridgeDist) * (1 - ridgeDist);
-          hmap[idx] += ridgeHeight * ridgeProfile * edgeMask[idx];
+          const ridgeDist = dist - 1.0;
+          hmap[idx] += ridgeHeight * (1 - ridgeDist) * (1 - ridgeDist) * edgeMask[idx];
         }
       }
     }
@@ -1130,19 +1129,26 @@ function applyAsteroidRubble(
     const y0 = Math.max(0, Math.floor((bv - br * 1.3 * physicalAspect) * h));
     const y1 = Math.min(h - 1, Math.ceil((bv + br * 1.3 * physicalAspect) * h));
 
+    const buW = bu * w;
+    const bvH = bv * h;
+    const aspectRatio = pxR / pyR;
     for (let py = y0; py <= y1; py++) {
+      const rowOff = py * w;
+      const dv = (py - bvH) * aspectRatio;
+      const dv2 = dv * dv;
+      if (dv2 > pxR2 * 1.69) continue; // early row rejection
       for (let px = x0; px <= x1; px++) {
         let wpx = px % w;
         if (wpx < 0) wpx += w;
-        const du = px - bu * w;
-        const dv = (py - bv * h) * (pxR / pyR);
-        const d2 = du * du + dv * dv;
+        const du = px - buW;
+        const d2 = du * du + dv2;
         if (d2 > pxR2 * 1.69) continue;
         const d = Math.sqrt(d2) / pxR;
         if (d > 1.3) continue;
-        const falloff = Math.max(0, 1 - d * d);
-        const mask = edgeMask[py * w + wpx];
-        hmap[py * w + wpx] += bh * falloff * falloff * mask;
+        const falloff = 1 - d * d;
+        const ff = falloff > 0 ? falloff : 0;
+        const idx = rowOff + wpx;
+        hmap[idx] += bh * ff * ff * edgeMask[idx];
       }
     }
   }
@@ -1163,19 +1169,25 @@ function applyAsteroidRubble(
     const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * h));
     const y1 = Math.min(h - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * h));
 
+    const puW = pu * w;
+    const pvH = pv * h;
+    const aspectRatio_p = pxR / pyR;
+    const invPxR2 = 1 / pxR2;
     for (let py = y0; py <= y1; py++) {
+      const rowOff = py * w;
+      const dv = (py - pvH) * aspectRatio_p;
+      const dv2 = dv * dv;
+      if (dv2 > pxR2 * 1.44) continue; // early row rejection
       for (let px = x0; px <= x1; px++) {
         let wpx = px % w;
         if (wpx < 0) wpx += w;
-        const du = px - pu * w;
-        const dv = (py - pv * h) * (pxR / pyR);
-        const d2 = du * du + dv * dv;
+        const du = px - puW;
+        const d2 = du * du + dv2;
         if (d2 > pxR2 * 1.44) continue;
-        const d = Math.sqrt(d2) / pxR;
-        if (d > 1.2) continue;
-        const falloff = Math.max(0, 1 - d * d);
-        const mask = edgeMask[py * w + wpx];
-        hmap[py * w + wpx] -= pd * falloff * mask;
+        const falloff = 1 - d2 * invPxR2;
+        if (falloff <= 0) continue;
+        const idx = rowOff + wpx;
+        hmap[idx] -= pd * falloff * edgeMask[idx];
       }
     }
   }
@@ -2324,12 +2336,31 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
   // Use shared half-res if provided
   const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
-  const kernels = [
+  // Pre-compute flat offset arrays for each kernel to avoid dynamic loop overhead
+  // This eliminates kernel object property access + step computation per pixel
+  const kernelDefs = [
     { radius: 2, step: 1, weight: 0.5 },
     { radius: 4, step: 1, weight: 0.35 },
     { radius: 8, step: 2, weight: 0.15 },
   ];
+  const kernelOffsets: { dyArr: Int16Array; dxArr: Int16Array; count: number; weight: number }[] = [];
+  for (const k of kernelDefs) {
+    const offsets: [number, number][] = [];
+    for (let ky = -k.radius; ky <= k.radius; ky += k.step) {
+      for (let kx = -k.radius; kx <= k.radius; kx += k.step) {
+        offsets.push([ky, kx]);
+      }
+    }
+    const dyArr = new Int16Array(offsets.length);
+    const dxArr = new Int16Array(offsets.length);
+    for (let i = 0; i < offsets.length; i++) {
+      dyArr[i] = offsets[i][0];
+      dxArr[i] = offsets[i][1];
+    }
+    kernelOffsets.push({ dyArr, dxArr, count: offsets.length, weight: k.weight });
+  }
 
+  const hhm1_ao = hh - 1;
   const halfAO = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
     const rowOff = y * hw;
@@ -2337,26 +2368,24 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
       const center = halfHmap[rowOff + x];
       let totalAO = 0;
 
-      for (const kernel of kernels) {
-        let higher = 0, samples = 0, heightDiffSum = 0;
-        for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
-          const sy = y + ky;
-          const syc = sy < 0 ? 0 : sy >= hh ? hh - 1 : sy;
-          const sRow = syc * hw;
-          for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
-            let sx = x + kx;
-            if (sx < 0) sx += hw; else if (sx >= hw) sx -= hw;
-            const sampleH = halfHmap[sRow + sx];
-            if (sampleH > center) {
-              higher++;
-              heightDiffSum += sampleH - center;
-            }
-            samples++;
+      for (let ki = 0; ki < kernelOffsets.length; ki++) {
+        const ko = kernelOffsets[ki];
+        let higher = 0, heightDiffSum = 0;
+        const cnt = ko.count;
+        for (let s = 0; s < cnt; s++) {
+          const sy = y + ko.dyArr[s];
+          const syc = sy < 0 ? 0 : sy > hhm1_ao ? hhm1_ao : sy;
+          let sx = x + ko.dxArr[s];
+          if (sx < 0) sx += hw; else if (sx >= hw) sx -= hw;
+          const sampleH = halfHmap[syc * hw + sx];
+          if (sampleH > center) {
+            higher++;
+            heightDiffSum += sampleH - center;
           }
         }
-        const invSamples = 1 / samples;
-        const kernelAO = higher * invSamples * 0.6 + (heightDiffSum * invSamples * 8 < 1 ? heightDiffSum * invSamples * 8 : 1) * 0.4;
-        totalAO += kernelAO * kernel.weight;
+        const invCnt = 1 / cnt;
+        const diffNorm = heightDiffSum * invCnt * 8;
+        totalAO += (higher * invCnt * 0.6 + (diffNorm < 1 ? diffNorm : 1) * 0.4) * ko.weight;
       }
       halfAO[rowOff + x] = 1.0 - totalAO * 0.7;
     }
