@@ -573,53 +573,56 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   }
 }
 
-// ── Erosion pass ──────────────────────────────────────────────────
+// ── Erosion pass (with pooled temp buffers) ──────────────────────
+
+// Module-level buffer pool to avoid repeated allocation of large Float32Arrays
+let _erosionBuf1: Float32Array | null = null;
+let _erosionBuf2: Float32Array | null = null;
 
 function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: number) {
   if (erosionFactor <= 0) return;
 
-  // Separable box blur — O(n*2k) instead of O(n*k²)
+  const len = w * h;
+  // Reuse pooled buffers if right size, otherwise allocate
+  if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
+  if (!_erosionBuf2 || _erosionBuf2.length !== len) _erosionBuf2 = new Float32Array(len);
+  const temp = _erosionBuf1;
+  const blurred = _erosionBuf2;
+
   const kernelR = Math.max(1, Math.round(2 + erosionFactor * 4));
   const kernelSize = kernelR * 2 + 1;
-  const temp = new Float32Array(hmap.length);
+  const invKernel = 1 / kernelSize;
 
   // Horizontal pass
   for (let y = 0; y < h; y++) {
     let sum = 0;
-    // Initialize window
     for (let kx = -kernelR; kx <= kernelR; kx++) {
-      const sx = ((kx % w) + w) % w;
-      sum += hmap[y * w + sx];
+      sum += hmap[y * w + ((kx % w) + w) % w];
     }
-    temp[y * w + 0] = sum / kernelSize;
+    temp[y * w] = sum * invKernel;
     for (let x = 1; x < w; x++) {
-      const addX = ((x + kernelR) % w + w) % w;
-      const removeX = ((x - kernelR - 1) % w + w) % w;
-      sum += hmap[y * w + addX] - hmap[y * w + removeX];
-      temp[y * w + x] = sum / kernelSize;
+      sum += hmap[y * w + ((x + kernelR) % w + w) % w] - hmap[y * w + ((x - kernelR - 1) % w + w) % w];
+      temp[y * w + x] = sum * invKernel;
     }
   }
 
   // Vertical pass
-  const blurred = new Float32Array(hmap.length);
   for (let x = 0; x < w; x++) {
     let sum = 0;
     for (let ky = -kernelR; ky <= kernelR; ky++) {
-      const sy = Math.max(0, Math.min(h - 1, ky));
-      sum += temp[sy * w + x];
+      sum += temp[Math.max(0, Math.min(h - 1, ky)) * w + x];
     }
-    blurred[x] = sum / kernelSize;
+    blurred[x] = sum * invKernel;
     for (let y = 1; y < h; y++) {
-      const addY = Math.min(h - 1, y + kernelR);
-      const removeY = Math.max(0, y - kernelR - 1);
-      sum += temp[addY * w + x] - temp[removeY * w + x];
-      blurred[y * w + x] = sum / kernelSize;
+      sum += temp[Math.min(h - 1, y + kernelR) * w + x] - temp[Math.max(0, y - kernelR - 1) * w + x];
+      blurred[y * w + x] = sum * invKernel;
     }
   }
 
   const blend = erosionFactor * 0.6;
-  for (let i = 0; i < hmap.length; i++) {
-    hmap[i] = lerp(hmap[i], blurred[i], blend);
+  const oneMinusBlend = 1 - blend;
+  for (let i = 0; i < len; i++) {
+    hmap[i] = hmap[i] * oneMinusBlend + blurred[i] * blend;
   }
 }
 
@@ -650,8 +653,6 @@ function applyTerrainType(
       break;
 
     case "lunar":
-      // Moon is well-served by the base engine + maria fill + ejecta
-      // Add subtle ray brightening around the map center for realism
       applyLunarRayBrightening(hmap, w, h, edgeMask, seed, depthScale);
       break;
 
@@ -668,8 +669,11 @@ function applyTerrainType(
       break;
 
     case "deimos":
-      // Extra smoothing pass to bury features
       applyErosion(hmap, w, h, 0.6);
+      break;
+
+    case "asteroid":
+      applyAsteroidRubble(hmap, w, h, edgeMask, seed, depthScale, rand, physicalAspect);
       break;
   }
 }
@@ -930,6 +934,104 @@ function applyOrganicDunes(
       const combined = dune * 0.7 + crossDune * 0.3;
       const idx = y * w + x;
       hmap[idx] += (combined - 0.5) * duneAmp * edgeMask[idx];
+    }
+  }
+}
+
+// ── Asteroid: Rubble-pile irregular pitting + boulder texture ──
+
+function applyAsteroidRubble(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+  rand: () => number, physicalAspect: number,
+) {
+  const rubbleNoise = makeNoise2D(seed + 17001);
+  const boulderNoise = makeNoise2D(seed + 17002);
+  const rubbleAmp = 0.07 * depthScale;
+  const aspectCorr = physicalAspect / (w / h);
+
+  // 1) Multi-scale rubble texture — chaotic, non-periodic bumps
+  for (let y = 0; y < h; y++) {
+    const vn = y / h;
+    for (let x = 0; x < w; x++) {
+      const un = x / w;
+      const idx = y * w + x;
+      const mask = edgeMask[idx];
+      if (mask < 0.01) continue;
+
+      // Coarse rubble (large irregular lumps)
+      const coarse = fbm(rubbleNoise, un * 10, vn * 10 * aspectCorr, 4, 2.3, 0.55);
+      // Fine rubble (small angular fragments)
+      const fine = Math.abs(boulderNoise(un * 35, vn * 35 * aspectCorr));
+      // Combined — coarse shapes + sharp angular fragments
+      const rubble = coarse * 0.6 + (fine - 0.3) * 0.4;
+      hmap[idx] += rubble * rubbleAmp * mask;
+    }
+  }
+
+  // 2) Scatter large "boulders" — isolated raised blobs
+  const boulderCount = 15 + Math.floor(rand() * 20);
+  for (let b = 0; b < boulderCount; b++) {
+    const bu = rand();
+    const bv = 0.15 + rand() * 0.7;
+    const br = 0.005 + rand() * 0.015;
+    const bh = 0.04 * depthScale * (0.5 + rand() * 0.5);
+    const pxR = br * w;
+    const pyR = br * h * physicalAspect;
+    const pxR2 = pxR * pxR;
+
+    const x0 = Math.floor((bu - br * 1.3) * w);
+    const x1 = Math.ceil((bu + br * 1.3) * w);
+    const y0 = Math.max(0, Math.floor((bv - br * 1.3 * physicalAspect) * h));
+    const y1 = Math.min(h - 1, Math.ceil((bv + br * 1.3 * physicalAspect) * h));
+
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        let wpx = px % w;
+        if (wpx < 0) wpx += w;
+        const du = px - bu * w;
+        const dv = (py - bv * h) * (pxR / pyR);
+        const d2 = du * du + dv * dv;
+        if (d2 > pxR2 * 1.69) continue;
+        const d = Math.sqrt(d2) / pxR;
+        if (d > 1.3) continue;
+        const falloff = Math.max(0, 1 - d * d);
+        const mask = edgeMask[py * w + wpx];
+        hmap[py * w + wpx] += bh * falloff * falloff * mask;
+      }
+    }
+  }
+
+  // 3) Extra irregular pitting — deeper than normal micro-pits
+  const pitCount = 30 + Math.floor(rand() * 40);
+  for (let p = 0; p < pitCount; p++) {
+    const pu = rand();
+    const pv = 0.1 + rand() * 0.8;
+    const pr = 0.003 + rand() * 0.01;
+    const pd = 0.05 * depthScale * (0.5 + rand() * 0.5);
+    const pxR = pr * w;
+    const pyR = pr * h * physicalAspect;
+    const pxR2 = pxR * pxR;
+
+    const x0 = Math.floor((pu - pr * 1.2) * w);
+    const x1 = Math.ceil((pu + pr * 1.2) * w);
+    const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * h));
+    const y1 = Math.min(h - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * h));
+
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        let wpx = px % w;
+        if (wpx < 0) wpx += w;
+        const du = px - pu * w;
+        const dv = (py - pv * h) * (pxR / pyR);
+        const d2 = du * du + dv * dv;
+        if (d2 > pxR2 * 1.44) continue;
+        const d = Math.sqrt(d2) / pxR;
+        if (d > 1.2) continue;
+        const falloff = Math.max(0, 1 - d * d);
+        const mask = edgeMask[py * w + wpx];
+        hmap[py * w + wpx] -= pd * falloff * mask;
+      }
     }
   }
 }
@@ -1474,16 +1576,18 @@ export function buildHeightmap(
       const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * MAP_H));
       const y1 = Math.min(MAP_H - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * MAP_H));
 
+      const pxR2 = pxR * pxR; // squared radius for fast rejection
+
       for (let py = y0; py <= y1; py++) {
         for (let px = x0; px <= x1; px++) {
           // Wrap x for seamless circumference
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
-          const du = (px - pu * MAP_W) / pxR;
-          const dv = (py - pv * MAP_H) / pyR;
-          const d = Math.sqrt(du * du + dv * dv);
-          if (d > 1.0) continue;
-          const falloff = 1 - d * d;
+          const du = (px - pu * MAP_W);
+          const dv = (py - pv * MAP_H) * (pxR / pyR); // aspect-correct to circle space
+          const d2 = du * du + dv * dv;
+          if (d2 > pxR2) continue; // squared distance check — no sqrt needed
+          const falloff = 1 - d2 / pxR2; // d²/r² maps 0→1 to 1→0
           const mask = edgeMask[py * MAP_W + wpx];
           hmap[py * MAP_W + wpx] -= pd * falloff * mask;
         }
@@ -1915,7 +2019,7 @@ function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed:
   return canvas;
 }
 
-// ── Displacement map ──────────────────────────────────────────────
+// ── Displacement map (uses Uint32Array for 4× fewer writes) ───────
 
 function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -1923,17 +2027,16 @@ function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number)
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
   const img = ctx.createImageData(w, h);
+  const buf32 = new Uint32Array(img.data.buffer);
 
   for (let y = 0; y < h; y++) {
+    const yy = h - 1 - y;
+    const rowSrc = y * w;
+    const rowDst = yy * w;
     for (let x = 0; x < w; x++) {
-      const hVal = hmap[y * w + x];
-      const v = Math.round(Math.max(0, Math.min(1, hVal)) * 255);
-      const yy = (h - 1 - y);
-      const idx = (yy * w + x) * 4;
-      img.data[idx] = v;
-      img.data[idx + 1] = v;
-      img.data[idx + 2] = v;
-      img.data[idx + 3] = 255;
+      const v = Math.max(0, Math.min(255, hmap[rowSrc + x] * 255 + 0.5)) | 0;
+      // Pack RGBA as single 32-bit write (little-endian: ABGR)
+      buf32[rowDst + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
   ctx.putImageData(img, 0, 0);
