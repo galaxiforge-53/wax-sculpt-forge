@@ -1,12 +1,16 @@
-import { useCallback, useRef, useState } from "react";
-import { ImageTerrainState, ImageTerrainMode, DEFAULT_IMAGE_TERRAIN } from "@/types/imageTerrain";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ImageTerrainState, ImageTerrainMode, DEFAULT_IMAGE_TERRAIN, IMAGE_TERRAIN_PRESETS } from "@/types/imageTerrain";
+import { generateHeightmapPreview } from "@/lib/imageTerrainEngine";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NativeImage = globalThis.Image;
-import { Upload, Layers, ArrowDown, ArrowUp, RotateCcw, FlipVertical } from "lucide-react";
+import {
+  Upload, Layers, ArrowDown, ArrowUp, RotateCcw, FlipVertical,
+  Moon, Flame, Zap, Eye, EyeOff, Sparkles, SlidersHorizontal,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ImageTerrainPanelProps {
@@ -19,6 +23,14 @@ const MODES: { id: ImageTerrainMode; label: string; desc: string }[] = [
   { id: "engraved", label: "Engraved", desc: "Cut into surface" },
   { id: "raised", label: "Raised", desc: "Relief above surface" },
 ];
+
+const PRESET_ICONS: Record<string, React.ReactNode> = {
+  moon: <Moon className="w-3.5 h-3.5" />,
+  flame: <Flame className="w-3.5 h-3.5" />,
+  zap: <Zap className="w-3.5 h-3.5" />,
+  "arrow-down": <ArrowDown className="w-3.5 h-3.5" />,
+  "arrow-up": <ArrowUp className="w-3.5 h-3.5" />,
+};
 
 function ParamRow({
   label, value, onChange, min = 0, max = 100, step = 1, unit = "%",
@@ -44,21 +56,78 @@ function ParamRow({
   );
 }
 
+function BeforeAfterPreview({ originalUrl, processedUrl }: { originalUrl: string; processedUrl: string | null }) {
+  const [showProcessed, setShowProcessed] = useState(true);
+
+  return (
+    <div className="relative rounded-lg overflow-hidden border border-border/50">
+      <img
+        src={showProcessed && processedUrl ? processedUrl : originalUrl}
+        alt={showProcessed ? "Processed terrain" : "Original image"}
+        className="w-full h-16 object-cover"
+      />
+      <div className="absolute top-1 right-1 flex gap-1">
+        <button
+          onClick={() => setShowProcessed(false)}
+          className={cn(
+            "px-1.5 py-0.5 rounded text-[8px] font-medium transition-colors",
+            !showProcessed
+              ? "bg-primary text-primary-foreground"
+              : "bg-black/40 text-white/70 hover:bg-black/60"
+          )}
+        >
+          Original
+        </button>
+        <button
+          onClick={() => setShowProcessed(true)}
+          className={cn(
+            "px-1.5 py-0.5 rounded text-[8px] font-medium transition-colors",
+            showProcessed
+              ? "bg-primary text-primary-foreground"
+              : "bg-black/40 text-white/70 hover:bg-black/60"
+          )}
+        >
+          Terrain
+        </button>
+      </div>
+      <span className="absolute bottom-1 left-1 text-[7px] text-white/60 bg-black/30 px-1 rounded">
+        {showProcessed ? "Processed heightmap" : "Source image"}
+      </span>
+    </div>
+  );
+}
+
 export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanelProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(state.imageDataUrl);
+  const [processedPreview, setProcessedPreview] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const previewTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const patch = useCallback(
-    (p: Partial<ImageTerrainState>) => onChange({ ...state, ...p }),
+    (p: Partial<ImageTerrainState>) => onChange({ ...state, ...p, presetId: p.presetId !== undefined ? p.presetId : null }),
     [state, onChange],
   );
+
+  // Generate processed preview with debounce
+  useEffect(() => {
+    if (!state.imageDataUrl || !state.enabled) {
+      setProcessedPreview(null);
+      return;
+    }
+    clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(async () => {
+      const url = await generateHeightmapPreview(state);
+      setProcessedPreview(url);
+    }, 400);
+    return () => clearTimeout(previewTimer.current);
+  }, [state]);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate
     if (!file.type.startsWith("image/")) {
       toast({ title: "Invalid file", description: "Please upload an image file (PNG, JPG, etc.)", variant: "destructive" });
       return;
@@ -68,12 +137,9 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
       return;
     }
 
-    // Read as data URL
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
-
-      // Resize to max 1024px for performance
       const img = new NativeImage();
       img.onload = () => {
         const maxDim = 1024;
@@ -96,15 +162,27 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
       img.src = dataUrl;
     };
     reader.readAsDataURL(file);
-
-    // Reset input so same file can be re-selected
     e.target.value = "";
   }, [patch, toast]);
 
   const handleClear = useCallback(() => {
     setPreviewUrl(null);
+    setProcessedPreview(null);
     onChange({ ...DEFAULT_IMAGE_TERRAIN });
   }, [onChange]);
+
+  const applyPreset = useCallback((presetId: string) => {
+    const preset = IMAGE_TERRAIN_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    onChange({
+      ...state,
+      ...preset.params,
+      presetId,
+      imageDataUrl: state.imageDataUrl,
+      fileName: state.fileName,
+      enabled: state.enabled,
+    });
+  }, [state, onChange]);
 
   return (
     <div className="space-y-3">
@@ -128,17 +206,15 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
       />
 
       {previewUrl ? (
-        <div className="relative group">
-          <img
-            src={previewUrl}
-            alt="Terrain source"
-            className="w-full h-20 object-cover rounded-lg border border-border/50"
-          />
-          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+        <div className="space-y-2">
+          {/* Before/After preview */}
+          <BeforeAfterPreview originalUrl={previewUrl} processedUrl={processedPreview} />
+          {/* Replace / Remove */}
+          <div className="flex gap-1">
             <Button
               size="sm"
               variant="secondary"
-              className="h-6 text-[9px] px-2"
+              className="flex-1 h-6 text-[9px] px-2"
               onClick={() => fileInputRef.current?.click()}
             >
               Replace
@@ -146,14 +222,14 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
             <Button
               size="sm"
               variant="destructive"
-              className="h-6 text-[9px] px-2"
+              className="flex-1 h-6 text-[9px] px-2"
               onClick={handleClear}
             >
               Remove
             </Button>
           </div>
           {state.fileName && (
-            <span className="absolute bottom-1 left-1 text-[8px] text-white/70 bg-black/40 px-1 rounded">
+            <span className="text-[8px] text-muted-foreground/60 block truncate">
               {state.fileName}
             </span>
           )}
@@ -169,9 +245,34 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
         </button>
       )}
 
-      {/* Only show controls if an image is loaded */}
+      {/* Controls only when image is loaded */}
       {state.imageDataUrl && (
         <>
+          {/* Presets */}
+          <div>
+            <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 mb-1.5 block">Presets</span>
+            <div className="grid grid-cols-2 gap-1">
+              {IMAGE_TERRAIN_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => applyPreset(preset.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 p-1.5 rounded-lg transition-all border text-left",
+                    state.presetId === preset.id
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/40 bg-secondary/30 text-muted-foreground hover:bg-secondary/60"
+                  )}
+                >
+                  {PRESET_ICONS[preset.icon] || <Sparkles className="w-3.5 h-3.5" />}
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-medium leading-none block truncate">{preset.label}</span>
+                    <span className="text-[7px] text-muted-foreground/60 leading-none block truncate">{preset.desc}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Mode selector */}
           <div>
             <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 mb-1.5 block">Mode</span>
@@ -196,38 +297,58 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
             </div>
           </div>
 
-          {/* Parameters */}
+          {/* Core parameters */}
           <div className="space-y-2">
             <ParamRow label="Depth" value={state.depth} onChange={(v) => patch({ depth: v })} />
             <ParamRow label="Scale" value={state.scale} onChange={(v) => patch({ scale: v })} min={10} max={400} />
             <ParamRow label="Contrast" value={state.contrast} onChange={(v) => patch({ contrast: v })} min={0} max={200} />
             <ParamRow label="Smoothing" value={state.smoothing} onChange={(v) => patch({ smoothing: v })} min={0} max={20} />
+            <ParamRow label="Sharpness" value={state.sharpness} onChange={(v) => patch({ sharpness: v })} min={0} max={100} />
+            <ParamRow label="Wrap Correction" value={state.wrapCorrection} onChange={(v) => patch({ wrapCorrection: v })} min={0} max={100} />
             {(state.mode === "engraved" || state.mode === "raised") && (
               <ParamRow label="Threshold" value={state.threshold} onChange={(v) => patch({ threshold: v })} />
             )}
           </div>
 
-          {/* Tiling & offset */}
-          <div className="space-y-2">
-            <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/60 block">Tiling & Position</span>
-            <div className="grid grid-cols-2 gap-2">
-              <ParamRow label="Tile U" value={state.tileU} onChange={(v) => patch({ tileU: v })} min={1} max={8} step={1} unit="×" />
-              <ParamRow label="Tile V" value={state.tileV} onChange={(v) => patch({ tileV: v })} min={1} max={4} step={1} unit="×" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <ParamRow label="Offset U" value={state.offsetU} onChange={(v) => patch({ offsetU: v })} />
-              <ParamRow label="Offset V" value={state.offsetV} onChange={(v) => patch({ offsetV: v })} />
-            </div>
-          </div>
-
-          {/* Invert toggle */}
+          {/* Auto cleanup toggle */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <FlipVertical className="w-3 h-3 text-muted-foreground/60" />
-              <span className="text-[10px] text-muted-foreground">Invert heights</span>
+              <Sparkles className="w-3 h-3 text-muted-foreground/60" />
+              <span className="text-[10px] text-muted-foreground">Auto cleanup</span>
             </div>
-            <Switch checked={state.invert} onCheckedChange={(v) => patch({ invert: v })} />
+            <Switch checked={state.autoCleanup} onCheckedChange={(v) => patch({ autoCleanup: v })} />
           </div>
+
+          {/* Advanced toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-1.5 w-full text-[9px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+          >
+            <SlidersHorizontal className="w-3 h-3" />
+            <span>{showAdvanced ? "Hide" : "Show"} advanced controls</span>
+          </button>
+
+          {showAdvanced && (
+            <div className="space-y-2 pl-1 border-l-2 border-border/30">
+              <div className="grid grid-cols-2 gap-2">
+                <ParamRow label="Tile U" value={state.tileU} onChange={(v) => patch({ tileU: v })} min={1} max={8} step={1} unit="×" />
+                <ParamRow label="Tile V" value={state.tileV} onChange={(v) => patch({ tileV: v })} min={1} max={4} step={1} unit="×" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <ParamRow label="Offset U" value={state.offsetU} onChange={(v) => patch({ offsetU: v })} />
+                <ParamRow label="Offset V" value={state.offsetV} onChange={(v) => patch({ offsetV: v })} />
+              </div>
+
+              {/* Invert toggle */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <FlipVertical className="w-3 h-3 text-muted-foreground/60" />
+                  <span className="text-[10px] text-muted-foreground">Invert heights</span>
+                </div>
+                <Switch checked={state.invert} onCheckedChange={(v) => patch({ invert: v })} />
+              </div>
+            </div>
+          )}
 
           {/* Reset */}
           <Button
@@ -239,6 +360,7 @@ export default function ImageTerrainPanel({ state, onChange }: ImageTerrainPanel
               imageDataUrl: state.imageDataUrl,
               fileName: state.fileName,
               enabled: state.enabled,
+              presetId: null,
             })}
           >
             <RotateCcw className="w-3 h-3" /> Reset Parameters
