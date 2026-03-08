@@ -2091,6 +2091,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.25] : [1, 2]))}
         >
           <AdaptiveDprController tier={qualityTier} isMobile={isMobile} isShowcase={sc} isInspection={insp} />
+          <DampingInvalidator />
           <ClipPlaneManager mode={cutawayMode} offset={cutawayOffset} params={params} />
 
           {/* Dynamic lighting from Lighting Studio */}
