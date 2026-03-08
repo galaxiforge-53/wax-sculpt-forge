@@ -1423,6 +1423,7 @@ interface RingViewportProps {
   ringPosition?: [number, number, number];
   ringRotation?: [number, number, number];
   showPrinterBed?: boolean;
+  rotationLocked?: boolean; // When true, disables orbit rotation but keeps zoom
 }
 
 // ── Clipping plane manager with interactive offset ─────────────────
