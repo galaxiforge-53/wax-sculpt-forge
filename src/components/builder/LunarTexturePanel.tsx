@@ -1,4 +1,4 @@
-import { LunarTextureState, CraterDensity, CraterSize, CraterShape, SymmetryMode, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
+import { LunarTextureState, CraterDensity, CraterSize, CraterShape, SymmetryMode, SurfaceZone, ZonePreset, ZONE_PRESETS, DEFAULT_ZONE, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
