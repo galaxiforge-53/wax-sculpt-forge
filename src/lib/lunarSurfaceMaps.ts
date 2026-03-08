@@ -562,13 +562,18 @@ function stampEjectaRays(
   for (let r = 0; r < rayCount; r++) {
     const angle = rand() * Math.PI * 2;
     const rayWidth = c.radius * (0.06 + rand() * 0.08);
+    // Pre-compute trig per ray instead of per step
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
+    const invPhysAspect = 1 / physicalAspect;
 
     const steps = Math.floor(rayLength * w * 0.5);
+    const invSteps = 1 / steps;
     for (let s = 0; s < steps; s++) {
-      const t = s / steps;
+      const t = s * invSteps;
       const dist = c.radius * 0.8 + t * rayLength;
-      const ru = c.cu + Math.cos(angle) * dist;
-      const rv = c.cv + Math.sin(angle) * dist / physicalAspect;
+      const ru = c.cu + cosAngle * dist;
+      const rv = c.cv + sinAngle * dist * invPhysAspect;
 
       if (rv < 0.05 || rv > 0.95) continue;
 
@@ -578,11 +583,14 @@ function stampEjectaRays(
 
       const fadeoff = (1 - t) * (1 - t);
       const jitter = rayWidth * w;
-      for (let j = -Math.ceil(jitter); j <= Math.ceil(jitter); j++) {
-        const wpx = ((px + j) % w + w) % w;
-        const idx = py * w + wpx;
-        const mask = edgeMask[idx];
-        hmap[idx] = Math.min(1, hmap[idx] + rayBrightness * fadeoff * mask);
+      const jCeil = Math.ceil(jitter);
+      const pyRow = py * w;
+      for (let j = -jCeil; j <= jCeil; j++) {
+        let wpx = (px + j) % w;
+        if (wpx < 0) wpx += w;
+        const idx = pyRow + wpx;
+        hmap[idx] = hmap[idx] + rayBrightness * fadeoff * edgeMask[idx];
+        if (hmap[idx] > 1) hmap[idx] = 1;
       }
 
       if (rand() < 0.03 * ejectaStrength) {
