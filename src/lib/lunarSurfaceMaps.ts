@@ -1169,19 +1169,25 @@ function applyAsteroidRubble(
     const y0 = Math.max(0, Math.floor((pv - pr * 1.2 * physicalAspect) * h));
     const y1 = Math.min(h - 1, Math.ceil((pv + pr * 1.2 * physicalAspect) * h));
 
+    const puW = pu * w;
+    const pvH = pv * h;
+    const aspectRatio_p = pxR / pyR;
+    const invPxR2 = 1 / pxR2;
     for (let py = y0; py <= y1; py++) {
+      const rowOff = py * w;
+      const dv = (py - pvH) * aspectRatio_p;
+      const dv2 = dv * dv;
+      if (dv2 > pxR2 * 1.44) continue; // early row rejection
       for (let px = x0; px <= x1; px++) {
         let wpx = px % w;
         if (wpx < 0) wpx += w;
-        const du = px - pu * w;
-        const dv = (py - pv * h) * (pxR / pyR);
-        const d2 = du * du + dv * dv;
+        const du = px - puW;
+        const d2 = du * du + dv2;
         if (d2 > pxR2 * 1.44) continue;
-        const d = Math.sqrt(d2) / pxR;
-        if (d > 1.2) continue;
-        const falloff = Math.max(0, 1 - d * d);
-        const mask = edgeMask[py * w + wpx];
-        hmap[py * w + wpx] -= pd * falloff * mask;
+        const falloff = 1 - d2 * invPxR2;
+        if (falloff <= 0) continue;
+        const idx = rowOff + wpx;
+        hmap[idx] -= pd * falloff * edgeMask[idx];
       }
     }
   }
