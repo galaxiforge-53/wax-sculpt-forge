@@ -922,33 +922,35 @@ function applyIceFractures(
 
     const steps = Math.floor(length * w * 0.7);
     const widthPx = Math.ceil(width * h);
+    const invWidthPx = 1 / widthPx;
+    const invSteps = 1 / steps;
+    // Hoist trig per fracture
+    const cosAngle = Math.cos(angle);
+    const sinAngle = Math.sin(angle);
 
     for (let i = 0; i < steps; i++) {
-      const t = i / steps;
-      const u = startU + Math.cos(angle) * t * length;
-      const v = startV + Math.sin(angle) * t * length;
+      const t = i * invSteps;
+      const u = startU + cosAngle * t * length;
+      const v = startV + sinAngle * t * length;
       if (v < 0.05 || v > 0.95) continue;
 
-      // Subtle meandering
       const meander = fractureNoise(u * 30, v * 30) * 0.008;
       const px = Math.floor(((u % 1 + 1) % 1) * w);
+      let wpx = px % w;
+      if (wpx < 0) wpx += w;
       const centerPy = Math.floor((v + meander) * h);
 
       for (let dy = -widthPx * 2; dy <= widthPx * 2; dy++) {
         const py = centerPy + dy;
         if (py < 0 || py >= h) continue;
-        const idx = py * w + ((px % w + w) % w);
-        const dist = Math.abs(dy) / widthPx;
+        const idx = py * w + wpx;
+        const dist = Math.abs(dy) * invWidthPx;
 
         if (dist < 1.0) {
-          // Central trench
-          const trenchProfile = (1 - dist * dist);
-          hmap[idx] -= depth * trenchProfile * edgeMask[idx];
+          hmap[idx] -= depth * (1 - dist * dist) * edgeMask[idx];
         } else if (dist < 2.0) {
-          // Raised ridge flanks
-          const ridgeDist = (dist - 1.0);
-          const ridgeProfile = (1 - ridgeDist) * (1 - ridgeDist);
-          hmap[idx] += ridgeHeight * ridgeProfile * edgeMask[idx];
+          const ridgeDist = dist - 1.0;
+          hmap[idx] += ridgeHeight * (1 - ridgeDist) * (1 - ridgeDist) * edgeMask[idx];
         }
       }
     }
