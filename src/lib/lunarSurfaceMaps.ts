@@ -1852,18 +1852,25 @@ export function buildHeightmap(
         const y0 = Math.max(0, Math.floor((s.cv - floorR * physicalAspect) * MAP_H));
         const y1 = Math.min(MAP_H - 1, Math.ceil((s.cv + floorR * physicalAspect) * MAP_H));
 
+        // Hoist per-crater constants
+        const sCuW = s.cu * MAP_W;
+        const sCvH = s.cv * MAP_H;
+        const aspectRatio = pxR / pyR;
+        const invPxR = 1 / pxR;
         for (let py = y0; py <= y1; py++) {
           const rowOff = py * MAP_W;
+          const dv = (py - sCvH) * aspectRatio;
+          const dv2 = dv * dv;
+          if (dv2 > pxR2) continue; // early row rejection
           for (let px = x0; px <= x1; px++) {
             let wpx = px % MAP_W;
             if (wpx < 0) wpx += MAP_W;
-            const du = px - s.cu * MAP_W;
-            const dv = (py - s.cv * MAP_H) * (pxR / pyR);
-            const d2 = du * du + dv * dv;
+            const du = px - sCuW;
+            const d2 = du * du + dv2;
             if (d2 > pxR2) continue;
-            const t = Math.sqrt(d2) / pxR;
-            // Smoothstep falloff: full melt in center, fade at edges
-            const meltBlend = (1 - t) * (1 - t) * 0.7;
+            const t = Math.sqrt(d2) * invPxR;
+            const oneMinusT = 1 - t;
+            const meltBlend = oneMinusT * oneMinusT * 0.7;
             const idx = rowOff + wpx;
             hmap[idx] = hmap[idx] * (1 - meltBlend) + meltBlurred[idx] * meltBlend;
           }
