@@ -471,10 +471,13 @@ interface LunarTexturePanelProps {
   onChange: (state: LunarTextureState) => void;
   onApplyPreset: (state: LunarTextureState, presetName: string) => void;
   onRandomize: (state: LunarTextureState) => void;
+  ringThickness?: number;
+  onEnhanceSummary?: (summary: string[]) => void;
 }
 
-export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRandomize }: LunarTexturePanelProps) {
+export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRandomize, ringThickness = 2.0, onEnhanceSummary }: LunarTexturePanelProps) {
   const [seedLocked, setSeedLocked] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const patch = (p: Partial<LunarTextureState>) => onChange({ ...state, ...p });
 
   const handlePreset = (name: string) => {
@@ -486,6 +489,18 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
   const handleRandomize = () => {
     const chaos = LUNAR_PRESETS.find((p) => p.name === "Random Chaos")!;
     onRandomize(chaos.build());
+  };
+
+  const handleEnhanceSurface = () => {
+    setIsEnhancing(true);
+    setTimeout(() => {
+      const result = enhanceSurface(state, ringThickness);
+      if (Object.keys(result.patch).length > 0) {
+        onChange({ ...state, ...result.patch });
+      }
+      onEnhanceSummary?.(result.summary);
+      setIsEnhancing(false);
+    }, 300);
   };
 
   const handleReseed = () => {
