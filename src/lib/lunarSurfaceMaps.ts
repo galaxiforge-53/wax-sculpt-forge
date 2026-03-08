@@ -730,16 +730,26 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
     }
   }
 
-  // Vertical pass
-  for (let x = 0; x < w; x++) {
-    let sum = 0;
-    for (let ky = -kernelR; ky <= kernelR; ky++) {
-      sum += temp[Math.max(0, Math.min(h - 1, ky)) * w + x];
-    }
-    blurred[x] = sum * invKernel;
-    for (let y = 1; y < h; y++) {
-      sum += temp[Math.min(h - 1, y + kernelR) * w + x] - temp[Math.max(0, y - kernelR - 1) * w + x];
-      blurred[y * w + x] = sum * invKernel;
+  // Vertical pass — process in TILE_W-wide column strips for cache locality.
+  // Column-major access (stride = w) thrashes L1/L2 cache on large maps.
+  // Processing in tiles keeps ~TILE_W columns in cache simultaneously.
+  const TILE_W = 64;
+  const hm1 = h - 1;
+  for (let x0 = 0; x0 < w; x0 += TILE_W) {
+    const x1 = x0 + TILE_W < w ? x0 + TILE_W : w;
+    for (let x = x0; x < x1; x++) {
+      let sum = 0;
+      for (let ky = -kernelR; ky <= kernelR; ky++) {
+        const cy = ky < 0 ? 0 : ky;
+        sum += temp[cy * w + x];
+      }
+      blurred[x] = sum * invKernel;
+      for (let y = 1; y < h; y++) {
+        const addY = y + kernelR;
+        const subY = y - kernelR - 1;
+        sum += temp[(addY < hm1 ? addY : hm1) * w + x] - temp[(subY > 0 ? subY : 0) * w + x];
+        blurred[y * w + x] = sum * invKernel;
+      }
     }
   }
 
