@@ -313,6 +313,7 @@ function BuilderInner() {
         setCurrentProjectId(saved.id);
         setCurrentProjectName(saved.name);
         toast({ title: "Saved to Cloud ☁️", description: `"${name}" synced.` });
+        clearAutosave();
       } else {
         // Fallback to local storage
         if (!id) id = `PRJ-${Date.now().toString(36).toUpperCase()}`;
