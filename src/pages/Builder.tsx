@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useRingDesign } from "@/hooks/useRingDesign";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useEffect, useRef, useState } from "react";
 import RingViewport, { RingViewportHandle, SnapshotAngle, CutawayMode } from "@/components/builder/RingViewport";
 import { ScaleReferenceType } from "@/components/builder/ScaleReference";
