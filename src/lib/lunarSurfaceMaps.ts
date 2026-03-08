@@ -197,27 +197,25 @@ function lerp(a: number, b: number, t: number) { return a + t * (b - a); }
 // This mask is always MAP_W × MAP_H and only depends on dimensions,
 // so we build it once and reuse across all heightmap generations.
 
-let _cachedEdgeMask: Float32Array | null = null;
-let _cachedEdgeMaskW = 0;
-let _cachedEdgeMaskH = 0;
+// Edge mask is row-constant — store as a 1D per-row array (4KB vs 16MB).
+// Every consumer indexes by row: edgeRow[y] instead of edgeMask[y*w].
+let _cachedEdgeRow: Float32Array | null = null;
+let _cachedEdgeRowH = 0;
 
-function buildEdgeMask(w: number, h: number): Float32Array {
-  if (_cachedEdgeMask && _cachedEdgeMaskW === w && _cachedEdgeMaskH === h) {
-    return _cachedEdgeMask;
+function buildEdgeRow(h: number): Float32Array {
+  if (_cachedEdgeRow && _cachedEdgeRowH === h) {
+    return _cachedEdgeRow;
   }
-  const mask = new Float32Array(w * h);
+  const row = new Float32Array(h);
+  const invHm1 = 1 / (h - 1);
   for (let y = 0; y < h; y++) {
-    const v = y / (h - 1);
-    const edgeDist = Math.min(v, 1 - v);
-    const m = smoothstep(0.0, 0.18, edgeDist);
-    // Fill entire row with same value (row-constant mask)
-    const rowStart = y * w;
-    mask.fill(m, rowStart, rowStart + w);
+    const v = y * invHm1;
+    const edgeDist = v < 0.5 ? v : 1 - v;
+    row[y] = smoothstep(0.0, 0.18, edgeDist);
   }
-  _cachedEdgeMask = mask;
-  _cachedEdgeMaskW = w;
-  _cachedEdgeMaskH = h;
-  return mask;
+  _cachedEdgeRow = row;
+  _cachedEdgeRowH = h;
+  return row;
 }
 
 // ── Crater shape distance function ────────────────────────────────
