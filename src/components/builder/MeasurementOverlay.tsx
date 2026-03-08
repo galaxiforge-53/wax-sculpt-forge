@@ -190,7 +190,7 @@ export default function MeasurementOverlay({ params, visible, sizeStandard = "US
         anchorY="bottom"
         fontWeight="bold"
       >
-        {`US Size ${params.size}`}
+        {`${sizeStandard} Size ${formatRingSize(params.size, sizeStandard)}`}
       </Text>
 
       {/* ── Outer diameter (faint) ── */}
