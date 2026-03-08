@@ -14,6 +14,7 @@ import { getTemplate } from "@/config/templates";
 import { DesignPreview, ViewMode } from "@/types/ring";
 import { getProject, saveProject } from "@/lib/projectsStore";
 import { saveCloudDesign, getCloudDesign } from "@/lib/cloudDesignsStore";
+import { createShareLink } from "@/lib/shareStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
