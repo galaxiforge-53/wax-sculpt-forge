@@ -2338,8 +2338,9 @@ function heightmapToDisplacementCanvas(hmap: Float32Array, w: number, h: number)
     const rowSrc = y * w;
     const rowDst = yy * w;
     for (let x = 0; x < w; x++) {
-      const v = Math.max(0, Math.min(255, hmap[rowSrc + x] * 255 + 0.5)) | 0;
-      // Pack RGBA as single 32-bit write (little-endian: ABGR)
+      // Branchless clamp: multiply then bitwise-or avoids Math.max/Math.min
+      let v = hmap[rowSrc + x] * 255 + 0.5 | 0;
+      v = (v | -(v > 0 ? 1 : 0)) & 0xFF; // clamp 0-255 branchless
       buf32[rowDst + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
   }
