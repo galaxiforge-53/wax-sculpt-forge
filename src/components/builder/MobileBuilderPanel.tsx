@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { RingParameters, ViewMode, MetalPreset, FinishPreset, ToolType } from "@/types/ring";
 import { LunarTextureState } from "@/types/lunar";
