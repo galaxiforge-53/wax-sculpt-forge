@@ -406,6 +406,8 @@ function stampCrater(
 
   for (let py = y0; py <= y1; py++) {
     const rowOff = py * w;
+    // Edge mask is row-constant — hoist to avoid per-pixel lookups on 16MB array
+    const rowMask = edgeMask[rowOff];
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
@@ -516,8 +518,7 @@ function stampCrater(
       }
 
       const idx = rowOff + wpx;
-      const mask = edgeMask[idx];
-      delta *= mask;
+      delta *= rowMask;
       if (delta < 0) {
         // Allow overlapping craters to stack deeper (minimum -0.3 for realistic depth)
         // Previous clamping to 0 prevented natural multi-impact basins
@@ -584,11 +585,12 @@ function stampEjectaRays(
       const jitter = rayWidth * w;
       const jCeil = Math.ceil(jitter);
       const pyRow = py * w;
+      const ejectaRowMask = edgeMask[pyRow]; // row-constant
       for (let j = -jCeil; j <= jCeil; j++) {
         let wpx = (px + j) % w;
         if (wpx < 0) wpx += w;
         const idx = pyRow + wpx;
-        hmap[idx] = hmap[idx] + rayBrightness * fadeoff * edgeMask[idx];
+        hmap[idx] = hmap[idx] + rayBrightness * fadeoff * ejectaRowMask;
         if (hmap[idx] > 1) hmap[idx] = 1;
       }
 
@@ -644,15 +646,16 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH6;
+    const mariaRowMask = edgeMask[rowOff]; // row-constant
+    if (mariaRowMask < 0.001) continue; // skip edge rows entirely
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       const hVal = hmap[idx];
-      if (hVal >= threshold) continue; // branch: skip above-threshold pixels early
+      if (hVal >= threshold) continue;
       const depth = (threshold - hVal) * invThreshold;
       const noise = mariaNoise(x * invW6, vCoord) * 0.3 + 0.5;
       const fill = depth * mariaStrength * noise;
-      const mask = edgeMask[idx];
-      hmap[idx] = hVal + (fillTarget - hVal) * fill * mask;
+      hmap[idx] = hVal + (fillTarget - hVal) * fill * mariaRowMask;
     }
   }
 }
@@ -672,15 +675,15 @@ function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFact
   for (let y = 0; y < h; y++) {
     const v = y * invH;
     const rowOff = y * w;
+    const ridgeRowMask = edgeMask[rowOff]; // row-constant
+    if (ridgeRowMask < 0.01) continue; // skip entire edge rows — eliminates ~4096 iterations per skipped row
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
-      const mask = edgeMask[idx];
-      if (mask < 0.01) continue;
       const u = x * invW;
       const n = Math.abs(fbm(ridgeNoise, u, v, 4, 2.2, 0.5));
       const ridge = 1.0 - n * 2.0;
       if (ridge > 0) {
-        hmap[idx] += ridge * ridgeAmp * mask;
+        hmap[idx] += ridge * ridgeAmp * ridgeRowMask;
       }
     }
   }
@@ -974,12 +977,14 @@ function applyLunarRayBrightening(
   for (let y = 0; y < h; y++) {
     const v05 = y * invH * 0.5;
     const rowOff = y * w;
+    const rayRowMask = edgeMask[rowOff]; // row-constant
+    if (rayRowMask < 0.001) continue; // skip edge rows
     for (let x = 0; x < w; x++) {
       const u3 = x * invW * 3;
       const n = rayNoise(u3, v05);
       if (n > 0.3) {
         const idx = rowOff + x;
-        hmap[idx] += (n - 0.3) * rayAmp * edgeMask[idx];
+        hmap[idx] += (n - 0.3) * rayAmp * rayRowMask;
       }
     }
   }
@@ -1008,13 +1013,15 @@ function applyDustFill(
   for (let y = 0; y < h; y++) {
     const rowOff = y * w;
     const vCoord = y * invH2;
+    const dustRowMask = edgeMask[rowOff]; // row-constant
+    if (dustRowMask < 0.001) continue; // skip edge rows
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
       if (hmap[idx] >= fillLevel) continue;
       const depth = (fillLevel - hmap[idx]) * invFillLevel;
       const windBias = 0.5 + 0.5 * dustNoise(x * invW4, vCoord);
       const fill = depth * 0.6 * windBias;
-      hmap[idx] = hmap[idx] + (fillTarget - hmap[idx]) * fill * edgeMask[idx];
+      hmap[idx] = hmap[idx] + (fillTarget - hmap[idx]) * fill * dustRowMask;
     }
   }
 }
@@ -1050,6 +1057,8 @@ function applyValhallaConcentric(
     const dv = y * invH - centerV;
     const dv2 = dv * dv;
     const rowOff = y * w;
+    const valhallaRowMask = edgeMask[rowOff]; // row-constant
+    if (valhallaRowMask < 0.001) continue; // skip edge rows
     for (let x = 0; x < w; x++) {
       let du = x * invW - centerU;
       if (du > 0.5) du -= 1;
@@ -1057,7 +1066,7 @@ function applyValhallaConcentric(
       const dist = Math.sqrt(du * du + dv2);
       const ringVal = Math.sin(dist * ringPhaseScale) * fastExpNeg4(dist);
       const idx = rowOff + x;
-      hmap[idx] += ringVal * ringAmp * edgeMask[idx];
+      hmap[idx] += ringVal * ringAmp * valhallaRowMask;
     }
   }
 }
@@ -1113,16 +1122,17 @@ function applyAsteroidRubble(
     const vn10 = y * invH_rubble * 10 * aspectCorr;
     const vn35 = y * invH_rubble * 35 * aspectCorr;
     const rowOff = y * w;
+    const rubbleRowMask = edgeMask[rowOff]; // row-constant
+    if (rubbleRowMask < 0.01) continue; // skip entire edge rows
+
     for (let x = 0; x < w; x++) {
       const idx = rowOff + x;
-      const mask = edgeMask[idx];
-      if (mask < 0.01) continue;
 
       const un = x * invW_rubble;
       const coarse = fbm(rubbleNoise, un * 10, vn10, 4, 2.3, 0.55);
       const fine = Math.abs(boulderNoise(un * 35, vn35));
       const rubble = coarse * 0.6 + (fine - 0.3) * 0.4;
-      hmap[idx] += rubble * rubbleAmp * mask;
+      hmap[idx] += rubble * rubbleAmp * rubbleRowMask;
     }
   }
 
@@ -1503,11 +1513,20 @@ function applySurfaceMasks(
         // Inline shape computation (avoids function call overhead per pixel per mask)
         switch (mask.shape) {
           case "circle": {
-            const hw = mask.width / 2;
-            const hh = mask.height / 2;
-            const dist = Math.sqrt((ru / hw) * (ru / hw) + (rv / hh) * (rv / hh));
-            if (dist < 1 - featherNorm) value = 1;
-            else if (dist < 1) value = 1 - (dist - (1 - featherNorm)) / featherNorm;
+            // Eliminate sqrt for majority of pixels via squared-distance comparison
+            const invHW = 2 / mask.width;
+            const invHH = 2 / mask.height;
+            const ruN = ru * invHW, rvN = rv * invHH;
+            const dist2 = ruN * ruN + rvN * rvN;
+            const featherStart = 1 - featherNorm;
+            const featherStart2 = featherStart * featherStart;
+            if (dist2 < featherStart2) {
+              value = 1; // clearly inside — no sqrt needed
+            } else if (dist2 < 1) {
+              // In feather zone — need sqrt for precise falloff
+              const dist = Math.sqrt(dist2);
+              value = 1 - (dist - featherStart) / featherNorm;
+            }
             break;
           }
           case "rectangle": {
@@ -1646,6 +1665,7 @@ export function buildHeightmap(
       const row0 = iy0 * halfW;
       const row1 = iy1 * halfW;
       const outRow = y * MAP_W;
+      const baseRowMask = edgeMask[outRow]; // row-constant — hoist to avoid 4096 lookups per row
       for (let x = 0; x < MAP_W; x++) {
         const fx = x * invMapW_halfW;
         const ix = Math.floor(fx);
@@ -1657,7 +1677,7 @@ export function buildHeightmap(
           halfBase[row0 + ix1] * fx1 * fy0 +
           halfBase[row1 + ix0] * fx0 * fy1 +
           halfBase[row1 + ix1] * fx1 * fy1;
-        hmap[outRow + x] += val * edgeMask[outRow + x];
+        hmap[outRow + x] += val * baseRowMask;
       }
     }
   }
@@ -1995,9 +2015,10 @@ export function buildHeightmap(
       const invPxR2 = 1 / pxR2;
       for (let py = y0; py <= y1; py++) {
         const rowOff_pit = py * MAP_W;
+        const pitRowMask = edgeMask[rowOff_pit]; // row-constant
         const dv = (py - pvH) * aspectRatio;
         const dv2 = dv * dv;
-        if (dv2 > pxR2) continue; // early row rejection
+        if (dv2 > pxR2) continue;
         for (let px = x0; px <= x1; px++) {
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
@@ -2005,7 +2026,7 @@ export function buildHeightmap(
           const d2 = du * du + dv2;
           if (d2 > pxR2) continue;
           const idx_pit = rowOff_pit + wpx;
-          hmap[idx_pit] -= pd * (1 - d2 * invPxR2) * edgeMask[idx_pit];
+          hmap[idx_pit] -= pd * (1 - d2 * invPxR2) * pitRowMask;
         }
       }
     }
@@ -2061,11 +2082,11 @@ export function buildHeightmap(
       const vCoord96 = yNorm * 96 * aspectCorrection;
       const vCoord200 = yNorm * 200 * aspectCorrection;
       const rowOff = y * MAP_W;
+      const regRowMask = edgeMask[rowOff]; // row-constant — hoist to skip 4096 lookups per row
+      if (regRowMask < 0.01) continue; // skip entire edge rows
 
       for (let x = 0; x < MAP_W; x++) {
         const idx = rowOff + x;
-        const mask = edgeMask[idx];
-        if (mask < 0.01) continue;
 
         const uNorm = x * invMapW;
 
@@ -2090,7 +2111,7 @@ export function buildHeightmap(
         const rv = -(uNorm * 200) * sinA + vCoord200 * cosA;
         const scratch = impactNoise(ru * 0.3, rv * 1.5) * grainStrength * 0.4;
 
-        hmap[idx] += (regN + fineN * fineStrength + grain + scratch) * mask;
+        hmap[idx] += (regN + fineN * fineStrength + grain + scratch) * regRowMask;
       }
     }
   }
