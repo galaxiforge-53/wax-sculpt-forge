@@ -1417,6 +1417,7 @@ export function generateLunarSurfaceMaps(
 
   const { hmap, craterCount } = buildHeightmap(lunar, aspect, ringDims);
   const maps = buildMapsFromHeightmap(hmap, MAP_W, MAP_H, lunar, aspect, craterCount);
+  evictCache();
   cache.set(key, maps);
   return maps;
 }
