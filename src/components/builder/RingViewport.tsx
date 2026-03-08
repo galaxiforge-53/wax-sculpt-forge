@@ -16,12 +16,14 @@ import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
 
 // ── Debounce hook for lunar texture regeneration ──────────────────
+// Uses JSON serialization for stable deep comparison of object values
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
+  const serialized = typeof value === "object" ? JSON.stringify(value) : String(value);
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), delayMs);
     return () => clearTimeout(timer);
-  }, [value, delayMs]);
+  }, [serialized, delayMs]); // eslint-disable-line react-hooks/exhaustive-deps
   return debounced;
 }
 
