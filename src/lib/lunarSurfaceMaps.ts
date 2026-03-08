@@ -2512,12 +2512,16 @@ function getSharedHalfHmap(hmap: Float32Array, w: number, h: number): Float32Arr
     _sharedHalfH = hh;
   }
   const half = _sharedHalfHmap;
+  const hm1 = h - 1;
   for (let y = 0; y < hh; y++) {
     const sy = y * 2;
-    const sy1 = Math.min(sy + 1, h - 1);
+    const sy1 = sy + 1 < h ? sy + 1 : hm1;
+    const rowSy = sy * w;
+    const rowSy1 = sy1 * w;
+    const dstRow = y * hw;
     for (let x = 0; x < hw; x++) {
       const sx = x * 2;
-      half[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
+      half[dstRow + x] = (hmap[rowSy + sx] + hmap[rowSy + sx + 1] + hmap[rowSy1 + sx] + hmap[rowSy1 + sx + 1]) * 0.25;
     }
   }
   return half;
