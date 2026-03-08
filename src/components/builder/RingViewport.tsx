@@ -693,6 +693,13 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const wearClearcoatLoss = wearFactor * 0.8;      // clearcoat wears off
   const wearSheenBoost = wearFactor * 0.15;        // subtle patina sheen
 
+  // ── Lunar-specific wear: craters flatten, rims soften, texture detail erodes ──
+  // High-contact areas (outer ring edges, raised rims) wear fastest
+  const lunarWearNormalReduction = wearFactor * 0.55;   // normal map strength drops — rims flatten
+  const lunarWearAoReduction = wearFactor * 0.5;        // AO fades — debris fills crevices
+  const lunarWearDispReduction = wearFactor * 0.45;     // displacement softens — craters shallow out
+  const lunarWearRoughnessUniformity = wearFactor * 0.3; // roughness map becomes more uniform
+
   // Compute physical aspect ratio for circular craters
   const physicalAspect = useMemo(() => {
     const outerDiam = debouncedParams.innerDiameter + 2 * debouncedParams.thickness;
@@ -802,17 +809,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
-    const strength = baseStrength * dimScale;
+    // Wear erodes crater rims — normal detail progressively flattens
+    const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction);
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale]);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction]);
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
-    // Base displacement scales with intensity and ring radius, modulated by dimScale
-    // so that craters maintain proportional physical depth
-    return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
-  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale]);
+    const baseDisp = outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
+    // Wear progressively shallows craters — rims erode, bowls fill with wear debris
+    return baseDisp * (1 - lunarWearDispReduction);
+  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale, lunarWearDispReduction]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
@@ -881,12 +889,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
+        roughness={Math.min(1, (hasLunar ? mc.roughness + 0.15 * (1 - lunarWearRoughnessUniformity) : mc.roughness) + finishRoughMod + wearRoughnessBoost)}
         metalness={mc.metalness}
         normalMap={lunarMaps?.normalMap ?? null}
         roughnessMap={lunarMaps?.roughnessMap ?? null}
         aoMap={lunarMaps?.aoMap ?? null}
-        aoMapIntensity={hasLunar ? 2.0 : 0}
+        aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) : 0}
         normalScale={normalScale}
         envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15)}
         clearcoat={Math.max(0, (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss))}
@@ -897,12 +905,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1)}
         ior={mc.ior}
         displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
-        displacementScale={dispScale * (1 - wearFactor * 0.3)}
-        displacementBias={-dispScale * (1 - wearFactor * 0.3) * 0.5}
+        displacementScale={dispScale}
+        displacementBias={-dispScale * 0.5}
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
@@ -1833,11 +1841,20 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
         {/* Wear preview indicator */}
         {wearPreview > 0 && (
           <div className="absolute top-3 left-3 z-20 pointer-events-none animate-in fade-in slide-in-from-left-2 duration-200" style={{ top: isRotationLocked ? '3.5rem' : '0.75rem' }}>
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent/15 backdrop-blur-sm border border-accent/30 rounded-lg">
-              <svg className="w-3.5 h-3.5 text-accent-foreground/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-[10px] font-medium text-accent-foreground/70">Wear Preview {wearPreview}%</span>
+            <div className="flex flex-col gap-0.5 px-2.5 py-1.5 bg-accent/15 backdrop-blur-sm border border-accent/30 rounded-lg">
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-accent-foreground/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-[10px] font-medium text-accent-foreground/70">
+                  Wear {wearPreview}% · {wearPreview <= 25 ? "1 year" : wearPreview <= 50 ? "5 years" : wearPreview <= 75 ? "10 years" : "20+ years"}
+                </span>
+              </div>
+              {!!lunarTexture?.enabled && wearPreview > 15 && (
+                <span className="text-[8px] text-accent-foreground/50 pl-5">
+                  {wearPreview <= 40 ? "Crater rims softening" : wearPreview <= 70 ? "Surface detail eroding" : "Terrain significantly worn"}
+                </span>
+              )}
             </div>
           </div>
         )}
