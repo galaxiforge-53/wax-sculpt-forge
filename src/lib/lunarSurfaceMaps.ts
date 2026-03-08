@@ -2088,10 +2088,21 @@ export function buildHeightmap(
     }
   }
 
-  // ─── 8) Normalize + contrast in single pass ──
-  // Merges two full-map traversals (normalize + contrast) into one
+  // ─── 8) Normalize + contrast in single pass (4-wide unrolled min/max) ──
+  // Process 4 elements at a time to reduce loop overhead by 75%
   let hMin = Infinity, hMax = -Infinity;
-  for (let i = 0; i < hmap.length; i++) {
+  const len = hmap.length;
+  const len4 = len & ~3; // floor to multiple of 4
+  for (let i = 0; i < len4; i += 4) {
+    const v0 = hmap[i], v1 = hmap[i + 1], v2 = hmap[i + 2], v3 = hmap[i + 3];
+    const min01 = v0 < v1 ? v0 : v1, min23 = v2 < v3 ? v2 : v3;
+    const max01 = v0 > v1 ? v0 : v1, max23 = v2 > v3 ? v2 : v3;
+    const localMin = min01 < min23 ? min01 : min23;
+    const localMax = max01 > max23 ? max01 : max23;
+    if (localMin < hMin) hMin = localMin;
+    if (localMax > hMax) hMax = localMax;
+  }
+  for (let i = len4; i < len; i++) {
     const v = hmap[i];
     if (v < hMin) hMin = v;
     if (v > hMax) hMax = v;
@@ -2101,7 +2112,16 @@ export function buildHeightmap(
   const contrastMult = 0.6 + contrastVal * 1.2;
   if (hRange > 0.001) {
     const invRange = 1 / hRange;
-    for (let i = 0; i < hmap.length; i++) {
+    // 4-wide contrast application
+    for (let i = 0; i < len4; i += 4) {
+      for (let j = 0; j < 4; j++) {
+        const idx = i + j;
+        const normalized = (hmap[idx] - hMin) * invRange;
+        const contrasted = 0.5 + (normalized - 0.5) * contrastMult;
+        hmap[idx] = contrasted < 0 ? 0 : contrasted > 1 ? 1 : contrasted;
+      }
+    }
+    for (let i = len4; i < len; i++) {
       const normalized = (hmap[i] - hMin) * invRange;
       const contrasted = 0.5 + (normalized - 0.5) * contrastMult;
       hmap[i] = contrasted < 0 ? 0 : contrasted > 1 ? 1 : contrasted;
