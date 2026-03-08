@@ -642,6 +642,49 @@ function BuilderInner() {
                   >
                     <ZoomIn className="w-3 h-3" />
                   </button>
+                  {/* Detail Boost dropdown */}
+                  <div className="relative group">
+                    <button
+                      className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                        ${detailBoost > 0
+                          ? "bg-secondary/30 text-secondary-foreground border border-secondary/40 shadow-[0_0_8px_hsl(var(--secondary)/0.2)]"
+                          : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                        }`}
+                      title="Exaggerate surface detail for inspection"
+                      onClick={() => setDetailBoost(v => v > 0 ? 0 : 50)}
+                    >
+                      🔬
+                    </button>
+                    <div className="absolute top-full right-0 mt-1 bg-card/95 backdrop-blur-xl border border-border rounded-lg shadow-xl p-3 min-w-[170px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 space-y-2">
+                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-medium">Detail Boost</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={detailBoost}
+                          onChange={(e) => setDetailBoost(Number(e.target.value))}
+                          className="flex-1 h-1 accent-primary"
+                        />
+                        <span className="text-[10px] font-mono text-primary w-8 text-right">×{(1 + detailBoost / 100 * 1.8).toFixed(1)}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {[0, 25, 50, 75, 100].map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setDetailBoost(v)}
+                            className={`flex-1 px-1 py-0.5 text-[8px] rounded transition-colors ${detailBoost === v ? "bg-primary/20 text-primary" : "bg-secondary/30 text-muted-foreground hover:text-foreground"}`}
+                          >
+                            {v === 0 ? "Off" : v === 25 ? "Low" : v === 50 ? "Med" : v === 75 ? "High" : "Max"}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[7px] text-muted-foreground/50">
+                        Exaggerates crater depth, rim sharpness, and engraving clarity for inspection
+                      </p>
+                    </div>
+                  </div>
                   <button
                     onClick={() => {
                       setShowPrinterBed((v) => !v);
