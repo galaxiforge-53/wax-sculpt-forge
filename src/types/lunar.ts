@@ -80,4 +80,6 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   layerMediumImpacts: 50,
   layerMicroPitting: 50,
   frozen: false,
+  symmetry: "none",
+  symmetryBlend: 30,
 };
