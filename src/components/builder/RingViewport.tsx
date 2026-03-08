@@ -799,10 +799,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       geoRef.current.capGeoTop.dispose();
       geoRef.current.capGeoBot.dispose();
     }
-    const result = buildSolidRingGeometry(debouncedParams, hasLunar, isMobile, geoQuality, debouncedWear);
+    const result = buildSolidRingGeometry(debouncedParams, hasLunar || hasImageTerrain, isMobile, geoQuality, debouncedWear);
     geoRef.current = result;
     return result;
-  }, [debouncedParams, hasLunar, isMobile, geoQuality, debouncedWear]);
+  }, [debouncedParams, hasLunar, hasImageTerrain, isMobile, geoQuality, debouncedWear]);
 
   // Cleanup on unmount
   useEffect(() => {
