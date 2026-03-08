@@ -9,7 +9,7 @@ import { getReturnUrl, getHandoffUrl, isEmbedMode } from "@/config/galaxiforge";
 import { generateExportSTL, downloadBlob, STLExportResult, SHRINKAGE_PROFILES, ShrinkageMetal } from "@/lib/stlExporter";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import ProductionSummaryPanel from "@/components/builder/ProductionSummaryPanel";
-import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale } from "lucide-react";
+import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale, Save, ExternalLink } from "lucide-react";
 import ViewportErrorBoundary from "@/components/builder/ViewportErrorBoundary";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
@@ -18,8 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/hooks/useAccess";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { saveCloudDesign } from "@/lib/cloudDesignsStore";
+import { saveProject, getProject } from "@/lib/projectsStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 // ── 3D Preview of export geometry ────────────────────────────────
 
@@ -89,6 +92,57 @@ const RING_SIZES = Object.keys(RING_SIZE_MAP).map(Number);
 
 type SubmitStep = "review" | "confirm" | "submitting" | "uploading-stl" | "uploading-previews" | "done";
 
+// ── Action Card component ────────────────────────────────────────
+
+function ActionCard({ icon: Icon, title, description, buttonLabel, onClick, disabled, loading, locked, variant = "outline", highlight }: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  locked?: boolean;
+  variant?: "primary" | "secondary" | "outline";
+  highlight?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "rounded-xl border p-4 sm:p-5 flex flex-col gap-3 transition-all",
+      highlight ? "border-primary/40 bg-primary/5 ring-1 ring-primary/10" : "border-border bg-card/50",
+      disabled && "opacity-60"
+    )}>
+      <div className="flex items-center gap-2.5">
+        <div className={cn(
+          "w-9 h-9 rounded-lg flex items-center justify-center shrink-0",
+          highlight ? "bg-primary/15" : "bg-secondary"
+        )}>
+          {locked ? <Lock className="w-4 h-4 text-muted-foreground" /> : <Icon className={cn("w-4 h-4", highlight ? "text-primary" : "text-foreground")} />}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{title}</p>
+          <p className="text-[10px] text-muted-foreground leading-snug">{description}</p>
+        </div>
+      </div>
+      <Button
+        onClick={onClick}
+        disabled={disabled}
+        size="sm"
+        className={cn(
+          "w-full mt-auto gap-1.5",
+          variant === "primary" && "bg-primary text-primary-foreground hover:bg-primary/90",
+          variant === "secondary" && "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          variant === "outline" && "border border-border bg-transparent text-foreground hover:bg-secondary/50"
+        )}
+        variant={variant === "outline" ? "outline" : variant === "secondary" ? "secondary" : "default"}
+      >
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Icon className="w-3.5 h-3.5" />}
+        <span dangerouslySetInnerHTML={{ __html: buttonLabel }} />
+      </Button>
+    </div>
+  );
+}
+
 // ── Main Export page ─────────────────────────────────────────────
 
 export default function Export() {
@@ -109,6 +163,28 @@ export default function Export() {
   const [confirmFinish, setConfirmFinish] = useState<FinishPreset>("polished");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [savingDesign, setSavingDesign] = useState(false);
+
+  const handleSaveDesign = async () => {
+    if (!pkg) return;
+    setSavingDesign(true);
+    try {
+      const name = pkg.id || "Untitled Design";
+      if (user) {
+        await saveCloudDesign({ name, design_package: pkg });
+        toast({ title: "Saved to Cloud ☁️", description: `"${name}" saved to your library.` });
+      } else {
+        const id = `PRJ-${Date.now().toString(36).toUpperCase()}`;
+        const now = new Date().toISOString();
+        saveProject({ id, name, createdAt: now, updatedAt: now, designPackage: pkg });
+        toast({ title: "Saved Locally", description: `"${name}" saved. Sign in to sync to cloud.` });
+      }
+    } catch (err: any) {
+      toast({ title: "Save Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingDesign(false);
+    }
+  };
 
   useEffect(() => {
     const raw = sessionStorage.getItem("designPackage");
@@ -317,10 +393,58 @@ export default function Export() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-8">
-      <div className="max-w-3xl w-full space-y-6">
-        <h1 className="font-display text-xl sm:text-2xl text-primary ember-text">Manufacturing Export</h1>
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-8">
+        <div className="max-w-4xl w-full space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="font-display text-xl sm:text-2xl text-primary ember-text">Export &amp; Production</h1>
+              <p className="text-xs text-muted-foreground mt-1">Save, export, or send your design for manufacturing</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/builder")} className="gap-1.5 text-muted-foreground">
+              <ArrowLeft className="h-4 w-4" /> Builder
+            </Button>
+          </div>
+
+          {/* ── Three Action Cards ─────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Save Design */}
+            <ActionCard
+              icon={Save}
+              title="Save Design"
+              description="Save to your library for later editing"
+              buttonLabel={user ? "Save to Cloud" : "Save Locally"}
+              onClick={handleSaveDesign}
+              disabled={savingDesign}
+              loading={savingDesign}
+              variant="secondary"
+            />
+
+            {/* Export STL */}
+            <ActionCard
+              icon={Download}
+              title="Export STL"
+              description={canExport ? "Download the 3D model for printing or casting" : "Requires Premium access code"}
+              buttonLabel={canExport ? `Download STL${stlResult ? ` (${stlResult.fileSizeKB} KB)` : ""}` : "Premium Required"}
+              onClick={handleDownloadSTL}
+              disabled={!stlResult || generating || !canExport}
+              locked={!canExport}
+              variant="outline"
+            />
+
+            {/* Send to Galaxy Forge */}
+            <ActionCard
+              icon={Send}
+              title="Send to Galaxy Forge"
+              description="Submit for professional production with full manufacturing package"
+              buttonLabel="Configure &amp; Submit"
+              onClick={handleSend}
+              disabled={sent}
+              variant="primary"
+              highlight
+            />
+          </div>
 
         {/* 3D STL Preview */}
         <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-forge-dark via-card to-forge-dark">
@@ -651,35 +775,17 @@ export default function Export() {
           )}
         </AnimatePresence>
 
-        {/* Actions — shown when not in submission flow */}
-        {!sent && submitStep === "review" ? (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" onClick={() => navigate("/builder")} className="flex-1">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
-            </Button>
-            <Button
-              onClick={handleDownloadSTL}
-              disabled={!stlResult || generating || !canExport}
-              className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              title={!canExport ? "Requires Premium access code" : ""}
-            >
-              {!canExport ? <Lock className="h-4 w-4 mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-              {!canExport ? "Premium Required" : `Download STL ${stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}`}
-            </Button>
-            <Button onClick={handleSend} className="flex-1 bg-primary text-primary-foreground hover:bg-ember-glow">
-              <Send className="h-4 w-4 mr-2" /> Send to Galaxy Forge
-            </Button>
-          </div>
-        ) : sent ? (
-          <div className="text-center space-y-4">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary/20 text-primary border border-primary/30"
-            >
+        {/* Success state replaces action cards */}
+        {sent && (
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center space-y-4 bg-card border border-primary/20 rounded-xl p-6"
+          >
+            <div className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary/20 text-primary border border-primary/30">
               <Check className="h-5 w-5" />
               <span className="font-display text-sm tracking-wide">Design Submitted to Galaxy Forge</span>
-            </motion.div>
+            </div>
             <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
               Your ring design with all manufacturing parameters has been submitted for production.
               {user && " You can view your orders in your design library."}
@@ -693,13 +799,13 @@ export default function Export() {
               </Button>
               <a
                 href={getReturnUrl(pkg.id)}
-                className="inline-block text-sm text-primary hover:text-molten transition-colors underline leading-9"
+                className="inline-block text-sm text-primary hover:text-foreground transition-colors underline leading-9"
               >
                 View on Galaxy Forge →
               </a>
             </div>
-          </div>
-        ) : null}
+          </motion.div>
+        )}
       </div>
     </div>
   );
