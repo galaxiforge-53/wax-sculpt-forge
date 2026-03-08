@@ -2091,6 +2091,34 @@ export interface GenerationProgress {
   percent: number;
 }
 
+// Shared half-res heightmap downsample — computed once, reused by roughness/AO/albedo
+// Previously each map function downsampled independently (3× redundant work on 4M pixels)
+let _sharedHalfHmap: Float32Array | null = null;
+let _sharedHalfW = 0;
+let _sharedHalfH = 0;
+
+function getSharedHalfHmap(hmap: Float32Array, w: number, h: number): Float32Array {
+  const hw = w >> 1;
+  const hh = h >> 1;
+  if (_sharedHalfHmap && _sharedHalfW === hw && _sharedHalfH === hh) {
+    // Recompute into existing buffer
+  } else {
+    _sharedHalfHmap = new Float32Array(hw * hh);
+    _sharedHalfW = hw;
+    _sharedHalfH = hh;
+  }
+  const half = _sharedHalfHmap;
+  for (let y = 0; y < hh; y++) {
+    const sy = y * 2;
+    const sy1 = Math.min(sy + 1, h - 1);
+    for (let x = 0; x < hw; x++) {
+      const sx = x * 2;
+      half[y * hw + x] = (hmap[sy * w + sx] + hmap[sy * w + sx + 1] + hmap[sy1 * w + sx] + hmap[sy1 * w + sx + 1]) * 0.25;
+    }
+  }
+  return half;
+}
+
 function buildMapsFromHeightmap(
   hmap: Float32Array,
   w: number,
@@ -2099,12 +2127,14 @@ function buildMapsFromHeightmap(
   aspect: number,
   craterCount: number,
 ): LunarSurfaceMapSet {
-  // Normal map strength scales with intensity: low intensity → subtle normals, high → sharp
+  // Pre-compute shared half-res downsample (used by roughness, AO, albedo)
+  const sharedHalf = getSharedHalfHmap(hmap, w, h);
+
   const normalStrength = 1.5 + (lunar.intensity / 100) * 2.0;
   const normalCanvas = heightmapToNormalCanvas(hmap, w, h, normalStrength, aspect);
-  const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail);
-  const aoCanvas = heightmapToAOCanvas(hmap, w, h);
-  const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed);
+  const roughnessCanvas = heightmapToRoughnessCanvas(hmap, w, h, lunar.microDetail, sharedHalf);
+  const aoCanvas = heightmapToAOCanvas(hmap, w, h, sharedHalf);
+  const albedoCanvas = heightmapToAlbedoCanvas(hmap, w, h, lunar.seed, sharedHalf);
   const displacementCanvas = heightmapToDisplacementCanvas(hmap, w, h);
 
   const normalMap = new THREE.CanvasTexture(normalCanvas);
