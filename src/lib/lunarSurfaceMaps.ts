@@ -1748,13 +1748,18 @@ export function buildHeightmap(
   // ─── 5) Erosion pass — age-dependent: large old craters erode more, small fresh stay sharp ──
   // First pass: global erosion for base weathering
   applyErosion(hmap, MAP_W, MAP_H, erosionFactor * 0.6);
+
   // Second pass: selective stronger erosion in areas dominated by large craters
-  // Large craters occupy >0.06 radius bands; we blur those regions more heavily
   if (erosionFactor > 0.15 && stamps.length > 0) {
-    // Build an "age mask" — higher near old large craters
-    const ageMask = new Float32Array(MAP_W * MAP_H);
+    // Reuse pooled buffer for age mask instead of allocating new Float32Array
+    const len = MAP_W * MAP_H;
+    if (!_erosionBuf2 || _erosionBuf2.length !== len) _erosionBuf2 = new Float32Array(len);
+    const ageMask = _erosionBuf2;
+    ageMask.fill(0); // Clear previous contents
+
+    // Build age mask using mega/hero craters only
     for (const s of stamps) {
-      if (s.tier > 1) continue; // only mega/hero get extra aging
+      if (s.tier > 1) continue;
       const extraErosion = (1 - s.tier / 2) * erosionFactor * 0.4;
       const spreadU = s.radius * 1.5;
       const spreadV = s.radius * 1.5 * physicalAspect;
@@ -1764,37 +1769,48 @@ export function buildHeightmap(
       const y1 = Math.min(MAP_H - 1, Math.ceil((s.cv + spreadV) * MAP_H));
       const rPx = s.radius * MAP_W;
       const rPx2 = rPx * rPx;
+      const invR2 = 1 / (rPx2 * 2.25);
+
       for (let py = y0; py <= y1; py++) {
+        const rowOff = py * MAP_W;
         for (let px = x0; px <= x1; px++) {
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
           const du = px - s.cu * MAP_W;
-          const dv = (py - s.cv * MAP_H);
+          const dv = py - s.cv * MAP_H;
           const d2 = du * du + dv * dv;
           if (d2 > rPx2 * 2.25) continue;
-          const falloff = Math.max(0, 1 - d2 / (rPx2 * 2.25));
-          const idx = py * MAP_W + wpx;
-          ageMask[idx] = Math.max(ageMask[idx], falloff * extraErosion);
+          const falloff = (1 - d2 * invR2);
+          const idx = rowOff + wpx;
+          const newVal = falloff * extraErosion;
+          if (newVal > ageMask[idx]) ageMask[idx] = newVal;
         }
       }
     }
-    // Apply age-weighted additional blur
-    const len = MAP_W * MAP_H;
+
+    // Apply age-weighted blur using pooled buffer
     if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
     const blurred = _erosionBuf1;
-    // Quick 3x3 blur
+
+    // Quick 3×3 blur with row-offset caching
     for (let y = 0; y < MAP_H; y++) {
-      const yA = Math.max(0, y - 1), yB = Math.min(MAP_H - 1, y + 1);
+      const yA = y > 0 ? y - 1 : 0;
+      const yB = y < MAP_H - 1 ? y + 1 : MAP_H - 1;
+      const rowA = yA * MAP_W;
+      const rowM = y * MAP_W;
+      const rowB = yB * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
         const xL = x === 0 ? MAP_W - 1 : x - 1;
         const xR = x === MAP_W - 1 ? 0 : x + 1;
-        blurred[y * MAP_W + x] = (
-          hmap[yA * MAP_W + xL] + hmap[yA * MAP_W + x] + hmap[yA * MAP_W + xR] +
-          hmap[y * MAP_W + xL] + hmap[y * MAP_W + x] + hmap[y * MAP_W + xR] +
-          hmap[yB * MAP_W + xL] + hmap[yB * MAP_W + x] + hmap[yB * MAP_W + xR]
-        ) / 9;
+        blurred[rowM + x] = (
+          hmap[rowA + xL] + hmap[rowA + x] + hmap[rowA + xR] +
+          hmap[rowM + xL] + hmap[rowM + x] + hmap[rowM + xR] +
+          hmap[rowB + xL] + hmap[rowB + x] + hmap[rowB + xR]
+        ) * 0.111111111; // 1/9
       }
     }
+
+    // Apply masked blur
     for (let i = 0; i < len; i++) {
       const a = ageMask[i];
       if (a > 0.001) hmap[i] = hmap[i] * (1 - a) + blurred[i] * a;
