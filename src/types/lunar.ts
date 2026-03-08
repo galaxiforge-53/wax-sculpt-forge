@@ -69,4 +69,7 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   ejectaStrength: 50,
   terrainType: "generic",
   terrainContrast: 60,
+  layerLargeCraters: 50,
+  layerMediumImpacts: 50,
+  layerMicroPitting: 50,
 };
