@@ -51,6 +51,10 @@ export interface LunarTextureState {
   // ── v8 surface zones ──
   zones?: SurfaceZone[];        // multiple texture zones across the ring width
   zonesEnabled?: boolean;       // whether to use multi-zone rendering
+  // ── v9 surface masks ──
+  masks?: SurfaceMask[];        // shape-based masks to control where texture applies
+  masksEnabled?: boolean;       // whether to use masking
+  maskMode?: MaskMode;          // how masks combine: "include" = texture only inside, "exclude" = texture everywhere except
 }
 
 export type SymmetryMode = "none" | "2" | "3" | "4" | "6" | "8";
