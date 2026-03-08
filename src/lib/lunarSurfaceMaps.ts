@@ -995,8 +995,8 @@ function applyLunarRayBrightening(
   for (let y = 0; y < h; y++) {
     const v05 = y * invH * 0.5;
     const rowOff = y * w;
-    const rayRowMask = edgeMask[rowOff]; // row-constant
-    if (rayRowMask < 0.001) continue; // skip edge rows
+    const rayRowMask = edgeRow[y];
+    if (rayRowMask < 0.001) continue;
     for (let x = 0; x < w; x++) {
       const u3 = x * invW * 3;
       const n = rayNoise(u3, v05);
