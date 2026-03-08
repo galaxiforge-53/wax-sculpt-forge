@@ -406,6 +406,8 @@ function stampCrater(
 
   for (let py = y0; py <= y1; py++) {
     const rowOff = py * w;
+    // Edge mask is row-constant — hoist to avoid per-pixel lookups on 16MB array
+    const rowMask = edgeMask[rowOff];
     for (let px = x0; px <= x1; px++) {
       let wpx = px % w;
       if (wpx < 0) wpx += w;
