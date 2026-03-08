@@ -2203,7 +2203,15 @@ export function buildHeightmap(
         smoothResult[rowC + x] = smoothTemp[rowA + x] * 0.25 + smoothTemp[rowC + x] * 0.5 + smoothTemp[rowB + x] * 0.25;
       }
     }
-    for (let i = 0; i < len; i++) {
+    // 4-wide unrolled blend
+    const len4s = len & ~3;
+    for (let i = 0; i < len4s; i += 4) {
+      hmap[i]     = hmap[i]     * 0.6 + smoothResult[i]     * 0.4;
+      hmap[i + 1] = hmap[i + 1] * 0.6 + smoothResult[i + 1] * 0.4;
+      hmap[i + 2] = hmap[i + 2] * 0.6 + smoothResult[i + 2] * 0.4;
+      hmap[i + 3] = hmap[i + 3] * 0.6 + smoothResult[i + 3] * 0.4;
+    }
+    for (let i = len4s; i < len; i++) {
       hmap[i] = hmap[i] * 0.6 + smoothResult[i] * 0.4;
     }
   }
