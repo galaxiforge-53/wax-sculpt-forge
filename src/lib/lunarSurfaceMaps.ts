@@ -233,9 +233,16 @@ function shapedDistance(
     // "circular" — no transformation
   }
 
-  // Standard domain warp (applies to all shapes for natural variation)
-  const wU = sp.warpNoise(px * sp.noiseScale / w, py * sp.noiseScale / h);
-  const wV = sp.warpNoise(py * sp.noiseScale / h + 100, px * sp.noiseScale / w + 100);
+  // Multi-octave domain warp for more organic, natural crater edges
+  // Two octaves of warp: coarse (large-scale irregularity) + fine (edge detail)
+  const coarseScale = sp.noiseScale * 0.5;
+  const fineScale = sp.noiseScale * 2.0;
+  const wU_coarse = sp.warpNoise(px * coarseScale / w, py * coarseScale / h);
+  const wV_coarse = sp.warpNoise(py * coarseScale / h + 100, px * coarseScale / w + 100);
+  const wU_fine = sp.warpNoise(px * fineScale / w + 50, py * fineScale / h + 50);
+  const wV_fine = sp.warpNoise(py * fineScale / h + 150, px * fineScale / w + 150);
+  const wU = wU_coarse * 0.7 + wU_fine * 0.3;
+  const wV = wV_coarse * 0.7 + wV_fine * 0.3;
   const wdu = sdu + sp.warpAmp * 0.22 * wU;
   const wdv = sdv + sp.warpAmp * 0.22 * wV;
 
