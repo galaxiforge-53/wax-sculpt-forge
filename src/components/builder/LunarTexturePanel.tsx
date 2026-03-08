@@ -1,4 +1,4 @@
-import { LunarTextureState, CraterDensity, CraterSize, CraterShape, SymmetryMode, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
+import { LunarTextureState, CraterDensity, CraterSize, CraterShape, SymmetryMode, SurfaceZone, ZonePreset, ZONE_PRESETS, DEFAULT_ZONE, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw, Layers, Plus, Trash2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
@@ -1072,6 +1072,222 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               Browse and preview different terrain seeds instantly
             </p>
             <SeedExplorer state={state} onChange={onChange} />
+          </SubSection>
+
+          {/* ── Surface Zones ── */}
+          <SubSection title="Surface Zones" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-2">
+              <Layers className="w-3 h-3 inline mr-1" />
+              Create multiple texture zones across the ring width — smooth center with textured edges, or vice versa
+            </p>
+
+            <div className="flex items-center justify-between mb-2 p-2 rounded-md bg-secondary/20">
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Enable Zones</Label>
+                <p className="text-[8px] text-muted-foreground/40">Override global texture with zone-specific settings</p>
+              </div>
+              <Switch 
+                checked={state.zonesEnabled ?? false} 
+                onCheckedChange={(v) => patch({ zonesEnabled: v })} 
+              />
+            </div>
+
+            {(state.zonesEnabled ?? false) && (
+              <div className="space-y-3">
+                {/* Zone presets */}
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] text-muted-foreground">Quick Presets</Label>
+                  <div className="grid grid-cols-2 gap-1">
+                    {([
+                      { value: "center-smooth" as ZonePreset, label: "Smooth Center", desc: "Polished band in middle" },
+                      { value: "edges-smooth" as ZonePreset, label: "Smooth Edges", desc: "Textured center band" },
+                      { value: "thirds" as ZonePreset, label: "Three Bands", desc: "Alternating zones" },
+                      { value: "gradient" as ZonePreset, label: "Gradient", desc: "Fade top to bottom" },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => patch({ zones: ZONE_PRESETS[opt.value] })}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-md text-left transition-all border",
+                          "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60 hover:border-primary/30"
+                        )}
+                      >
+                        <span className="text-[10px] font-medium">{opt.label}</span>
+                        <span className="text-[7px] opacity-60">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Zone list */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">Zones ({(state.zones ?? []).length})</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => {
+                        const newZone: SurfaceZone = {
+                          ...DEFAULT_ZONE,
+                          id: `zone-${Date.now()}`,
+                          name: `Zone ${(state.zones ?? []).length + 1}`,
+                          startV: 0.4,
+                          endV: 0.6,
+                        };
+                        patch({ zones: [...(state.zones ?? []), newZone] });
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add Zone
+                    </Button>
+                  </div>
+
+                  {(state.zones ?? []).map((zone, idx) => (
+                    <div key={zone.id} className="p-2 rounded-lg bg-secondary/30 border border-border/40 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <input
+                          type="text"
+                          value={zone.name}
+                          onChange={(e) => {
+                            const newZones = [...(state.zones ?? [])];
+                            newZones[idx] = { ...zone, name: e.target.value };
+                            patch({ zones: newZones });
+                          }}
+                          className="bg-transparent border-none text-[10px] font-medium text-foreground focus:outline-none w-24"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-destructive/60 hover:text-destructive"
+                          onClick={() => {
+                            const newZones = (state.zones ?? []).filter((_, i) => i !== idx);
+                            patch({ zones: newZones });
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+
+                      {/* Zone position */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+                          <span>Position: {(zone.startV * 100).toFixed(0)}% – {(zone.endV * 100).toFixed(0)}%</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Slider
+                            value={[zone.startV * 100]}
+                            onValueChange={([v]) => {
+                              const newZones = [...(state.zones ?? [])];
+                              newZones[idx] = { ...zone, startV: Math.min(v / 100, zone.endV - 0.05) };
+                              patch({ zones: newZones });
+                            }}
+                            min={0}
+                            max={95}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <Slider
+                            value={[zone.endV * 100]}
+                            onValueChange={([v]) => {
+                              const newZones = [...(state.zones ?? [])];
+                              newZones[idx] = { ...zone, endV: Math.max(v / 100, zone.startV + 0.05) };
+                              patch({ zones: newZones });
+                            }}
+                            min={5}
+                            max={100}
+                            step={1}
+                            className="flex-1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Zone intensity & smoothness */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[9px] text-muted-foreground">Intensity: {zone.intensity}%</Label>
+                          <Slider
+                            value={[zone.intensity]}
+                            onValueChange={([v]) => {
+                              const newZones = [...(state.zones ?? [])];
+                              newZones[idx] = { ...zone, intensity: v };
+                              patch({ zones: newZones });
+                            }}
+                            min={0}
+                            max={100}
+                            step={1}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[9px] text-muted-foreground">Smoothness: {zone.smoothness}%</Label>
+                          <Slider
+                            value={[zone.smoothness]}
+                            onValueChange={([v]) => {
+                              const newZones = [...(state.zones ?? [])];
+                              newZones[idx] = { ...zone, smoothness: v };
+                              patch({ zones: newZones });
+                            }}
+                            min={0}
+                            max={100}
+                            step={1}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Blend width */}
+                      <div className="space-y-1">
+                        <Label className="text-[9px] text-muted-foreground">Edge Blend: {zone.blendWidth}%</Label>
+                        <Slider
+                          value={[zone.blendWidth]}
+                          onValueChange={([v]) => {
+                            const newZones = [...(state.zones ?? [])];
+                            newZones[idx] = { ...zone, blendWidth: v };
+                            patch({ zones: newZones });
+                          }}
+                          min={0}
+                          max={50}
+                          step={1}
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {(state.zones ?? []).length === 0 && (
+                    <p className="text-[9px] text-muted-foreground/50 text-center py-3">
+                      No zones defined. Add zones or select a preset above.
+                    </p>
+                  )}
+                </div>
+
+                {/* Visual zone preview bar */}
+                {(state.zones ?? []).length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-[9px] text-muted-foreground">Zone Map (Ring Width)</Label>
+                    <div className="h-4 rounded-full overflow-hidden bg-secondary/50 border border-border/40 relative">
+                      {(state.zones ?? []).map((zone, idx) => (
+                        <div
+                          key={zone.id}
+                          className="absolute top-0 h-full"
+                          style={{
+                            left: `${zone.startV * 100}%`,
+                            width: `${(zone.endV - zone.startV) * 100}%`,
+                            background: `linear-gradient(to right, 
+                              hsla(var(--primary), ${(100 - zone.smoothness) / 100}) ${zone.blendWidth}%, 
+                              hsla(var(--primary), ${(100 - zone.smoothness) / 100}) ${100 - zone.blendWidth}%, 
+                              hsla(var(--primary), ${(100 - zone.smoothness) / 100})
+                            )`,
+                            opacity: zone.intensity / 100 * 0.8 + 0.2,
+                          }}
+                          title={zone.name}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-[7px] text-muted-foreground/40 text-center">
+                      Top edge ← Ring width → Bottom edge
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </SubSection>
 
           {/* ── Advanced Terrain Editor ── */}
