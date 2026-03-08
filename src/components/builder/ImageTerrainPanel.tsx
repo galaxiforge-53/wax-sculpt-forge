@@ -4,6 +4,8 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+const NativeImage = globalThis.Image;
 import { Upload, Image, Layers, ArrowDown, ArrowUp, RotateCcw, FlipVertical } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
