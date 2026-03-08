@@ -1841,7 +1841,7 @@ export function buildHeightmap(
     // Ejecta rays for mega + hero
     if (s.tier <= 1) {
       stampEjectaRays(
-        hmap, MAP_W, MAP_H, s, rand, edgeMask, secondaryStamps,
+        hmap, MAP_W, MAP_H, s, rand, edgeRow, secondaryStamps,
         physicalAspect, ejectaFactor, shapeMode, ovalElong, globalOvalAngle,
       );
     }
