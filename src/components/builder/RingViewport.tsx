@@ -1575,6 +1575,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
             minPolarAngle={0}
             maxPolarAngle={Math.PI}
+            onChange={() => {
+              // In demand mode, OrbitControls auto-invalidates but damping needs continuous frames
+            }}
           />
 
           {/* Camera preset animator */}
