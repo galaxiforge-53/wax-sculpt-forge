@@ -952,7 +952,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, wearRoughnessBoost, wearClearcoatLoss, wearFactor]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, wearRoughnessBoost, wearClearcoatLoss, wearFactor, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor]);
 
   // Cap material — matches inner but matte
   const capMaterial = useMemo(() => {
