@@ -9,9 +9,11 @@ import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";
 import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
+import { ImageTerrainState } from "@/types/imageTerrain";
 import { EngravingState } from "@/types/engraving";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { generateLunarSurfaceMaps, generateLunarSurfaceMapsAsync, disposeLunarMaps, type LunarSurfaceMapSet, type GenerationProgress } from "@/lib/lunarSurfaceMaps";
+import { generateImageTerrainMaps, disposeImageTerrainMaps, type ImageTerrainMapSet } from "@/lib/imageTerrainEngine";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Progress } from "@/components/ui/progress";
 import MeasurementOverlay from "./MeasurementOverlay";
@@ -141,6 +143,7 @@ interface RingMeshProps {
   onAddWaxMark?: (mark: Omit<WaxMark, "id" | "createdAt">) => void;
   stampSettings?: StampSettings;
   lunarTexture?: LunarTextureState;
+  imageTerrain?: ImageTerrainState;
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional polishing finish
   detailBoost?: number; // 0–100, exaggerates surface detail for inspection
@@ -765,8 +768,9 @@ function ThicknessHeatmapOverlay({ outerGeo, params }: { outerGeo: THREE.LatheGe
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, imageTerrain, wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
+  const hasImageTerrain = !!imageTerrain?.enabled && !!imageTerrain?.imageDataUrl;
   const isMobile = useIsMobile();
   const wearAmount = wearPreview;
   const polishAmount = polishPreview;
@@ -795,10 +799,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       geoRef.current.capGeoTop.dispose();
       geoRef.current.capGeoBot.dispose();
     }
-    const result = buildSolidRingGeometry(debouncedParams, hasLunar, isMobile, geoQuality, debouncedWear);
+    const result = buildSolidRingGeometry(debouncedParams, hasLunar || hasImageTerrain, isMobile, geoQuality, debouncedWear);
     geoRef.current = result;
     return result;
-  }, [debouncedParams, hasLunar, isMobile, geoQuality, debouncedWear]);
+  }, [debouncedParams, hasLunar, hasImageTerrain, isMobile, geoQuality, debouncedWear]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -957,6 +961,34 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lunarParamsKey, effectiveAspect, effectiveDims]);
 
+  // ── Image terrain map generation ──
+  const [imgTerrainMaps, setImgTerrainMaps] = useState<ImageTerrainMapSet | null>(null);
+  const imgGenIdRef = useRef(0);
+  const debouncedImgTerrain = useDebouncedValue(imageTerrain, isMobile ? 400 : 250);
+
+  useEffect(() => {
+    if (!debouncedImgTerrain?.enabled || !debouncedImgTerrain?.imageDataUrl) {
+      if (imgTerrainMaps) {
+        disposeImageTerrainMaps(imgTerrainMaps);
+      }
+      setImgTerrainMaps(null);
+      return;
+    }
+    const genId = ++imgGenIdRef.current;
+    generateImageTerrainMaps(debouncedImgTerrain).then((maps) => {
+      if (imgGenIdRef.current !== genId || !maps) return;
+      setImgTerrainMaps((prev) => {
+        if (prev && prev !== maps) disposeImageTerrainMaps(prev);
+        return maps;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedImgTerrain]);
+
+  // ── Choose active surface maps: image terrain takes priority over lunar ──
+  const activeMaps = hasImageTerrain && imgTerrainMaps ? imgTerrainMaps : lunarMaps;
+  const hasActiveSurface = hasLunar || hasImageTerrain;
+
   // Scale normal and displacement strength relative to a reference ring (size 8, 6mm wide)
   // Smaller rings → stronger normals per-texel; larger rings → softer
   const dimScale = useMemo(() => {
@@ -969,13 +1001,21 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   }, [debouncedParams.innerDiameter, debouncedParams.thickness, debouncedParams.width]);
 
   const normalScale = useMemo(() => {
+    if (hasImageTerrain && imgTerrainMaps) {
+      const strength = 1.0 + (imageTerrain!.depth / 100) * 3.0;
+      return new THREE.Vector2(strength * dimScale, -strength * dimScale);
+    }
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
     const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction) * (1 - polishNormalSoften) * detailNormalMul;
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften, detailNormalMul]);
+  }, [hasImageTerrain, imgTerrainMaps, imageTerrain?.depth, lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction, polishNormalSoften, detailNormalMul]);
 
   const dispScale = useMemo(() => {
+    if (hasImageTerrain && imgTerrainMaps) {
+      const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
+      return outerR * (0.02 + (imageTerrain!.depth / 100) * 0.12);
+    }
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
     const baseDisp = outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
@@ -1008,7 +1048,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     });
   }, [viewMode, activeTool, onAddWaxMark, stampSettings]);
 
-  // Outer material — has lunar textures
+  // Outer material — has lunar/image terrain textures
   const outerMaterial = useMemo(() => {
     if (isWaxPrint) {
       return (
@@ -1016,12 +1056,12 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
           color="#C8B896"
           roughness={0.6}
           metalness={0.0}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 2.5 : 0.5}
+          normalMap={activeMaps?.normalMap ?? null}
+          roughnessMap={activeMaps?.roughnessMap ?? null}
+          aoMap={activeMaps?.aoMap ?? null}
+          aoMapIntensity={hasActiveSurface ? 2.5 : 0.5}
           normalScale={normalScale}
-          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementMap={hasActiveSurface ? activeMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
           side={THREE.FrontSide}
@@ -1032,14 +1072,14 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       return (
         <meshStandardMaterial
           color="#78A85B"
-          roughness={hasLunar ? 0.82 : 0.85}
+          roughness={hasActiveSurface ? 0.82 : 0.85}
           metalness={0.05}
-          normalMap={lunarMaps?.normalMap ?? null}
-          roughnessMap={lunarMaps?.roughnessMap ?? null}
-          aoMap={lunarMaps?.aoMap ?? null}
-          aoMapIntensity={hasLunar ? 1.4 : 0}
+          normalMap={activeMaps?.normalMap ?? null}
+          roughnessMap={activeMaps?.roughnessMap ?? null}
+          aoMap={activeMaps?.aoMap ?? null}
+          aoMapIntensity={hasActiveSurface ? 1.4 : 0}
           normalScale={normalScale}
-          displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+          displacementMap={hasActiveSurface ? activeMaps?.displacementMap ?? null : null}
           displacementScale={dispScale}
           displacementBias={-dispScale * 0.5}
           side={THREE.FrontSide}
@@ -1050,18 +1090,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       <meshPhysicalMaterial
         color={mc.color}
         roughness={Math.max(0.02, Math.min(1,
-          (hasLunar ? mc.roughness + (0.15 + detailRoughContrast) * (1 - lunarWearRoughnessUniformity) : mc.roughness)
+          (hasActiveSurface ? mc.roughness + (0.15 + detailRoughContrast) * (1 - lunarWearRoughnessUniformity) : mc.roughness)
           + finishRoughMod + wearRoughnessBoost - polishRoughnessReduction
         ))}
         metalness={mc.metalness}
-        normalMap={lunarMaps?.normalMap ?? null}
-        roughnessMap={lunarMaps?.roughnessMap ?? null}
-        aoMap={lunarMaps?.aoMap ?? null}
-        aoMapIntensity={hasLunar ? 2.0 * (1 - lunarWearAoReduction) * detailAoMul : 0}
+        normalMap={activeMaps?.normalMap ?? null}
+        roughnessMap={activeMaps?.roughnessMap ?? null}
+        aoMap={activeMaps?.aoMap ?? null}
+        aoMapIntensity={hasActiveSurface ? 2.0 * (1 - lunarWearAoReduction) * detailAoMul : 0}
         normalScale={normalScale}
         envMapIntensity={mc.envMapIntensity * (1 + wearFactor * 0.15 + polishEnvBoost)}
         clearcoat={Math.min(1, Math.max(0,
-          (hasLunar ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss) + polishClearcoatBoost
+          (hasActiveSurface ? mc.clearcoat : mc.clearcoat * 1.5) * (1 - wearClearcoatLoss) + polishClearcoatBoost
         ))}
         clearcoatRoughness={Math.max(0.01, mc.clearcoatRoughness + wearFactor * 0.15 - polishFactor * 0.08)}
         reflectivity={Math.min(1, mc.reflectivity + polishReflectivityBoost)}
@@ -1069,13 +1109,13 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
         sheenColor={mc.sheenColor}
         sheenRoughness={Math.min(1, mc.sheenRoughness + wearFactor * 0.1 - polishFactor * 0.05)}
         ior={mc.ior}
-        displacementMap={hasLunar ? lunarMaps?.displacementMap ?? null : null}
+        displacementMap={hasActiveSurface ? activeMaps?.displacementMap ?? null : null}
         displacementScale={dispScale}
         displacementBias={-dispScale * 0.5}
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod, lunarMaps, normalScale, hasLunar, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor, detailRoughContrast, detailAoMul]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, activeMaps, normalScale, hasActiveSurface, dispScale, wearFactor, wearRoughnessBoost, wearClearcoatLoss, wearSheenBoost, lunarWearAoReduction, lunarWearRoughnessUniformity, polishRoughnessReduction, polishClearcoatBoost, polishReflectivityBoost, polishEnvBoost, polishFactor, detailRoughContrast, detailAoMul]);
 
   // Inner bore material — always smooth, polished, NO lunar texture
   const innerMaterial = useMemo(() => {
@@ -1712,6 +1752,7 @@ interface RingViewportProps {
   stampSettings?: StampSettings;
   inlays?: InlayChannel[];
   lunarTexture?: LunarTextureState;
+  imageTerrain?: ImageTerrainState;
   cameraPreset?: SnapshotAngle | null;
   onPresetApplied?: () => void;
   showMeasurements?: boolean;
@@ -1996,7 +2037,7 @@ const LightingRig = React.memo(function LightingRig({
 });
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
-  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
+  function RingViewport({ params, viewMode, metalPreset, finishPreset = "polished", activeTool, onAddWaxMark, waxMarks, stampSettings, inlays, lunarTexture, imageTerrain, engraving, cameraPreset, onPresetApplied, showMeasurements, cutawayMode = "normal", cutawayOffset = 0, lighting: lightingProp, showcaseMode = false, inspectionMode = false, ringPosition, ringRotation, showPrinterBed = false, rotationLocked = false, scaleReference = "none", wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, turntableSpeed = 0, bgPreset = "dark-studio" }, ref) {
     const lighting = lightingProp ?? DEFAULT_LIGHTING;
     const sc = showcaseMode;
     const insp = inspectionMode;
@@ -2217,6 +2258,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
               onAddWaxMark={onAddWaxMark}
               stampSettings={stampSettings}
               lunarTexture={lunarTexture}
+              imageTerrain={imageTerrain}
               wearPreview={wearPreview}
               polishPreview={polishPreview}
               detailBoost={detailBoost}

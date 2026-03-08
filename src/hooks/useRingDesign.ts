@@ -16,6 +16,7 @@ import { InlayChannel } from "@/types/inlays";
 import { slugFromUrl, findCodexMaterial } from "@/lib/codexMaterials";
 import { LunarTextureState, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { EngravingState, DEFAULT_ENGRAVING } from "@/types/engraving";
+import { ImageTerrainState, DEFAULT_IMAGE_TERRAIN } from "@/types/imageTerrain";
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import { ForgePipelineState, ForgeStageId } from "@/types/pipeline";
 import { STAGES } from "@/config/pipeline";
@@ -67,6 +68,7 @@ export function useRingDesign() {
   const [inlays, setInlays] = useState<InlayChannel[]>([]);
   const [lunarTexture, setLunarTextureRaw] = useState<LunarTextureState>(DEFAULT_LUNAR_TEXTURE);
   const [engraving, setEngravingRaw] = useState<EngravingState>(DEFAULT_ENGRAVING);
+  const [imageTerrain, setImageTerrainRaw] = useState<ImageTerrainState>(DEFAULT_IMAGE_TERRAIN);
   const [stampSettings, setStampSettings] = useState<StampSettings>({
     type: "dent",
     radiusMm: 1.2,
@@ -293,6 +295,11 @@ export function useRingDesign() {
     logCraftAction("engraving_updated", { text: next.text, font: next.font, sizeMm: next.sizeMm, depthMm: next.depthMm });
   }, [logCraftAction]);
 
+  const setImageTerrain = useCallback((next: ImageTerrainState) => {
+    setImageTerrainRaw(next);
+    logCraftAction("image_terrain_updated", { enabled: next.enabled, mode: next.mode, depth: next.depth });
+  }, [logCraftAction]);
+
   // --- Inlay helpers ---
   const addInlayChannel = useCallback((input: Omit<InlayChannel, "id" | "createdAt">) => {
     const channel: InlayChannel = {
@@ -502,6 +509,8 @@ export function useRingDesign() {
     randomizeLunar,
     engraving,
     setEngraving,
+    imageTerrain,
+    setImageTerrain,
     enhanceDesign,
     balanceAnalysis,
     autoBalance,

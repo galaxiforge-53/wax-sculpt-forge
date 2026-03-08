@@ -206,6 +206,7 @@ function BuilderInner() {
     inlays, addInlayChannel, removeInlayChannel, clearInlays,
     lunarTexture, setLunarTexture, applyLunarPreset, randomizeLunar,
     engraving, setEngraving,
+    imageTerrain, setImageTerrain,
     enhanceDesign,
     balanceAnalysis,
     autoBalance,
@@ -531,6 +532,8 @@ function BuilderInner() {
       onApplyTemplate={applyTemplate}
       engraving={engraving}
       onEngravingChange={setEngraving}
+      imageTerrain={imageTerrain}
+      onImageTerrainChange={setImageTerrain}
       metalPreset={metalPreset}
       finishPreset={finishPreset}
       onViewModeChange={setViewMode}
@@ -592,6 +595,7 @@ function BuilderInner() {
               stampSettings={stampSettings}
               inlays={inlays}
               lunarTexture={lunarTexture}
+              imageTerrain={imageTerrain}
               engraving={engraving}
               cameraPreset={cameraPreset}
               onPresetApplied={() => setCameraPreset(null)}

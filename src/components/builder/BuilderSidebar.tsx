@@ -3,6 +3,7 @@ import { WaxMark } from "@/types/waxmarks";
 import { InlayChannel } from "@/types/inlays";
 import { LunarTextureState } from "@/types/lunar";
 import { EngravingState } from "@/types/engraving";
+import { ImageTerrainState } from "@/types/imageTerrain";
 import { CastabilityReport } from "@/types/castability";
 import { BalanceAnalysis } from "@/lib/surfaceBalancer";
 import { ForgePipelineState } from "@/types/pipeline";
@@ -18,6 +19,7 @@ import EngravingPanel from "./EngravingPanel";
 import TemplatesPanel from "./TemplatesPanel";
 import AIAssistantPanel from "./AIAssistantPanel";
 import LightingStudioPanel from "./LightingStudioPanel";
+import ImageTerrainPanel from "./ImageTerrainPanel";
 import PresetManager from "./PresetManager";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -25,7 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flame } from "lucide-react";
+import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flame, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useAccess } from "@/hooks/useAccess";
@@ -56,6 +58,8 @@ interface BuilderSidebarProps {
   onApplyTemplate: (params: Partial<RingParameters>) => void;
   engraving: EngravingState;
   onEngravingChange: (state: EngravingState) => void;
+  imageTerrain: ImageTerrainState;
+  onImageTerrainChange: (state: ImageTerrainState) => void;
   metalPreset: MetalPreset;
   finishPreset: FinishPreset;
   onViewModeChange: (mode: ViewMode) => void;
@@ -241,6 +245,7 @@ export default function BuilderSidebar({
   lunarTexture, onLunarChange, onApplyLunarPreset, onRandomizeLunar,
   onApplyTemplate,
   engraving, onEngravingChange,
+  imageTerrain, onImageTerrainChange,
   metalPreset, finishPreset,
   onViewModeChange, onMetalChange, onFinishChange,
   lighting, onLightingChange,
@@ -322,6 +327,11 @@ export default function BuilderSidebar({
           ) : (
             <PremiumLock />
           )}
+        </Section>
+
+        {/* ═══ 3.5. IMAGE TERRAIN ═══ */}
+        <Section title="Image Terrain" icon={ImageIcon} defaultOpen={false}>
+          <ImageTerrainPanel state={imageTerrain} onChange={onImageTerrainChange} />
         </Section>
 
         {/* ═══ 4. MATERIALS & LIGHTING ═══ */}
