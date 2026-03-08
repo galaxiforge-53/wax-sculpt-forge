@@ -9,13 +9,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw, Layers, Plus, Trash2, Eye, EyeOff, FlipHorizontal, Grid3x3, Blend } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw, Layers, Plus, Trash2, Eye, EyeOff, FlipHorizontal, Grid3x3, Blend, Wand2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { estimateCraterCount } from "@/lib/lunarSurfaceMaps";
 import AdvancedTerrainEditor from "./AdvancedTerrainEditor";
 import SeedExplorer from "./SeedExplorer";
+import { enhanceSurface } from "@/lib/designEnhancer";
 
 // ── Helper: build a full LunarTextureState from partial overrides ──
 const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
