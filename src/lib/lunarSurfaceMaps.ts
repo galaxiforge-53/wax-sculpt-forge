@@ -785,7 +785,7 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
 function applyTerrainType(
   hmap: Float32Array, w: number, h: number,
   terrainType: TerrainType,
-  edgeMask: Float32Array, seed: number,
+  edgeRow: Float32Array, seed: number,
   depthScale: number, rand: () => number,
   physicalAspect: number,
 ) {
@@ -793,31 +793,31 @@ function applyTerrainType(
 
   switch (terrainType) {
     case "mercurian":
-      applyLobateScarps(hmap, w, h, edgeMask, seed, depthScale);
+      applyLobateScarps(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "phobos":
-      applyPhobosGrooves(hmap, w, h, edgeMask, seed, depthScale, rand);
+      applyPhobosGrooves(hmap, w, h, edgeRow, seed, depthScale, rand);
       break;
 
     case "europa":
-      applyIceFractures(hmap, w, h, edgeMask, seed, depthScale);
+      applyIceFractures(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "lunar":
-      applyLunarRayBrightening(hmap, w, h, edgeMask, seed, depthScale);
+      applyLunarRayBrightening(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "martian":
-      applyDustFill(hmap, w, h, edgeMask, seed, depthScale);
+      applyDustFill(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "callisto":
-      applyValhallaConcentric(hmap, w, h, edgeMask, seed, depthScale);
+      applyValhallaConcentric(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "titan":
-      applyOrganicDunes(hmap, w, h, edgeMask, seed, depthScale);
+      applyOrganicDunes(hmap, w, h, edgeRow, seed, depthScale);
       break;
 
     case "deimos":
@@ -825,7 +825,7 @@ function applyTerrainType(
       break;
 
     case "asteroid":
-      applyAsteroidRubble(hmap, w, h, edgeMask, seed, depthScale, rand, physicalAspect);
+      applyAsteroidRubble(hmap, w, h, edgeRow, seed, depthScale, rand, physicalAspect);
       break;
   }
 }
