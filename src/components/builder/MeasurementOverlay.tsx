@@ -123,7 +123,7 @@ export default function MeasurementOverlay({ params, visible, sizeStandard = "US
         anchorY="middle"
         rotation={[0, 0, -Math.PI / 2]}
       >
-        {`${params.width.toFixed(1)}mm W`}
+        {`${formatDimension(params.width, dimensionUnit)} W`}
       </Text>
 
       {/* ── Thickness ── */}
