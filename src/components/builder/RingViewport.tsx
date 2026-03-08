@@ -557,16 +557,18 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
 }
 
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
-function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
+function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
   const isMobile = useIsMobile();
+  const wearAmount = wearPreview;
 
   // Debounce params for geometry builds to avoid thrashing during slider drags
   const debouncedParams = useDebouncedValue(params, isMobile ? 150 : 80);
+  const debouncedWear = useDebouncedValue(wearAmount, 100);
 
   // Adaptive quality for geometry detail
   const geoQuality = useAdaptiveQuality(
-    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar],
+    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar, debouncedWear],
     isMobile ? 1200 : 600,
   );
 
@@ -581,10 +583,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
       geoRef.current.capGeoTop.dispose();
       geoRef.current.capGeoBot.dispose();
     }
-    const result = buildSolidRingGeometry(debouncedParams, hasLunar, isMobile, geoQuality);
+    const result = buildSolidRingGeometry(debouncedParams, hasLunar, isMobile, geoQuality, debouncedWear);
     geoRef.current = result;
     return result;
-  }, [debouncedParams, hasLunar, isMobile, geoQuality]);
+  }, [debouncedParams, hasLunar, isMobile, geoQuality, debouncedWear]);
 
   // Cleanup on unmount
   useEffect(() => {
