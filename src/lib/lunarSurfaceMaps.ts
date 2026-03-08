@@ -880,10 +880,11 @@ function applyPhobosGrooves(
     const angleOffset = (rand() - 0.5) * 0.05; // slight tilt
 
     const widthPx = Math.ceil(grooveWidthV * h);
+    const invWidthPx = 1 / widthPx;
+    const invW = 1 / w;
 
     for (let x = 0; x < w; x++) {
-      const u = x / w;
-      // Wobble the groove path
+      const u = x * invW;
       const wobble = grooveNoise(u * 15, vPos * 10) * 0.02;
       const centerV = vPos + angleOffset * u + wobble;
       const centerPy = Math.floor(centerV * h);
@@ -892,8 +893,7 @@ function applyPhobosGrooves(
         const py = centerPy + dy;
         if (py < 0 || py >= h) continue;
         const idx = py * w + x;
-        const dist = Math.abs(dy) / widthPx;
-        // U-shaped groove profile
+        const dist = Math.abs(dy) * invWidthPx;
         const profile = (1 - dist * dist);
         hmap[idx] -= grooveDepth * profile * edgeMask[idx];
       }
