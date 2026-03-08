@@ -2289,7 +2289,6 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             // Smoother touch feel
             {...(isMobile ? { enableZoom: true, zoomToCursor: false } : {})}
           />
-          />
 
           {/* Rotation lock indicator */}
           {isRotationLocked && (
