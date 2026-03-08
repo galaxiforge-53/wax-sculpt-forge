@@ -809,17 +809,18 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
   const normalScale = useMemo(() => {
     if (!lunarTexture?.enabled) return new THREE.Vector2(0, 0);
     const baseStrength = 1.5 + (lunarTexture.intensity / 100) * 3.0;
-    const strength = baseStrength * dimScale;
+    // Wear erodes crater rims — normal detail progressively flattens
+    const strength = baseStrength * dimScale * (1 - lunarWearNormalReduction);
     return new THREE.Vector2(strength, -strength);
-  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale]);
+  }, [lunarTexture?.enabled, lunarTexture?.intensity, dimScale, lunarWearNormalReduction]);
 
   const dispScale = useMemo(() => {
     if (!hasLunar || !lunarTexture) return 0;
     const outerR = debouncedParams.innerDiameter / 2 / 10 + debouncedParams.thickness / 10;
-    // Base displacement scales with intensity and ring radius, modulated by dimScale
-    // so that craters maintain proportional physical depth
-    return outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
-  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale]);
+    const baseDisp = outerR * (0.04 + (lunarTexture.intensity / 100) * 0.10) * (1 / dimScale);
+    // Wear progressively shallows craters — rims erode, bowls fill with wear debris
+    return baseDisp * (1 - lunarWearDispReduction);
+  }, [hasLunar, lunarTexture?.intensity, debouncedParams.innerDiameter, debouncedParams.thickness, dimScale, lunarWearDispReduction]);
 
   // Map active tool to wax mark type for sculpting tools
   const SCULPT_TOOL_MAP: Record<string, import("@/types/waxmarks").WaxMarkType> = {
