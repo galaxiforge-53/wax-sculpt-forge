@@ -37,6 +37,7 @@ import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/li
 import PreferencesPanel from "@/components/builder/PreferencesPanel";
 import { cn } from "@/lib/utils";
 import { useAutosave, loadAutosave, clearAutosave } from "@/hooks/useAutosave";
+import { useViewportState } from "@/hooks/useViewportState";
 
 function BuilderInner() {
   const navigate = useNavigate();
