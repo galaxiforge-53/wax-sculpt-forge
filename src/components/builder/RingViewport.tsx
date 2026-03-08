@@ -1400,6 +1400,8 @@ function PrinterBedSimulation({ params }: { params: RingParameters }) {
 
 export type CutawayMode = "normal" | "inside" | "cross-section" | "quarter-cut";
 
+import ScaleReference, { ScaleReferenceType } from "./ScaleReference";
+
 interface RingViewportProps {
   params: RingParameters;
   viewMode: ViewMode;
@@ -1424,6 +1426,7 @@ interface RingViewportProps {
   ringRotation?: [number, number, number];
   showPrinterBed?: boolean;
   rotationLocked?: boolean; // When true, disables orbit rotation but keeps zoom
+  scaleReference?: ScaleReferenceType; // Show real-world scale reference objects
 }
 
 // ── Clipping plane manager with interactive offset ─────────────────
