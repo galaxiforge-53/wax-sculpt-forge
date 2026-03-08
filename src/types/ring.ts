@@ -15,7 +15,13 @@ export interface RingParameters {
   grooveCount: number;
   grooveDepth: number;
   bevelSize: number;
+  // ── Interior controls ──
+  interiorCurvature: number;    // 0–100, how domed the inner bore surface is (0 = flat cylinder, 100 = deep dome)
+  comfortFitDepth: number;      // 0–100, how deep the comfort curve extends into the band (only when comfortFit=true)
+  interiorProfile: InteriorProfile; // shape of the inner bore cross-section
 }
+
+export type InteriorProfile = "flat" | "comfort-dome" | "european" | "anatomical";
 
 export interface DesignPreview {
   id: "front" | "angle" | "side" | "inside";
