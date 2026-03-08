@@ -1,15 +1,17 @@
 import { useMemo } from "react";
 import { Text, Line } from "@react-three/drei";
 import * as THREE from "three";
-import { RingParameters } from "@/types/ring";
+import { RingParameters, RingSizeStandard, DimensionUnit, formatRingSize, formatDimension } from "@/types/ring";
 
 interface MeasurementOverlayProps {
   params: RingParameters;
   visible: boolean;
+  sizeStandard?: RingSizeStandard;
+  dimensionUnit?: DimensionUnit;
 }
 
 /** Subtle 3D dimension guides rendered inside the Canvas */
-export default function MeasurementOverlay({ params, visible }: MeasurementOverlayProps) {
+export default function MeasurementOverlay({ params, visible, sizeStandard = "US", dimensionUnit = "mm" }: MeasurementOverlayProps) {
   const innerR = params.innerDiameter / 2 / 10;
   const outerR = innerR + params.thickness / 10;
   const width = params.width / 10;
@@ -99,7 +101,7 @@ export default function MeasurementOverlay({ params, visible }: MeasurementOverl
         anchorX="center"
         anchorY="top"
       >
-        {`Ø${params.innerDiameter.toFixed(1)}mm (ID)`}
+        {`Ø${formatDimension(params.innerDiameter, dimensionUnit)} (ID)`}
       </Text>
 
       {/* ── Width ── */}
@@ -121,7 +123,7 @@ export default function MeasurementOverlay({ params, visible }: MeasurementOverl
         anchorY="middle"
         rotation={[0, 0, -Math.PI / 2]}
       >
-        {`${params.width.toFixed(1)}mm W`}
+        {`${formatDimension(params.width, dimensionUnit)} W`}
       </Text>
 
       {/* ── Thickness ── */}
@@ -141,7 +143,7 @@ export default function MeasurementOverlay({ params, visible }: MeasurementOverl
         anchorX="center"
         anchorY="bottom"
       >
-        {`${params.thickness.toFixed(1)}mm T`}
+        {`${formatDimension(params.thickness, dimensionUnit)} T`}
       </Text>
 
       {/* ── Inner bore circle ── */}
@@ -188,7 +190,7 @@ export default function MeasurementOverlay({ params, visible }: MeasurementOverl
         anchorY="bottom"
         fontWeight="bold"
       >
-        {`US Size ${params.size}`}
+        {`${sizeStandard} Size ${formatRingSize(params.size, sizeStandard)}`}
       </Text>
 
       {/* ── Outer diameter (faint) ── */}
@@ -209,7 +211,7 @@ export default function MeasurementOverlay({ params, visible }: MeasurementOverl
         anchorX="center"
         anchorY="bottom"
       >
-        {`OD ${(params.innerDiameter + 2 * params.thickness).toFixed(1)}mm`}
+        {`OD ${formatDimension(params.innerDiameter + 2 * params.thickness, dimensionUnit)}`}
       </Text>
     </group>
   );

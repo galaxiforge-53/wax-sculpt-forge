@@ -1,4 +1,4 @@
-import { RingParameters, RingProfile, InteriorProfile, RING_SIZE_MAP, ViewMode, MetalPreset, EdgeStyle } from "@/types/ring";
+import { RingParameters, RingProfile, InteriorProfile, RING_SIZE_MAP, ViewMode, MetalPreset, EdgeStyle, RingSizeStandard, DimensionUnit, formatRingSize, formatDimension, US_TO_UK, US_TO_EU } from "@/types/ring";
 import { WaxMarkType } from "@/types/waxmarks";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { Slider } from "@/components/ui/slider";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Scale } from "lucide-react";
 
 // ── Metal density data (g/cm³) ───────────────────────────────────
@@ -183,6 +183,8 @@ function EdgeStyleIcon({ style, active }: { style: EdgeStyle; active: boolean })
 
 export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange, metalPreset = "silver" }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
+  const [sizeStandard, setSizeStandard] = useState<RingSizeStandard>("US");
+  const [dimUnit, setDimUnit] = useState<DimensionUnit>("mm");
 
   // Weight calculation for all metals
   const weightEstimates = useMemo(() => {
@@ -207,11 +209,45 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
   return (
     <div className="flex flex-col gap-4">
 
+      {/* ── Unit System Selector ── */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center gap-1 p-0.5 rounded-md bg-secondary/60 border border-border/50">
+          {(["US", "UK", "EU"] as RingSizeStandard[]).map((std) => (
+            <button
+              key={std}
+              onClick={() => setSizeStandard(std)}
+              className={`flex-1 px-2 py-1 text-[9px] font-semibold rounded transition-all
+                ${sizeStandard === std
+                  ? "bg-primary/15 text-primary border border-primary/30 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              {std}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 p-0.5 rounded-md bg-secondary/60 border border-border/50">
+          {(["mm", "inch"] as DimensionUnit[]).map((u) => (
+            <button
+              key={u}
+              onClick={() => setDimUnit(u)}
+              className={`px-2 py-1 text-[9px] font-semibold rounded transition-all
+                ${dimUnit === u
+                  ? "bg-primary/15 text-primary border border-primary/30 shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              {u === "mm" ? "mm" : "in"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Ring Size ── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-secondary-foreground">Ring Size (US)</Label>
-          <span className="text-xs font-mono text-primary">{params.size}</span>
+          <Label className="text-xs text-secondary-foreground">Ring Size ({sizeStandard})</Label>
+          <span className="text-xs font-mono text-primary">{formatRingSize(params.size, sizeStandard)}</span>
         </div>
         <Slider
           value={[params.size]}
@@ -221,8 +257,16 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
           step={1}
           className="w-full"
         />
+        {/* Show all standards at once */}
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span>US {params.size}</span>
+          <span className="text-border">·</span>
+          <span>UK {US_TO_UK[params.size] ?? "—"}</span>
+          <span className="text-border">·</span>
+          <span>EU {US_TO_EU[params.size] ?? "—"}</span>
+        </div>
         <p className="text-[10px] text-muted-foreground">
-          Inner Ø {params.innerDiameter.toFixed(1)}mm · Circumference {(params.innerDiameter * Math.PI).toFixed(1)}mm
+          Inner Ø {formatDimension(params.innerDiameter, dimUnit)} · Circ. {formatDimension(params.innerDiameter * Math.PI, dimUnit)}
         </p>
       </div>
 
@@ -277,7 +321,7 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
               min={2}
               max={14}
             />
-            <span className="text-[10px] text-muted-foreground">mm</span>
+            <span className="text-[10px] text-muted-foreground">{dimUnit === "mm" ? "mm" : "in"}</span>
           </div>
         </div>
         <Slider
@@ -303,7 +347,7 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
               min={1}
               max={4}
             />
-            <span className="text-[10px] text-muted-foreground">mm</span>
+            <span className="text-[10px] text-muted-foreground">{dimUnit === "mm" ? "mm" : "in"}</span>
           </div>
         </div>
         <Slider
