@@ -159,17 +159,15 @@ function fbm(noise: (x: number, y: number) => number, x: number, y: number, octa
     return (n0 + n1 + n2 + n3 + n4 + n5) / 1.96875;
   }
   if (octaves === 5) {
-    let sum = 0, amp = 1, freq = 1, maxAmp = 0;
-    sum += noise(x, y); maxAmp += 1;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    amp *= gain; freq *= lacunarity;
-    sum += noise(x * freq, y * freq) * amp; maxAmp += amp;
-    return sum / maxAmp;
+    // Pre-compute all frequencies and amplitudes (unrolled, no loop)
+    const f1 = lacunarity, g1 = gain;
+    const f2 = f1 * lacunarity, g2 = g1 * gain;
+    const f3 = f2 * lacunarity, g3 = g2 * gain;
+    const f4 = f3 * lacunarity, g4 = g3 * gain;
+    const invMaxAmp = 1 / (1 + g1 + g2 + g3 + g4);
+    return (noise(x, y) + noise(x * f1, y * f1) * g1 +
+            noise(x * f2, y * f2) * g2 + noise(x * f3, y * f3) * g3 +
+            noise(x * f4, y * f4) * g4) * invMaxAmp;
   }
   // General fallback
   let sum = 0, amp = 1, freq = 1, maxAmp = 0;
