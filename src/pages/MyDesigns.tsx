@@ -44,6 +44,9 @@ export default function MyDesigns() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [historyOpenId, setHistoryOpenId] = useState<string | null>(null);
+  const [versions, setVersions] = useState<DesignVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
