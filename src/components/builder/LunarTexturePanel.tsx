@@ -849,6 +849,15 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
 
             <div className="space-y-1.5 mt-2">
               <div className="flex items-center justify-between">
+                <Label className="text-[10px] text-muted-foreground">Terrain Contrast</Label>
+                <span className="text-[10px] font-mono text-primary/80">{state.terrainContrast ?? 60}%</span>
+              </div>
+              <Slider value={[state.terrainContrast ?? 60]} onValueChange={([v]) => patch({ terrainContrast: v })} min={0} max={100} step={1} />
+              <p className="text-[8px] text-muted-foreground/40">How dramatic crater depth/height differences appear</p>
+            </div>
+
+            <div className="space-y-1.5 mt-2">
+              <div className="flex items-center justify-between">
                 <Label className="text-[10px] text-muted-foreground">Crater Overlap</Label>
                 <span className="text-[10px] font-mono text-primary/80">{state.overlapIntensity}%</span>
               </div>
