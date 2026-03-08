@@ -9,11 +9,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { estimateCraterCount } from "@/lib/lunarSurfaceMaps";
+import AdvancedTerrainEditor from "./AdvancedTerrainEditor";
 
 // ── Helper: build a full LunarTextureState from partial overrides ──
 const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
@@ -979,6 +980,15 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
                 </Button>
               </div>
             </div>
+          </SubSection>
+
+          {/* ── Advanced Terrain Editor ── */}
+          <SubSection title="Advanced Terrain Editor" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5 flex items-center gap-1">
+              <SlidersHorizontal className="w-3 h-3" />
+              Precise numeric controls with JSON import/export for power users
+            </p>
+            <AdvancedTerrainEditor state={state} onChange={onChange} />
           </SubSection>
         </div>
       )}
