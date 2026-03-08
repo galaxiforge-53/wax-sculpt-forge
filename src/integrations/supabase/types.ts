@@ -74,6 +74,47 @@ export type Database = {
         }
         Relationships: []
       }
+      design_versions: {
+        Row: {
+          created_at: string
+          design_id: string
+          design_package: Json
+          id: string
+          label: string
+          thumbnail: string | null
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          design_id: string
+          design_package: Json
+          id?: string
+          label?: string
+          thumbnail?: string | null
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          created_at?: string
+          design_id?: string
+          design_package?: Json
+          id?: string
+          label?: string
+          thumbnail?: string | null
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "design_versions_design_id_fkey"
+            columns: ["design_id"]
+            isOneToOne: false
+            referencedRelation: "ring_designs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_orders: {
         Row: {
           created_at: string

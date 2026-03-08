@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { DesignPackage } from "@/types/ring";
+import { saveVersion } from "@/lib/designVersionStore";
 
 export interface CloudDesign {
   id: string;
@@ -51,6 +52,14 @@ export async function saveCloudDesign(
       .select()
       .single();
     if (error) throw error;
+
+    // Auto-save version snapshot
+    try {
+      await saveVersion(existingId, design.design_package, undefined, design.thumbnail);
+    } catch (e) {
+      console.warn("Version snapshot failed:", e);
+    }
+
     return data as unknown as CloudDesign;
   }
 
@@ -65,6 +74,14 @@ export async function saveCloudDesign(
     .select()
     .single();
   if (error) throw error;
+
+  // Save initial version
+  try {
+    await saveVersion(data.id, design.design_package, "Initial version", design.thumbnail);
+  } catch (e) {
+    console.warn("Initial version snapshot failed:", e);
+  }
+
   return data as unknown as CloudDesign;
 }
 
