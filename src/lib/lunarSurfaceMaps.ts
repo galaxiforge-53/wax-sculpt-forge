@@ -39,6 +39,7 @@ function cacheKey(lunar: LunarTextureState): string {
     lunar.mariaFill ?? 0, lunar.highlandRidges ?? 0,
     lunar.craterFloorTexture ?? 30, lunar.ejectaStrength ?? 50,
     lunar.terrainType ?? "generic",
+    lunar.terrainContrast ?? 60,
   ].join("-");
 }
 
@@ -1131,8 +1132,11 @@ export function buildHeightmap(
   }
 
   // ─── 8) Depth contrast boost ──
+  const contrastVal = (lunar.terrainContrast ?? 60) / 100; // 0–1
+  // Map 0–1 to a contrast multiplier: 0→0.6 (flat), 0.5→1.0 (neutral), 1.0→1.8 (dramatic)
+  const contrastMult = 0.6 + contrastVal * 1.2;
   for (let i = 0; i < hmap.length; i++) {
-    hmap[i] = 0.5 + (hmap[i] - 0.5) * 1.2;
+    hmap[i] = 0.5 + (hmap[i] - 0.5) * contrastMult;
     hmap[i] = Math.max(0, Math.min(1, hmap[i]));
   }
 

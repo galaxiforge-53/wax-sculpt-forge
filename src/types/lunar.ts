@@ -38,6 +38,7 @@ export interface LunarTextureState {
   ejectaStrength: number;       // 0–100, intensity of radial ejecta rays
   // ── v4 fields ──
   terrainType?: TerrainType;    // planet-specific terrain generation mode
+  terrainContrast?: number;     // 0–100, how dramatic crater depth/height differences appear (default 60)
 }
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
@@ -63,4 +64,5 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   craterFloorTexture: 30,
   ejectaStrength: 50,
   terrainType: "generic",
+  terrainContrast: 60,
 };
