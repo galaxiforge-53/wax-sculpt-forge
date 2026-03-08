@@ -10,6 +10,7 @@ import { generateExportSTL, downloadBlob, STLExportResult, SHRINKAGE_PROFILES, S
 import { evaluateCastability } from "@/lib/castabilityEngine";
 import ProductionSummaryPanel from "@/components/builder/ProductionSummaryPanel";
 import { Check, ArrowLeft, Send, Download, Box, Ruler, Layers, AlertTriangle, Loader2, Lock, FileText, ChevronRight, Sparkles, Scale } from "lucide-react";
+import ViewportErrorBoundary from "@/components/builder/ViewportErrorBoundary";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
@@ -330,13 +331,15 @@ export default function Export() {
               </div>
             </div>
           ) : stlResult ? (
-            <Canvas
-              camera={{ position: [0, 1.2, 3.0], fov: 32 }}
-              gl={{ antialias: true, alpha: true }}
-              dpr={[1, 2]}
-            >
-              <ExportPreviewScene geometry={stlResult.geometry} />
-            </Canvas>
+            <ViewportErrorBoundary>
+              <Canvas
+                camera={{ position: [0, 1.2, 3.0], fov: 32 }}
+                gl={{ antialias: true, alpha: true }}
+                dpr={[1, 2]}
+              >
+                <ExportPreviewScene geometry={stlResult.geometry} />
+              </Canvas>
+            </ViewportErrorBoundary>
           ) : null}
 
           {/* Model stats overlay */}

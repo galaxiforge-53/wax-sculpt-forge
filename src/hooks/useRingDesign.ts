@@ -244,18 +244,22 @@ export function useRingDesign() {
     logCraftAction("wax_marks_cleared", {});
   }, [logCraftAction]);
 
+  // Throttle craft action logging for lunar updates to avoid excessive array growth
+  const lastLunarLogRef = useRef(0);
   const setLunarTexture = useCallback((next: LunarTextureState) => {
     setLunarTextureRaw(next);
-    logCraftAction("lunar_texture_updated", {
-      enabled: next.enabled,
-      intensity: next.intensity,
-      craterDensity: next.craterDensity,
-      craterSize: next.craterSize,
-      seed: next.seed,
-      microDetail: next.microDetail,
-      rimSharpness: next.rimSharpness,
-      overlapIntensity: next.overlapIntensity,
-    });
+    // Only log craft action at most every 500ms during rapid slider changes
+    const now = Date.now();
+    if (now - lastLunarLogRef.current > 500) {
+      lastLunarLogRef.current = now;
+      logCraftAction("lunar_texture_updated", {
+        enabled: next.enabled,
+        intensity: next.intensity,
+        craterDensity: next.craterDensity,
+        craterSize: next.craterSize,
+        seed: next.seed,
+      });
+    }
   }, [logCraftAction]);
 
   const applyLunarPreset = useCallback((next: LunarTextureState, presetName: string) => {
