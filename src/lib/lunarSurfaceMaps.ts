@@ -1130,7 +1130,7 @@ export function buildHeightmap(
     }
 
     const grainRng = seededRng(lunar.seed + 9999);
-    const grainStrength = microFactor * 0.035 * depthScale;
+    const grainStrength = microFactor * 0.035 * depthScale * layerMicro;
     for (let i = 0; i < hmap.length; i++) {
       const mask = edgeMask[i];
       hmap[i] += (grainRng() - 0.5) * grainStrength * mask;
