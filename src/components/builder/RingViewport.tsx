@@ -111,6 +111,7 @@ interface RingMeshProps {
   wearPreview?: number; // 0–100, simulates aging/wear softening
   polishPreview?: number; // 0–100, simulates professional polishing finish
   detailBoost?: number; // 0–100, exaggerates surface detail for inspection
+  thicknessHeatmap?: boolean; // show colour-coded thickness overlay
 }
 
 // ── Physically-based metal material configs ───────────────────────
