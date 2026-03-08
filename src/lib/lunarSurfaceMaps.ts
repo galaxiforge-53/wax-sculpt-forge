@@ -1012,7 +1012,7 @@ function applyLunarRayBrightening(
 
 function applyDustFill(
   hmap: Float32Array, w: number, h: number,
-  edgeMask: Float32Array, seed: number, depthScale: number,
+  edgeRow: Float32Array, seed: number, depthScale: number,
 ) {
   const dustNoise = makeNoise2D(seed + 14001);
   const sampleCount = 2000;
