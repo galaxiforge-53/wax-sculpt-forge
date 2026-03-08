@@ -18,8 +18,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccess } from "@/hooks/useAccess";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { saveCloudDesign } from "@/lib/cloudDesignsStore";
+import { saveProject, getProject } from "@/lib/projectsStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 // ── 3D Preview of export geometry ────────────────────────────────
 
