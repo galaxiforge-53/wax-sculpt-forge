@@ -1866,7 +1866,7 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
             preserveDrawingBuffer: true,
             antialias: !isMobile,
             toneMapping: THREE.ACESFilmicToneMapping,
-            toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : 0.95),
+            toneMappingExposure: insp ? 1.15 : (sc ? 1.05 : activeBg.toneMappingExposure),
             powerPreference: isMobile ? "low-power" : "high-performance",
           }}
           dpr={insp ? [2, 2] : (sc ? [2, 2] : (isMobile ? [1, 1.5] : [1, 2]))}
