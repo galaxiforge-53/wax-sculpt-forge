@@ -108,7 +108,7 @@ export function useUserPreferences() {
         console.warn("Failed to load preferences:", error.message);
         setPrefs(loadLocalPrefs());
       } else if (data) {
-        const loaded = fromDbRow(data as Record<string, unknown>);
+        const loaded = fromDbRow(data as unknown as Record<string, unknown>);
         setPrefs(loaded);
         saveLocalPrefs(loaded); // sync local
       } else {
