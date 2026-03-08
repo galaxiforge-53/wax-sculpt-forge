@@ -1,4 +1,4 @@
-import { useReducer, useCallback, Dispatch } from "react";
+import { useReducer, useCallback, useMemo, Dispatch } from "react";
 import { SnapshotAngle, CutawayMode, BackgroundPreset } from "@/components/builder/RingViewport";
 import { ScaleReferenceType } from "@/components/builder/ScaleReference";
 import { LightingSettings, DEFAULT_LIGHTING } from "@/types/lighting";

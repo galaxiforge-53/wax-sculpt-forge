@@ -719,7 +719,7 @@ function BuilderInner() {
                         value={Math.round(ringRotation[idx] * 180 / Math.PI)}
                         onChange={(e) => {
                           const deg = parseFloat(e.target.value) || 0;
-                          const next: [number, number, number] = [...ringRotation];
+                          const next = [...ringRotation] as [number, number, number];
                           next[idx] = deg * Math.PI / 180;
                           setRingRotation(next);
                         }}
