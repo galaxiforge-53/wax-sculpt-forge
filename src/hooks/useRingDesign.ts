@@ -89,9 +89,19 @@ export function useRingDesign() {
     updatedAt: new Date().toISOString(),
   });
 
+  // Throttle craft action logging to prevent unbounded array growth
+  const lastActionTimeRef = useRef(0);
   const logCraftAction = useCallback((type: string, payload: Record<string, unknown>) => {
-    const action: CraftAction = { id: craftId(), type, timestamp: Date.now(), payload };
-    setCraftActions((prev) => [...prev, action]);
+    const now = Date.now();
+    // Throttle to at most one action per 200ms for the same type
+    if (now - lastActionTimeRef.current < 200) return;
+    lastActionTimeRef.current = now;
+    const action: CraftAction = { id: craftId(), type, timestamp: now, payload };
+    setCraftActions((prev) => {
+      const next = [...prev, action];
+      // Keep only last 60 actions to bound memory
+      return next.length > 60 ? next.slice(-60) : next;
+    });
     craftStateRef.current.updatedAt = new Date().toISOString();
   }, []);
 

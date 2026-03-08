@@ -68,13 +68,14 @@ function AdaptiveDprController({ tier, isMobile, isShowcase, isInspection }: {
 
   useEffect(() => {
     if (isShowcase || isInspection) {
-      gl.setPixelRatio(2);
+      gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       return;
     }
     if (tier === "preview") {
+      // Drop DPR during interaction for responsiveness
       gl.setPixelRatio(isMobile ? 1 : 1);
     } else {
-      gl.setPixelRatio(isMobile ? 1.5 : Math.min(window.devicePixelRatio, 2));
+      gl.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : Math.min(window.devicePixelRatio, 2));
     }
   }, [tier, isMobile, isShowcase, isInspection, gl]);
 
@@ -397,13 +398,14 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
   const wearEdgeLoss = wearFactor * (params.thickness / 10) * 0.04;
 
   // Adaptive segments: lower during preview tier and on mobile
+  // Production tuning: reduced max segments for better frame rates without visible quality loss
   const isPreview = qualityTier === "preview";
   const radSegs = hasLunar
-    ? (isMobile ? (isPreview ? 128 : 256) : (isPreview ? 256 : 768))
-    : (isMobile ? (isPreview ? 32 : 64) : (isPreview ? 64 : 128));
+    ? (isMobile ? (isPreview ? 96 : 192) : (isPreview ? 192 : 512))
+    : (isMobile ? (isPreview ? 32 : 48) : (isPreview ? 48 : 96));
   const profileSteps = hasLunar
-    ? (isMobile ? (isPreview ? 32 : 64) : (isPreview ? 64 : 192))
-    : (isMobile ? (isPreview ? 8 : 16) : (isPreview ? 16 : 32));
+    ? (isMobile ? (isPreview ? 24 : 48) : (isPreview ? 48 : 128))
+    : (isMobile ? (isPreview ? 8 : 12) : (isPreview ? 12 : 24));
 
   // Build outer profile curve (only outer surface, from one edge to other)
   const outerPoints: THREE.Vector2[] = [];
@@ -2063,9 +2065,9 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           </div>
         )}
         <Canvas
-          camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 30 : 35) }}
-          shadows={sc || insp ? "soft" : (isMobile ? false : true)}
-          frameloop="always"
+          camera={{ position: initialCamPos, fov: insp ? 25 : (isMobile ? 32 : 35) }}
+          shadows={sc || insp ? "soft" : (isMobile ? false : (qualityTier === "preview" ? false : true))}
+          frameloop={turntableSpeed > 0 || surfaceProgress ? "always" : "demand"}
           gl={{
             preserveDrawingBuffer: true,
             antialias: !isMobile,
@@ -2142,13 +2144,15 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                 />
 
                 {/* Overhead softbox — large area light for smooth gradients on curved surfaces */}
-                <rectAreaLight
-                  width={5}
-                  height={5}
-                  position={[0, 5, 0]}
-                  intensity={isCast ? 0.8 : 0.5}
-                  color="#ffffff"
-                />
+                {!isMobile && (
+                  <rectAreaLight
+                    width={5}
+                    height={5}
+                    position={[0, 5, 0]}
+                    intensity={isCast ? 0.8 : 0.5}
+                    color="#ffffff"
+                  />
+                )}
 
                 {/* Rim / kicker light — edge highlights that separate ring from background */}
                 <spotLight
@@ -2166,19 +2170,24 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
                   color="#ffffff"
                 />
 
-                {/* Top-back hair light — subtle rim highlight on upper edge */}
-                <pointLight
-                  position={[0, 4, -3]}
-                  intensity={isCast ? 0.6 : 0.3}
-                  color="#f0f0ff"
-                />
+                {/* Additional lights only on desktop for quality */}
+                {!isMobile && (
+                  <>
+                    {/* Top-back hair light — subtle rim highlight on upper edge */}
+                    <pointLight
+                      position={[0, 4, -3]}
+                      intensity={isCast ? 0.6 : 0.3}
+                      color="#f0f0ff"
+                    />
 
-                {/* Side accent — warm kiss light that catches crater rims */}
-                <pointLight
-                  position={[-4, 0.5, 1]}
-                  intensity={isCast ? 0.5 : 0.3}
-                  color={isCast ? "#ffe0c0" : "#d0d0ff"}
-                />
+                    {/* Side accent — warm kiss light that catches crater rims */}
+                    <pointLight
+                      position={[-4, 0.5, 1]}
+                      intensity={isCast ? 0.5 : 0.3}
+                      color={isCast ? "#ffe0c0" : "#d0d0ff"}
+                    />
+                  </>
+                )}
 
                 {/* Showcase extra lights — rim light and accent */}
                 {sc && (
@@ -2280,17 +2289,17 @@ const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
           <OrbitControls
             enablePan={false}
             enableRotate={!isRotationLocked && turntableSpeed === 0}
-            minDistance={insp ? 0.8 : (isMobile ? 1.5 : 2.0)}
-            maxDistance={insp ? 8 : (isMobile ? 12 : 14)}
+            minDistance={insp ? 0.8 : (isMobile ? 1.8 : 2.0)}
+            maxDistance={insp ? 8 : (isMobile ? 10 : 14)}
             autoRotate={turntableSpeed > 0}
             autoRotateSpeed={turntableSpeed}
             enableDamping
-            dampingFactor={isMobile ? 0.12 : 0.08}
-            rotateSpeed={isMobile ? 0.5 : 1.0}
-            zoomSpeed={isMobile ? 0.7 : 1.0}
+            dampingFactor={isMobile ? 0.15 : 0.08}
+            rotateSpeed={isMobile ? 0.6 : 1.0}
+            zoomSpeed={isMobile ? 0.8 : 1.0}
             touches={{ ONE: isRotationLocked ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
-            minPolarAngle={0}
-            maxPolarAngle={Math.PI}
+            minPolarAngle={0.1}
+            maxPolarAngle={Math.PI - 0.1}
           />
 
           {/* Rotation lock indicator */}

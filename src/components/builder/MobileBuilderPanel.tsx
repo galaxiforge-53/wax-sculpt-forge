@@ -101,11 +101,12 @@ function PremiumLock() {
 
 // ── Panel heights ────────────────────────────────────────────────
 
-type PanelHeight = "collapsed" | "half" | "full";
-const PANEL_HEIGHTS: Record<PanelHeight, string> = {
-  collapsed: "h-0",
-  half: "h-[40vh]",
-  full: "h-[70vh]",
+type PanelHeight = "collapsed" | "peek" | "half" | "full";
+const PANEL_HEIGHTS: Record<PanelHeight, number> = {
+  collapsed: 0,
+  peek: 25,
+  half: 40,
+  full: 70,
 };
 
 // ── Component ────────────────────────────────────────────────────
@@ -126,7 +127,8 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
   };
 
   const cycleHeight = () => {
-    if (panelHeight === "collapsed") setPanelHeight("half");
+    if (panelHeight === "collapsed") setPanelHeight("peek");
+    else if (panelHeight === "peek") setPanelHeight("half");
     else if (panelHeight === "half") setPanelHeight("full");
     else setPanelHeight("collapsed");
   };
@@ -355,24 +357,29 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
         {panelHeight !== "collapsed" && (
           <motion.div
             initial={{ height: 0 }}
-            animate={{ height: panelHeight === "half" ? "40vh" : "70vh" }}
+            animate={{ height: `${PANEL_HEIGHTS[panelHeight]}vh` }}
             exit={{ height: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
             className="bg-card/95 backdrop-blur-xl border-t border-border overflow-hidden pointer-events-auto"
           >
             {/* Drag handle + close */}
             <div
-              className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 cursor-grab active:cursor-grabbing touch-none"
+              className="flex items-center justify-between px-3 py-2 border-b border-border/50 cursor-grab active:cursor-grabbing touch-none"
               onPointerDown={(e) => {
                 const startY = e.clientY;
                 const startHeight = panelHeight;
+                const el = e.currentTarget;
+                el.setPointerCapture(e.pointerId);
                 const onMove = (moveE: PointerEvent) => {
                   const dy = startY - moveE.clientY;
-                  if (startHeight === "half" && dy > 60) setPanelHeight("full");
-                  else if (startHeight === "half" && dy < -60) setPanelHeight("collapsed");
+                  if (startHeight === "peek" && dy > 50) setPanelHeight("half");
+                  else if (startHeight === "peek" && dy < -40) setPanelHeight("collapsed");
+                  else if (startHeight === "half" && dy > 60) setPanelHeight("full");
+                  else if (startHeight === "half" && dy < -60) setPanelHeight("peek");
                   else if (startHeight === "full" && dy < -60) setPanelHeight("half");
                 };
                 const onUp = () => {
+                  el.releasePointerCapture(e.pointerId);
                   window.removeEventListener("pointermove", onMove);
                   window.removeEventListener("pointerup", onUp);
                 };
@@ -381,20 +388,20 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
               }}
             >
               <div className="flex-1 flex justify-center">
-                <div className="w-8 h-1 rounded-full bg-muted-foreground/30" />
+                <div className="w-10 h-1.5 rounded-full bg-muted-foreground/30" />
               </div>
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-display absolute left-1/2 -translate-x-1/2">
                 {TABS.find((t) => t.id === activeTab)?.label}
               </span>
               <button
                 onClick={() => setPanelHeight("collapsed")}
-                className="p-1 -mr-1 text-muted-foreground hover:text-foreground transition-colors relative z-10"
+                className="p-1.5 -mr-1 text-muted-foreground hover:text-foreground transition-colors relative z-10 touch-target"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <ScrollArea className="h-[calc(100%-36px)]">
-              <div className="p-3 pb-8">
+            <ScrollArea className="h-[calc(100%-44px)]">
+              <div className="p-3 pb-20">
                 {contentMap[activeTab]()}
               </div>
             </ScrollArea>
@@ -413,7 +420,7 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
                 key={tab.id}
                 onClick={() => togglePanel(tab.id)}
                 className={cn(
-                  "flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-all relative",
+                  "flex-1 flex flex-col items-center gap-0.5 py-3 transition-all relative touch-target",
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground active:text-foreground"

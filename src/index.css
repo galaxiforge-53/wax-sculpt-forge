@@ -333,3 +333,28 @@
     height: 24px;
   }
 }
+
+/* GPU-accelerated transforms for smooth animations */
+.gpu-layer {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Prevent text selection during drag operations */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Optimize canvas rendering on mobile */
+@media (max-width: 768px) {
+  canvas {
+    touch-action: none;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Prevent overscroll bounce on iOS when dragging panels */
+  .builder-viewport-bg {
+    overscroll-behavior: none;
+  }
+}
