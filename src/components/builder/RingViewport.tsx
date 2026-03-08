@@ -413,33 +413,83 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
       outerPoints.push(new THREE.Vector2(r, y));
     }
   } else if (params.profile === "flat") {
+    const edgeStyle = params.edgeStyle ?? "soft-bevel";
     if (hasLunar) {
+      // Continuous profile for lunar displacement — apply edge style via smooth function
       for (let i = 0; i <= profileSteps; i++) {
         const t = i / profileSteps;
         const y = (t - 0.5) * halfW * 2;
         const edgeDist = Math.min(t, 1 - t);
-        const bevelT = Math.min(1, edgeDist / (bevel / (halfW * 2) + 0.01));
-        const r = innerR + (outerR - innerR) * Math.min(1, bevelT);
+        const bevelZone = bevel / (halfW * 2) + 0.01;
+        const bevelT = Math.min(1, edgeDist / bevelZone);
+        let r: number;
+        if (edgeStyle === "sharp") {
+          // Hard 90° edge, no rounding
+          r = outerR;
+        } else if (edgeStyle === "chamfer") {
+          // Linear 45° cut at edges
+          r = innerR + (outerR - innerR) * Math.min(1, bevelT);
+        } else if (edgeStyle === "rounded") {
+          // Deep smooth radius — ease-in-out curve
+          const smoothT = bevelT < 1 ? (1 - Math.cos(bevelT * Math.PI)) / 2 : 1;
+          r = innerR + (outerR - innerR) * Math.min(1, smoothT);
+        } else {
+          // soft-bevel (default) — gentle quarter-circle
+          r = innerR + (outerR - innerR) * Math.min(1, bevelT);
+        }
         outerPoints.push(new THREE.Vector2(r, y));
       }
     } else {
       const b = Math.min(bevel, halfW * 0.4);
-      outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
-      for (let i = 0; i <= 8; i++) {
-        const t = i / 8;
-        outerPoints.push(new THREE.Vector2(
-          outerR - b + b * Math.sin(t * Math.PI / 2),
-          -halfW + b * (1 - Math.cos(t * Math.PI / 2))
-        ));
-      }
-      outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
-      outerPoints.push(new THREE.Vector2(outerR, halfW - b));
-      for (let i = 0; i <= 8; i++) {
-        const t = i / 8;
-        outerPoints.push(new THREE.Vector2(
-          outerR - b * Math.sin(t * Math.PI / 2),
-          halfW - b + b * Math.sin(t * Math.PI / 2) // fixed: was incorrect
-        ));
+      if (edgeStyle === "sharp") {
+        // Pure right-angle edges
+        outerPoints.push(new THREE.Vector2(outerR, -halfW));
+        outerPoints.push(new THREE.Vector2(outerR, halfW));
+      } else if (edgeStyle === "chamfer") {
+        // Straight 45° chamfer cut
+        outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
+        outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
+        outerPoints.push(new THREE.Vector2(outerR, halfW - b));
+        outerPoints.push(new THREE.Vector2(outerR - b, halfW));
+      } else if (edgeStyle === "rounded") {
+        // Full quarter-circle arcs with more segments for smoother rounding
+        const arcSteps = 12;
+        outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
+          outerPoints.push(new THREE.Vector2(
+            outerR - b + b * Math.sin(t * Math.PI / 2),
+            -halfW + b * (1 - Math.cos(t * Math.PI / 2))
+          ));
+        }
+        outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
+        outerPoints.push(new THREE.Vector2(outerR, halfW - b));
+        for (let i = 0; i <= arcSteps; i++) {
+          const t = i / arcSteps;
+          outerPoints.push(new THREE.Vector2(
+            outerR - b * (1 - Math.cos(t * Math.PI / 2)),
+            halfW - b + b * Math.sin(t * Math.PI / 2)
+          ));
+        }
+      } else {
+        // soft-bevel (default) — existing quarter-circle bevel
+        outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
+        for (let i = 0; i <= 8; i++) {
+          const t = i / 8;
+          outerPoints.push(new THREE.Vector2(
+            outerR - b + b * Math.sin(t * Math.PI / 2),
+            -halfW + b * (1 - Math.cos(t * Math.PI / 2))
+          ));
+        }
+        outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
+        outerPoints.push(new THREE.Vector2(outerR, halfW - b));
+        for (let i = 0; i <= 8; i++) {
+          const t = i / 8;
+          outerPoints.push(new THREE.Vector2(
+            outerR - b * Math.sin(t * Math.PI / 2),
+            halfW - b + b * Math.sin(t * Math.PI / 2)
+          ));
+        }
       }
     }
   } else if (params.profile === "knife-edge") {
@@ -451,11 +501,40 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
       const y = (t - 0.5) * halfW * 2;
       outerPoints.push(new THREE.Vector2(r, y));
     }
-  } else { // square
-    for (let i = 0; i <= profileSteps; i++) {
-      const t = i / profileSteps;
-      const y = (t - 0.5) * halfW * 2;
-      outerPoints.push(new THREE.Vector2(outerR, y));
+  } else { // square — also apply edge styles
+    const edgeStyle = params.edgeStyle ?? "soft-bevel";
+    const b = Math.min(bevel, halfW * 0.4);
+    if (edgeStyle === "sharp" || b < 0.001) {
+      for (let i = 0; i <= profileSteps; i++) {
+        const t = i / profileSteps;
+        const y = (t - 0.5) * halfW * 2;
+        outerPoints.push(new THREE.Vector2(outerR, y));
+      }
+    } else if (edgeStyle === "chamfer") {
+      outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
+      outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
+      outerPoints.push(new THREE.Vector2(outerR, halfW - b));
+      outerPoints.push(new THREE.Vector2(outerR - b, halfW));
+    } else {
+      // rounded or soft-bevel on square profile
+      const arcSteps = edgeStyle === "rounded" ? 12 : 8;
+      outerPoints.push(new THREE.Vector2(outerR - b, -halfW));
+      for (let i = 0; i <= arcSteps; i++) {
+        const t = i / arcSteps;
+        outerPoints.push(new THREE.Vector2(
+          outerR - b + b * Math.sin(t * Math.PI / 2),
+          -halfW + b * (1 - Math.cos(t * Math.PI / 2))
+        ));
+      }
+      outerPoints.push(new THREE.Vector2(outerR, -halfW + b));
+      outerPoints.push(new THREE.Vector2(outerR, halfW - b));
+      for (let i = 0; i <= arcSteps; i++) {
+        const t = i / arcSteps;
+        outerPoints.push(new THREE.Vector2(
+          outerR - b * (1 - Math.cos(t * Math.PI / 2)),
+          halfW - b + b * Math.sin(t * Math.PI / 2)
+        ));
+      }
     }
   }
 
@@ -568,7 +647,7 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   // Adaptive quality for geometry detail
   const geoQuality = useAdaptiveQuality(
-    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar, debouncedWear],
+    [debouncedParams.size, debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness, debouncedParams.profile, debouncedParams.bevelSize, debouncedParams.edgeStyle, debouncedParams.grooveCount, debouncedParams.interiorProfile, debouncedParams.interiorCurvature, debouncedParams.comfortFitDepth, hasLunar, debouncedWear],
     isMobile ? 1200 : 600,
   );
 

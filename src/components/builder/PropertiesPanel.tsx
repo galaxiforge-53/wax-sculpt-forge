@@ -1,4 +1,4 @@
-import { RingParameters, RingProfile, InteriorProfile, RING_SIZE_MAP, ViewMode, MetalPreset } from "@/types/ring";
+import { RingParameters, RingProfile, InteriorProfile, RING_SIZE_MAP, ViewMode, MetalPreset, EdgeStyle } from "@/types/ring";
 import { WaxMarkType } from "@/types/waxmarks";
 import { StampSettings } from "@/hooks/useRingDesign";
 import { Slider } from "@/components/ui/slider";
@@ -154,6 +154,32 @@ const STAMP_TYPES: { value: WaxMarkType; label: string }[] = [
   { value: "carve-sculpt", label: "Carve" },
   { value: "smooth-sculpt", label: "Smooth" },
 ];
+
+/** Small SVG icon showing edge cross-section shape */
+function EdgeStyleIcon({ style, active }: { style: EdgeStyle; active: boolean }) {
+  const stroke = active ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))";
+  const w = 24, h = 16;
+  let d = "";
+  switch (style) {
+    case "sharp":
+      d = "M4 14 L4 2 L20 2 L20 14";
+      break;
+    case "soft-bevel":
+      d = "M4 14 L4 5 Q4 2 7 2 L17 2 Q20 2 20 5 L20 14";
+      break;
+    case "rounded":
+      d = "M4 14 L4 8 C4 2 8 2 12 2 C16 2 20 2 20 8 L20 14";
+      break;
+    case "chamfer":
+      d = "M4 14 L4 6 L8 2 L16 2 L20 6 L20 14";
+      break;
+  }
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none">
+      <path d={d} stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMode, waxMarkCount, onClearWaxMarks, stampSettings, onStampSettingsChange, metalPreset = "silver" }: PropertiesPanelProps) {
   const sizes = Object.keys(RING_SIZE_MAP).map(Number);
@@ -406,17 +432,49 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         />
       </div>
 
-      {/* ── Bevel ── */}
+      {/* ── Edge Style ── */}
       <div className="space-y-2">
-        <Label className="text-xs text-secondary-foreground">Bevel: {params.bevelSize.toFixed(1)}mm</Label>
-        <Slider
-          value={[params.bevelSize]}
-          onValueChange={([v]) => onUpdate({ bevelSize: v })}
-          min={0}
-          max={2}
-          step={0.1}
-        />
+        <Label className="text-xs text-secondary-foreground">Edge Style</Label>
+        <div className="grid grid-cols-4 gap-1.5">
+          {([
+            { value: "sharp" as EdgeStyle, label: "Sharp", desc: "Hard 90° edge" },
+            { value: "soft-bevel" as EdgeStyle, label: "Bevel", desc: "Gentle quarter-round" },
+            { value: "rounded" as EdgeStyle, label: "Round", desc: "Full smooth radius" },
+            { value: "chamfer" as EdgeStyle, label: "Chamfer", desc: "Straight 45° cut" },
+          ]).map(es => {
+            const active = (params.edgeStyle ?? "soft-bevel") === es.value;
+            return (
+              <button
+                key={es.value}
+                onClick={() => onUpdate({ edgeStyle: es.value })}
+                className={`flex flex-col items-center gap-1 p-2 rounded-md border transition-all text-center ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary shadow-sm"
+                    : "border-border bg-secondary/30 text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                }`}
+                title={es.desc}
+              >
+                <EdgeStyleIcon style={es.value} active={active} />
+                <span className="text-[9px] font-medium leading-tight">{es.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ── Bevel Size ── */}
+      {(params.edgeStyle ?? "soft-bevel") !== "sharp" && (
+        <div className="space-y-2">
+          <Label className="text-xs text-secondary-foreground">Bevel Size: {params.bevelSize.toFixed(1)}mm</Label>
+          <Slider
+            value={[params.bevelSize]}
+            onValueChange={([v]) => onUpdate({ bevelSize: v })}
+            min={0}
+            max={2}
+            step={0.1}
+          />
+        </div>
+      )}
 
       {/* ── Weight Estimate ── */}
       <div className="mt-1 p-3 rounded-lg bg-secondary/60 border border-border space-y-2">
