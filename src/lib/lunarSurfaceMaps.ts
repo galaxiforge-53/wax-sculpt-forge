@@ -1213,12 +1213,15 @@ export function buildHeightmap(
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
   // ─── 1) fBm base terrain layer ──
+  // Scale V coordinate by aspect correction so noise features stay circular
+  // physicalAspect = circumference/width, pixel ratio = MAP_W/MAP_H = 4
+  const aspectCorrection = physicalAspect / (MAP_W / MAP_H);
   const baseNoise = makeNoise2D(lunar.seed + 500);
   const baseAmp = (0.04 + terrainRough * 0.12) * depthScale;
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const u = x / MAP_W * 8;
-      const v = y / MAP_H * 8;
+      const v = y / MAP_H * 8 * aspectCorrection;
       const n = fbm(baseNoise, u, v, 6, 2.0, 0.5);
       const mask = edgeMask[y * MAP_W + x];
       hmap[y * MAP_W + x] += n * baseAmp * mask;
