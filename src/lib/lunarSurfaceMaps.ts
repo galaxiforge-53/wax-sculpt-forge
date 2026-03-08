@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { LunarTextureState } from "@/types/lunar";
+import { LunarTextureState, TerrainType } from "@/types/lunar";
 
 /**
  * Generates full-ring UV-space maps (normalMap, roughnessMap, aoMap, albedoMap, displacementMap)
@@ -38,6 +38,7 @@ function cacheKey(lunar: LunarTextureState): string {
     lunar.ovalElongation ?? 50, lunar.ovalAngle ?? 0,
     lunar.mariaFill ?? 0, lunar.highlandRidges ?? 0,
     lunar.craterFloorTexture ?? 30, lunar.ejectaStrength ?? 50,
+    lunar.terrainType ?? "generic",
   ].join("-");
 }
 
@@ -549,6 +550,310 @@ function applyErosion(hmap: Float32Array, w: number, h: number, erosionFactor: n
   }
 }
 
+// ── Planet-specific terrain passes ────────────────────────────────
+// Each terrain type adds unique geological features on top of the
+// base crater distribution, making each body visually distinct.
+
+function applyTerrainType(
+  hmap: Float32Array, w: number, h: number,
+  terrainType: TerrainType,
+  edgeMask: Float32Array, seed: number,
+  depthScale: number, rand: () => number,
+  physicalAspect: number,
+) {
+  if (terrainType === "generic") return;
+
+  switch (terrainType) {
+    case "mercurian":
+      applyLobateScarps(hmap, w, h, edgeMask, seed, depthScale);
+      break;
+
+    case "phobos":
+      applyPhobosGrooves(hmap, w, h, edgeMask, seed, depthScale, rand);
+      break;
+
+    case "europa":
+      applyIceFractures(hmap, w, h, edgeMask, seed, depthScale);
+      break;
+
+    case "lunar":
+      // Moon is well-served by the base engine + maria fill + ejecta
+      // Add subtle ray brightening around the map center for realism
+      applyLunarRayBrightening(hmap, w, h, edgeMask, seed, depthScale);
+      break;
+
+    case "martian":
+      applyDustFill(hmap, w, h, edgeMask, seed, depthScale);
+      break;
+
+    case "callisto":
+      applyValhallaConcentric(hmap, w, h, edgeMask, seed, depthScale);
+      break;
+
+    case "titan":
+      applyOrganicDunes(hmap, w, h, edgeMask, seed, depthScale);
+      break;
+
+    case "deimos":
+      // Extra smoothing pass to bury features
+      applyErosion(hmap, w, h, 0.6);
+      break;
+  }
+}
+
+// ── Mercury: Lobate scarps (thrust fault ridges from planetary cooling) ──
+
+function applyLobateScarps(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+) {
+  const scarpNoise = makeNoise2D(seed + 10001);
+  const scarpCount = 3 + Math.floor(seededRng(seed + 10002)() * 4);
+  const scarpRng = seededRng(seed + 10003);
+
+  for (let s = 0; s < scarpCount; s++) {
+    const startU = scarpRng();
+    const startV = 0.15 + scarpRng() * 0.7;
+    const angle = (scarpRng() - 0.5) * Math.PI * 0.4; // mostly horizontal
+    const length = 0.3 + scarpRng() * 0.4;
+    const scarpHeight = 0.06 * depthScale * (0.5 + scarpRng() * 0.5);
+    const scarpWidth = 0.008 + scarpRng() * 0.012;
+
+    const steps = Math.floor(length * w);
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const u = startU + Math.cos(angle) * t * length;
+      const v = startV + Math.sin(angle) * t * length;
+      // Add wavy perturbation
+      const waveOffset = scarpNoise(u * 20, v * 20) * 0.015;
+
+      const px = Math.floor(((u % 1 + 1) % 1) * w);
+      const halfWidthPx = Math.ceil(scarpWidth * h);
+
+      for (let dy = -halfWidthPx; dy <= halfWidthPx; dy++) {
+        const py = Math.floor((v + waveOffset) * h) + dy;
+        if (py < 0 || py >= h) continue;
+        const wpx = ((px % w) + w) % w;
+        const idx = py * w + wpx;
+        const dist = Math.abs(dy) / halfWidthPx;
+
+        // Sharp step on one side, gradual slope on other
+        if (dy < 0) {
+          // Rising scarp face
+          const rise = (1 - dist) * (1 - dist);
+          hmap[idx] += scarpHeight * rise * edgeMask[idx] * (1 - t * 0.3);
+        } else {
+          // Gentle back-slope
+          const slope = (1 - dist);
+          hmap[idx] += scarpHeight * 0.3 * slope * edgeMask[idx] * (1 - t * 0.3);
+        }
+      }
+    }
+  }
+}
+
+// ── Phobos: Parallel groove lines (Stickney-radial grooves) ──
+
+function applyPhobosGrooves(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+  rand: () => number,
+) {
+  const grooveCount = 8 + Math.floor(rand() * 12);
+  const grooveNoise = makeNoise2D(seed + 11001);
+
+  for (let g = 0; g < grooveCount; g++) {
+    const vPos = 0.1 + rand() * 0.8; // v position across band width
+    const grooveDepth = 0.03 * depthScale * (0.4 + rand() * 0.6);
+    const grooveWidthV = 0.004 + rand() * 0.008;
+    const angleOffset = (rand() - 0.5) * 0.05; // slight tilt
+
+    const widthPx = Math.ceil(grooveWidthV * h);
+
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+      // Wobble the groove path
+      const wobble = grooveNoise(u * 15, vPos * 10) * 0.02;
+      const centerV = vPos + angleOffset * u + wobble;
+      const centerPy = Math.floor(centerV * h);
+
+      for (let dy = -widthPx; dy <= widthPx; dy++) {
+        const py = centerPy + dy;
+        if (py < 0 || py >= h) continue;
+        const idx = py * w + x;
+        const dist = Math.abs(dy) / widthPx;
+        // U-shaped groove profile
+        const profile = (1 - dist * dist);
+        hmap[idx] -= grooveDepth * profile * edgeMask[idx];
+      }
+    }
+  }
+}
+
+// ── Europa: Linear ice fractures (lineae) ──
+
+function applyIceFractures(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+) {
+  const fractureRng = seededRng(seed + 12001);
+  const fractureNoise = makeNoise2D(seed + 12002);
+  const lineaeCount = 12 + Math.floor(fractureRng() * 15);
+
+  for (let f = 0; f < lineaeCount; f++) {
+    const startU = fractureRng();
+    const startV = 0.1 + fractureRng() * 0.8;
+    const angle = fractureRng() * Math.PI; // any direction
+    const length = 0.15 + fractureRng() * 0.5;
+    const width = 0.002 + fractureRng() * 0.005;
+    const depth = 0.025 * depthScale * (0.3 + fractureRng() * 0.7);
+    const ridgeHeight = depth * 0.6; // raised edges along fracture
+
+    const steps = Math.floor(length * w * 0.7);
+    const widthPx = Math.ceil(width * h);
+
+    for (let i = 0; i < steps; i++) {
+      const t = i / steps;
+      const u = startU + Math.cos(angle) * t * length;
+      const v = startV + Math.sin(angle) * t * length;
+      if (v < 0.05 || v > 0.95) continue;
+
+      // Subtle meandering
+      const meander = fractureNoise(u * 30, v * 30) * 0.008;
+      const px = Math.floor(((u % 1 + 1) % 1) * w);
+      const centerPy = Math.floor((v + meander) * h);
+
+      for (let dy = -widthPx * 2; dy <= widthPx * 2; dy++) {
+        const py = centerPy + dy;
+        if (py < 0 || py >= h) continue;
+        const idx = py * w + ((px % w + w) % w);
+        const dist = Math.abs(dy) / widthPx;
+
+        if (dist < 1.0) {
+          // Central trench
+          const trenchProfile = (1 - dist * dist);
+          hmap[idx] -= depth * trenchProfile * edgeMask[idx];
+        } else if (dist < 2.0) {
+          // Raised ridge flanks
+          const ridgeDist = (dist - 1.0);
+          const ridgeProfile = (1 - ridgeDist) * (1 - ridgeDist);
+          hmap[idx] += ridgeHeight * ridgeProfile * edgeMask[idx];
+        }
+      }
+    }
+  }
+
+  // Extra: smooth icy plains base — reduce high-frequency noise
+  applyErosion(hmap, w, h, 0.25);
+}
+
+// ── Moon: Subtle ray brightening (Copernican ray system) ──
+
+function applyLunarRayBrightening(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+) {
+  const rayNoise = makeNoise2D(seed + 13001);
+  const rayAmp = 0.015 * depthScale;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const u = x / w * 6;
+      const v = y / h * 6;
+      // Directional noise creating subtle linear brightening
+      const n = rayNoise(u * 3, v * 0.5);
+      if (n > 0.3) {
+        const idx = y * w + x;
+        hmap[idx] += (n - 0.3) * rayAmp * edgeMask[idx];
+      }
+    }
+  }
+}
+
+// ── Mars: Dust fill — smooths lower areas more aggressively ──
+
+function applyDustFill(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+) {
+  // Wind-driven dust fills craters unevenly
+  const dustNoise = makeNoise2D(seed + 14001);
+  const sorted = Float32Array.from(hmap).sort();
+  const fillLevel = sorted[Math.floor(sorted.length * 0.45)];
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (hmap[idx] < fillLevel) {
+        const depth = (fillLevel - hmap[idx]) / Math.max(0.01, fillLevel);
+        // Wind direction bias — dust accumulates on one side
+        const windBias = 0.5 + 0.5 * dustNoise(x / w * 4, y / h * 2);
+        const fill = depth * 0.6 * windBias;
+        hmap[idx] = lerp(hmap[idx], fillLevel * 0.9, fill * edgeMask[idx]);
+      }
+    }
+  }
+}
+
+// ── Callisto: Valhalla-like concentric ring structure ──
+
+function applyValhallaConcentric(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+) {
+  const rng = seededRng(seed + 15001);
+  const centerU = 0.3 + rng() * 0.4;
+  const centerV = 0.3 + rng() * 0.4;
+  const ringCount = 4 + Math.floor(rng() * 4);
+  const ringAmp = 0.03 * depthScale;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let du = (x / w - centerU);
+      // Wrap around circumference
+      if (du > 0.5) du -= 1;
+      if (du < -0.5) du += 1;
+      const dv = (y / h - centerV);
+      const dist = Math.sqrt(du * du + dv * dv);
+
+      // Concentric sine waves
+      const ringPhase = dist * ringCount * Math.PI * 8;
+      const ringVal = Math.sin(ringPhase) * Math.exp(-dist * 4);
+
+      const idx = y * w + x;
+      hmap[idx] += ringVal * ringAmp * edgeMask[idx];
+    }
+  }
+}
+
+// ── Titan: Organic dune fields ──
+
+function applyOrganicDunes(
+  hmap: Float32Array, w: number, h: number,
+  edgeMask: Float32Array, seed: number, depthScale: number,
+) {
+  const duneNoise = makeNoise2D(seed + 16001);
+  const duneNoise2 = makeNoise2D(seed + 16002);
+  const duneAmp = 0.05 * depthScale;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+      const v = y / h;
+
+      // Long parallel dunes with meandering — primarily u-direction
+      const dunePhase = v * 25 + duneNoise(u * 8, v * 3) * 3;
+      const dune = Math.sin(dunePhase) * 0.5 + 0.5;
+      // Cross-pattern secondary dunes
+      const crossDune = Math.sin(u * 40 + duneNoise2(u * 5, v * 5) * 2) * 0.3 + 0.5;
+
+      const combined = dune * 0.7 + crossDune * 0.3;
+      const idx = y * w + x;
+      hmap[idx] += (combined - 0.5) * duneAmp * edgeMask[idx];
+    }
+  }
+}
+
 // ── Build heightmap ───────────────────────────────────────────────
 
 const REF_INNER_DIAM = 18.1;
@@ -752,7 +1057,11 @@ export function buildHeightmap(
   // ─── 5) Erosion pass ──
   applyErosion(hmap, MAP_W, MAP_H, erosionFactor);
 
-  // ─── 6) Micro-pitting layer ──
+  // ─── 5b) Planet-specific terrain passes ──
+  const terrainType: TerrainType = lunar.terrainType ?? "generic";
+  applyTerrainType(hmap, MAP_W, MAP_H, terrainType, edgeMask, lunar.seed, depthScale, rand, physicalAspect);
+
+
   if (microFactor > 0) {
     const pitRng = seededRng(lunar.seed + 5555);
     const pitCount = Math.floor(microPitCount * microFactor);

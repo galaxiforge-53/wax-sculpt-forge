@@ -1,6 +1,16 @@
 export type CraterDensity = "low" | "med" | "high";
 export type CraterSize = "small" | "med" | "large";
 export type CraterShape = "circular" | "oval" | "organic" | "angular";
+export type TerrainType =
+  | "generic"       // Default — pure parameter-driven
+  | "lunar"         // Earth's Moon — large circular craters, maria, ejecta
+  | "mercurian"     // Mercury — dense overlapping, lobate scarps
+  | "martian"       // Mars — wind-eroded, dust-filled
+  | "phobos"        // Phobos — irregular clusters, parallel grooves
+  | "deimos"        // Deimos — buried soft craters
+  | "europa"        // Europa — icy fractures, very few craters
+  | "callisto"      // Callisto — saturated ancient bombardment
+  | "titan";        // Titan — almost no craters, organic dunes
 
 export interface LunarTextureState {
   enabled: boolean;
@@ -26,6 +36,8 @@ export interface LunarTextureState {
   highlandRidges: number;       // 0–100, raised ridge networks between craters
   craterFloorTexture: number;   // 0–100, roughness inside crater bowls
   ejectaStrength: number;       // 0–100, intensity of radial ejecta rays
+  // ── v4 fields ──
+  terrainType?: TerrainType;    // planet-specific terrain generation mode
 }
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
@@ -50,4 +62,5 @@ export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
   highlandRidges: 0,
   craterFloorTexture: 30,
   ejectaStrength: 50,
+  terrainType: "generic",
 };
