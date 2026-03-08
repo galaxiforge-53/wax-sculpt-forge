@@ -35,6 +35,7 @@ import SEOHead from "@/components/SEOHead";
 import { LightingSettings, DEFAULT_LIGHTING, LIGHTING_PRESETS } from "@/types/lighting";
 import PreferencesPanel from "@/components/builder/PreferencesPanel";
 import { cn } from "@/lib/utils";
+import { useAutosave, loadAutosave, clearAutosave } from "@/hooks/useAutosave";
 
 function BuilderInner() {
   const navigate = useNavigate();
@@ -110,16 +111,54 @@ function BuilderInner() {
   const { prefs, updatePrefs } = useUserPreferences();
   const [prefsOpen, setPrefsOpen] = useState(false);
 
+  // ── Autosave system ──
+  const autosaveStatus = useAutosave({
+    generateDesignPackage,
+    projectId: currentProjectId,
+    projectName: currentProjectName,
+    userId: user?.id ?? null,
+    enabled: prefs.autoSave !== false,
+  });
+
   // Apply user preferences as initial defaults (only once on mount, before any template/project override)
   const prefsAppliedRef = useRef(false);
   useEffect(() => {
     if (prefsAppliedRef.current) return;
     const hasTemplate = !!sessionStorage.getItem("applyTemplate");
     const hasProject = !!sessionStorage.getItem("openProjectId");
-    if (hasTemplate || hasProject) {
+    const hasCloud = !!sessionStorage.getItem("openCloudDesignId");
+    const hasShared = !!sessionStorage.getItem("sharedDesignPackage");
+    if (hasTemplate || hasProject || hasCloud || hasShared) {
       prefsAppliedRef.current = true;
       return; // Don't override if loading a template/project
     }
+
+    // Check for autosave recovery
+    const autosaved = loadAutosave();
+    if (autosaved) {
+      const savedAt = new Date(autosaved.meta.savedAt);
+      const ageMinutes = (Date.now() - savedAt.getTime()) / 60000;
+      // Only offer recovery if less than 24 hours old
+      if (ageMinutes < 1440) {
+        const timeLabelParts: string[] = [];
+        if (ageMinutes < 1) timeLabelParts.push("just now");
+        else if (ageMinutes < 60) timeLabelParts.push(`${Math.round(ageMinutes)}m ago`);
+        else timeLabelParts.push(`${Math.round(ageMinutes / 60)}h ago`);
+        const nameLabel = autosaved.meta.projectName ? ` "${autosaved.meta.projectName}"` : "";
+
+        // Auto-restore silently — toast to inform user
+        restoreDesign(autosaved.pkg);
+        if (autosaved.meta.projectId) setCurrentProjectId(autosaved.meta.projectId);
+        if (autosaved.meta.projectName) setCurrentProjectName(autosaved.meta.projectName);
+        toast({
+          title: "🔄 Design Restored",
+          description: `Recovered${nameLabel} from ${timeLabelParts[0]}.`,
+        });
+        prefsAppliedRef.current = true;
+        return;
+      }
+    }
+
     prefsAppliedRef.current = true;
     setMetalPreset(prefs.defaultMetal);
     setFinishPreset(prefs.defaultFinish);
@@ -274,6 +313,7 @@ function BuilderInner() {
         setCurrentProjectId(saved.id);
         setCurrentProjectName(saved.name);
         toast({ title: "Saved to Cloud ☁️", description: `"${name}" synced.` });
+        clearAutosave();
       } else {
         // Fallback to local storage
         if (!id) id = `PRJ-${Date.now().toString(36).toUpperCase()}`;
@@ -525,6 +565,33 @@ function BuilderInner() {
                 </span>
                 <span className="text-muted-foreground/60">|</span>
                 <span className="font-mono">{castabilityReport.score}/100</span>
+              </div>
+            </div>
+          )}
+
+          {/* Autosave indicator — bottom-right */}
+          {!isMobile && autosaveStatus.lastSaved && (
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-none animate-in fade-in duration-500">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-card/60 backdrop-blur-sm border border-border/30 rounded-md">
+                {autosaveStatus.isSaving ? (
+                  <>
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-[8px] text-muted-foreground">Saving…</span>
+                  </>
+                ) : (
+                  <>
+                    <div className={cn("w-2 h-2 rounded-full", autosaveStatus.isCloudSynced ? "bg-emerald-500" : "bg-muted-foreground/40")} />
+                    <span className="text-[8px] text-muted-foreground">
+                      {autosaveStatus.isCloudSynced ? "Synced" : "Saved"}{" "}
+                      {(() => {
+                        const ago = (Date.now() - new Date(autosaveStatus.lastSaved!).getTime()) / 1000;
+                        if (ago < 10) return "just now";
+                        if (ago < 60) return `${Math.round(ago)}s ago`;
+                        return `${Math.round(ago / 60)}m ago`;
+                      })()}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
