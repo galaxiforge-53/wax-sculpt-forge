@@ -88,11 +88,14 @@ function makeNoise2D(seed: number) {
   const rng = seededRng(seed);
   const SIZE = 256;
   const perm = new Uint8Array(SIZE * 2);
-  const grad: number[][] = [];
+  // Flatten gradient vectors into a single Float64Array with stride 2
+  // Eliminates pointer indirection on every noise lookup (~50M+ calls per generation)
+  const gradFlat = new Float64Array(SIZE * 2);
   for (let i = 0; i < SIZE; i++) {
     perm[i] = i;
     const angle = rng() * Math.PI * 2;
-    grad.push([Math.cos(angle), Math.sin(angle)]);
+    gradFlat[i * 2] = Math.cos(angle);
+    gradFlat[i * 2 + 1] = Math.sin(angle);
   }
   for (let i = SIZE - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -100,28 +103,30 @@ function makeNoise2D(seed: number) {
   }
   for (let i = 0; i < SIZE; i++) perm[SIZE + i] = perm[i];
 
-  function fade(t: number) { return t * t * t * (t * (t * 6 - 15) + 10); }
-  function lerpN(a: number, b: number, t: number) { return a + t * (b - a); }
-  function dot2(g: number[], x: number, y: number) { return g[0] * x + g[1] * y; }
-
   return (x: number, y: number): number => {
     const xi = Math.floor(x) & 255;
     const yi = Math.floor(y) & 255;
     const xf = x - Math.floor(x);
     const yf = y - Math.floor(y);
-    const u = fade(xf);
-    const v = fade(yf);
+    // Inline fade: t³(6t²-15t+10)
+    const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
+    const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
 
-    const aa = perm[perm[xi] + yi] & 255;
-    const ab = perm[perm[xi] + yi + 1] & 255;
-    const ba = perm[perm[xi + 1] + yi] & 255;
-    const bb = perm[perm[xi + 1] + yi + 1] & 255;
+    const aa = (perm[perm[xi] + yi] & 255) * 2;
+    const ab = (perm[perm[xi] + yi + 1] & 255) * 2;
+    const ba = (perm[perm[xi + 1] + yi] & 255) * 2;
+    const bb = (perm[perm[xi + 1] + yi + 1] & 255) * 2;
 
-    return lerpN(
-      lerpN(dot2(grad[aa], xf, yf), dot2(grad[ba], xf - 1, yf), u),
-      lerpN(dot2(grad[ab], xf, yf - 1), dot2(grad[bb], xf - 1, yf - 1), u),
-      v
-    );
+    // Inline dot products with flat gradient array
+    const d00 = gradFlat[aa] * xf + gradFlat[aa + 1] * yf;
+    const d10 = gradFlat[ba] * (xf - 1) + gradFlat[ba + 1] * yf;
+    const d01 = gradFlat[ab] * xf + gradFlat[ab + 1] * (yf - 1);
+    const d11 = gradFlat[bb] * (xf - 1) + gradFlat[bb + 1] * (yf - 1);
+
+    // Inline bilinear interpolation
+    const x0 = d00 + u * (d10 - d00);
+    const x1 = d01 + u * (d11 - d01);
+    return x0 + v * (x1 - x0);
   };
 }
 
