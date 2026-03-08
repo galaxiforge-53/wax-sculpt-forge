@@ -775,35 +775,17 @@ export default function Export() {
           )}
         </AnimatePresence>
 
-        {/* Actions — shown when not in submission flow */}
-        {!sent && submitStep === "review" ? (
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" onClick={() => navigate("/builder")} className="flex-1">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back
-            </Button>
-            <Button
-              onClick={handleDownloadSTL}
-              disabled={!stlResult || generating || !canExport}
-              className="flex-1 bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              title={!canExport ? "Requires Premium access code" : ""}
-            >
-              {!canExport ? <Lock className="h-4 w-4 mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-              {!canExport ? "Premium Required" : `Download STL ${stlResult ? `(${stlResult.fileSizeKB} KB)` : ""}`}
-            </Button>
-            <Button onClick={handleSend} className="flex-1 bg-primary text-primary-foreground hover:bg-ember-glow">
-              <Send className="h-4 w-4 mr-2" /> Send to Galaxy Forge
-            </Button>
-          </div>
-        ) : sent ? (
-          <div className="text-center space-y-4">
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary/20 text-primary border border-primary/30"
-            >
+        {/* Success state replaces action cards */}
+        {sent && (
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center space-y-4 bg-card border border-primary/20 rounded-xl p-6"
+          >
+            <div className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary/20 text-primary border border-primary/30">
               <Check className="h-5 w-5" />
               <span className="font-display text-sm tracking-wide">Design Submitted to Galaxy Forge</span>
-            </motion.div>
+            </div>
             <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
               Your ring design with all manufacturing parameters has been submitted for production.
               {user && " You can view your orders in your design library."}
@@ -817,13 +799,13 @@ export default function Export() {
               </Button>
               <a
                 href={getReturnUrl(pkg.id)}
-                className="inline-block text-sm text-primary hover:text-molten transition-colors underline leading-9"
+                className="inline-block text-sm text-primary hover:text-foreground transition-colors underline leading-9"
               >
                 View on Galaxy Forge →
               </a>
             </div>
-          </div>
-        ) : null}
+          </motion.div>
+        )}
       </div>
     </div>
   );
