@@ -243,20 +243,18 @@ function shapedDistance(
   // Apply shape transformation
   switch (sp.shape) {
     case "oval": {
-      // Rotate into oval frame, scale one axis
+      // Pre-compute trig once per call (callers should cache for per-crater use)
       const cos = Math.cos(sp.ovalAngleRad);
       const sin = Math.sin(sp.ovalAngleRad);
       const ru = du * cos + dv * sin;
       const rv = -du * sin + dv * cos;
-      // Elongation: stretch one axis (0.3 to 1.0 ratio)
       const ratio = 1.0 - sp.ovalElongation * 0.7;
-      sdu = ru / Math.max(0.3, ratio);
+      const invRatio = 1 / (ratio > 0.3 ? ratio : 0.3);
+      sdu = ru * invRatio;
       sdv = rv;
-      // Rotate back for warp
-      const cos2 = Math.cos(-sp.ovalAngleRad);
-      const sin2 = Math.sin(-sp.ovalAngleRad);
-      const finalU = sdu * cos2 + sdv * sin2;
-      const finalV = -sdu * sin2 + sdv * cos2;
+      // Rotate back — use negated angle (cos is same, sin negates)
+      const finalU = sdu * cos - sdv * sin;
+      const finalV = sdu * sin + sdv * cos;
       sdu = finalU;
       sdv = finalV;
       break;
