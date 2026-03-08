@@ -29,6 +29,7 @@ import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flam
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useAccess } from "@/hooks/useAccess";
+import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
 interface BuilderSidebarProps {
@@ -246,6 +247,7 @@ export default function BuilderSidebar({
   balanceAnalysis, onAutoBalance,
 }: BuilderSidebarProps) {
   const { isPremium } = useAccess();
+  const { toast } = useToast();
 
   return (
     <ScrollArea className="h-full">
@@ -295,6 +297,13 @@ export default function BuilderSidebar({
                 onChange={onLunarChange}
                 onApplyPreset={onApplyLunarPreset}
                 onRandomize={onRandomizeLunar}
+                ringThickness={params.thickness}
+                onEnhanceSummary={(summary) => {
+                  toast({
+                    title: "✨ Surface Enhanced",
+                    description: summary.slice(0, 3).join(" · "),
+                  });
+                }}
               />
               <div className="border-t border-border/40 mt-3 pt-3">
                 <SubLabel>Inlays</SubLabel>

@@ -9,13 +9,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw, Layers, Plus, Trash2, Eye, EyeOff, FlipHorizontal, Grid3x3, Blend } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw, Layers, Plus, Trash2, Eye, EyeOff, FlipHorizontal, Grid3x3, Blend, Wand2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
 import { estimateCraterCount } from "@/lib/lunarSurfaceMaps";
 import AdvancedTerrainEditor from "./AdvancedTerrainEditor";
 import SeedExplorer from "./SeedExplorer";
+import { enhanceSurface } from "@/lib/designEnhancer";
 
 // ── Helper: build a full LunarTextureState from partial overrides ──
 const preset = (overrides: Partial<LunarTextureState>): LunarTextureState => ({
@@ -470,10 +471,13 @@ interface LunarTexturePanelProps {
   onChange: (state: LunarTextureState) => void;
   onApplyPreset: (state: LunarTextureState, presetName: string) => void;
   onRandomize: (state: LunarTextureState) => void;
+  ringThickness?: number;
+  onEnhanceSummary?: (summary: string[]) => void;
 }
 
-export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRandomize }: LunarTexturePanelProps) {
+export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRandomize, ringThickness = 2.0, onEnhanceSummary }: LunarTexturePanelProps) {
   const [seedLocked, setSeedLocked] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const patch = (p: Partial<LunarTextureState>) => onChange({ ...state, ...p });
 
   const handlePreset = (name: string) => {
@@ -485,6 +489,18 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
   const handleRandomize = () => {
     const chaos = LUNAR_PRESETS.find((p) => p.name === "Random Chaos")!;
     onRandomize(chaos.build());
+  };
+
+  const handleEnhanceSurface = () => {
+    setIsEnhancing(true);
+    setTimeout(() => {
+      const result = enhanceSurface(state, ringThickness);
+      if (Object.keys(result.patch).length > 0) {
+        onChange({ ...state, ...result.patch });
+      }
+      onEnhanceSummary?.(result.summary);
+      setIsEnhancing(false);
+    }, 300);
   };
 
   const handleReseed = () => {
@@ -694,6 +710,18 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               <Dices className="w-3 h-3 mr-1" /> Randomize
             </Button>
           </div>
+
+          {/* Enhance Surface */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-[10px] h-7 border-accent/50 text-accent hover:bg-accent/10 hover:text-accent gap-1.5"
+            onClick={handleEnhanceSurface}
+            disabled={isEnhancing}
+          >
+            <Wand2 className="w-3 h-3" />
+            {isEnhancing ? "Enhancing…" : "Enhance Surface"}
+          </Button>
 
           {/* Seed lock */}
           <div className="flex items-center justify-between bg-secondary/30 rounded px-2 py-1">

@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { RingParameters, ViewMode, MetalPreset, FinishPreset, ToolType } from "@/types/ring";
 import { LunarTextureState } from "@/types/lunar";
@@ -113,6 +114,7 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
   const [activeTab, setActiveTab] = useState<MobileTab>("shape");
   const [panelHeight, setPanelHeight] = useState<PanelHeight>("collapsed");
   const { isPremium } = useAccess();
+  const { toast } = useToast();
 
   const togglePanel = (tab: MobileTab) => {
     if (activeTab === tab && panelHeight !== "collapsed") {
@@ -166,6 +168,13 @@ export default function MobileBuilderPanel(props: MobileBuilderPanelProps) {
           onChange={props.onLunarChange}
           onApplyPreset={props.onApplyLunarPreset}
           onRandomize={props.onRandomizeLunar}
+          ringThickness={props.params.thickness}
+          onEnhanceSummary={(summary) => {
+            toast({
+              title: "✨ Surface Enhanced",
+              description: summary.slice(0, 3).join(" · "),
+            });
+          }}
         />
       ) : (
         <PremiumLock />
