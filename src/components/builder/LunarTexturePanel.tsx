@@ -981,6 +981,15 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               </div>
             </div>
           </SubSection>
+
+          {/* ── Advanced Terrain Editor ── */}
+          <SubSection title="Advanced Terrain Editor" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5 flex items-center gap-1">
+              <SlidersHorizontal className="w-3 h-3" />
+              Precise numeric controls with JSON import/export for power users
+            </p>
+            <AdvancedTerrainEditor state={state} onChange={onChange} />
+          </SubSection>
         </div>
       )}
     </div>
