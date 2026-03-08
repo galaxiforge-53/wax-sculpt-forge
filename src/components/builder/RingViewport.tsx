@@ -836,17 +836,17 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
     return (
       <meshPhysicalMaterial
         color={mc.color}
-        roughness={Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3)}
+        roughness={Math.min(1, mc.roughness * 0.6 + finishRoughMod * 0.3 + wearRoughnessBoost * 1.5)}
         metalness={mc.metalness}
         envMapIntensity={mc.envMapIntensity * 0.8}
-        clearcoat={0.4}
-        clearcoatRoughness={0.03}
+        clearcoat={Math.max(0, 0.4 * (1 - wearClearcoatLoss * 0.5))}
+        clearcoatRoughness={0.03 + wearFactor * 0.1}
         reflectivity={mc.reflectivity}
         ior={mc.ior}
         side={THREE.FrontSide}
       />
     );
-  }, [isWax, isWaxPrint, mc, finishRoughMod]);
+  }, [isWax, isWaxPrint, mc, finishRoughMod, wearRoughnessBoost, wearClearcoatLoss, wearFactor]);
 
   // Cap material — matches inner but matte
   const capMaterial = useMemo(() => {
