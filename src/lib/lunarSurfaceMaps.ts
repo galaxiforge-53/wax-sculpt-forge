@@ -2336,12 +2336,31 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
   // Use shared half-res if provided
   const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
-  const kernels = [
+  // Pre-compute flat offset arrays for each kernel to avoid dynamic loop overhead
+  // This eliminates kernel object property access + step computation per pixel
+  const kernelDefs = [
     { radius: 2, step: 1, weight: 0.5 },
     { radius: 4, step: 1, weight: 0.35 },
     { radius: 8, step: 2, weight: 0.15 },
   ];
+  const kernelOffsets: { dyArr: Int16Array; dxArr: Int16Array; count: number; weight: number }[] = [];
+  for (const k of kernelDefs) {
+    const offsets: [number, number][] = [];
+    for (let ky = -k.radius; ky <= k.radius; ky += k.step) {
+      for (let kx = -k.radius; kx <= k.radius; kx += k.step) {
+        offsets.push([ky, kx]);
+      }
+    }
+    const dyArr = new Int16Array(offsets.length);
+    const dxArr = new Int16Array(offsets.length);
+    for (let i = 0; i < offsets.length; i++) {
+      dyArr[i] = offsets[i][0];
+      dxArr[i] = offsets[i][1];
+    }
+    kernelOffsets.push({ dyArr, dxArr, count: offsets.length, weight: k.weight });
+  }
 
+  const hhm1_ao = hh - 1;
   const halfAO = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
     const rowOff = y * hw;
@@ -2349,26 +2368,24 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
       const center = halfHmap[rowOff + x];
       let totalAO = 0;
 
-      for (const kernel of kernels) {
-        let higher = 0, samples = 0, heightDiffSum = 0;
-        for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
-          const sy = y + ky;
-          const syc = sy < 0 ? 0 : sy >= hh ? hh - 1 : sy;
-          const sRow = syc * hw;
-          for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
-            let sx = x + kx;
-            if (sx < 0) sx += hw; else if (sx >= hw) sx -= hw;
-            const sampleH = halfHmap[sRow + sx];
-            if (sampleH > center) {
-              higher++;
-              heightDiffSum += sampleH - center;
-            }
-            samples++;
+      for (let ki = 0; ki < kernelOffsets.length; ki++) {
+        const ko = kernelOffsets[ki];
+        let higher = 0, heightDiffSum = 0;
+        const cnt = ko.count;
+        for (let s = 0; s < cnt; s++) {
+          const sy = y + ko.dyArr[s];
+          const syc = sy < 0 ? 0 : sy > hhm1_ao ? hhm1_ao : sy;
+          let sx = x + ko.dxArr[s];
+          if (sx < 0) sx += hw; else if (sx >= hw) sx -= hw;
+          const sampleH = halfHmap[syc * hw + sx];
+          if (sampleH > center) {
+            higher++;
+            heightDiffSum += sampleH - center;
           }
         }
-        const invSamples = 1 / samples;
-        const kernelAO = higher * invSamples * 0.6 + (heightDiffSum * invSamples * 8 < 1 ? heightDiffSum * invSamples * 8 : 1) * 0.4;
-        totalAO += kernelAO * kernel.weight;
+        const invCnt = 1 / cnt;
+        const diffNorm = heightDiffSum * invCnt * 8;
+        totalAO += (higher * invCnt * 0.6 + (diffNorm < 1 ? diffNorm : 1) * 0.4) * ko.weight;
       }
       halfAO[rowOff + x] = 1.0 - totalAO * 0.7;
     }
