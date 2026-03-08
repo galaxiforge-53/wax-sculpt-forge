@@ -43,6 +43,8 @@ export interface LunarTextureState {
   layerLargeCraters?: number;   // 0–100, strength of mega + hero craters (default 50)
   layerMediumImpacts?: number;  // 0–100, strength of medium + small impacts (default 50)
   layerMicroPitting?: number;   // 0–100, strength of micro pits + regolith texture (default 50)
+  // ── v6 freeze field ──
+  frozen?: boolean;             // if true, terrain won't regenerate when ring params change
 }
 
 export const DEFAULT_LUNAR_TEXTURE: LunarTextureState = {
