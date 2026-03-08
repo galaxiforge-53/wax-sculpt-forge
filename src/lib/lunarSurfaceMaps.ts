@@ -433,7 +433,7 @@ function stampEjectaRays(
       const t = s / steps;
       const dist = c.radius * 0.8 + t * rayLength;
       const ru = c.cu + Math.cos(angle) * dist;
-      const rv = c.cv + Math.sin(angle) * dist * physicalAspect;
+      const rv = c.cv + Math.sin(angle) * dist / physicalAspect;
 
       if (rv < 0.05 || rv > 0.95) continue;
 
@@ -508,16 +508,17 @@ function applyMariaFill(hmap: Float32Array, w: number, h: number, mariaFactor: n
 // ── Highland ridges pass ─────────────────────────────────────────
 // Adds raised ridge networks using directional fBm
 
-function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeMask: Float32Array, seed: number, depthScale: number) {
+function applyHighlandRidges(hmap: Float32Array, w: number, h: number, ridgeFactor: number, edgeMask: Float32Array, seed: number, depthScale: number, physicalAspect: number = 1) {
   if (ridgeFactor <= 0) return;
 
   const ridgeNoise = makeNoise2D(seed + 7500);
   const ridgeAmp = ridgeFactor * 0.08 * depthScale;
+  const aspectCorr = physicalAspect / (w / h);
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const u = x / w * 12;
-      const v = y / h * 12;
+      const v = y / h * 12 * aspectCorr;
       // Ridged noise: abs(fbm) creates sharp ridges
       const n = Math.abs(fbm(ridgeNoise, u, v, 4, 2.2, 0.5));
       // Invert so ridges are peaks
@@ -1213,12 +1214,15 @@ export function buildHeightmap(
   const edgeMask = buildEdgeMask(MAP_W, MAP_H);
 
   // ─── 1) fBm base terrain layer ──
+  // Scale V coordinate by aspect correction so noise features stay circular
+  // physicalAspect = circumference/width, pixel ratio = MAP_W/MAP_H = 4
+  const aspectCorrection = physicalAspect / (MAP_W / MAP_H);
   const baseNoise = makeNoise2D(lunar.seed + 500);
   const baseAmp = (0.04 + terrainRough * 0.12) * depthScale;
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const u = x / MAP_W * 8;
-      const v = y / MAP_H * 8;
+      const v = y / MAP_H * 8 * aspectCorrection;
       const n = fbm(baseNoise, u, v, 6, 2.0, 0.5);
       const mask = edgeMask[y * MAP_W + x];
       hmap[y * MAP_W + x] += n * baseAmp * mask;
@@ -1226,7 +1230,7 @@ export function buildHeightmap(
   }
 
   // ─── 1b) Highland ridges layer ──
-  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeMask, lunar.seed, depthScale);
+  applyHighlandRidges(hmap, MAP_W, MAP_H, ridgeFactor, edgeMask, lunar.seed, depthScale, physicalAspect);
 
   // ─── 2) Domain warp noise ──
   const warpNoise = makeNoise2D(lunar.seed + 1234);
@@ -1412,7 +1416,7 @@ export function buildHeightmap(
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 48;
-        const v = y / MAP_H * 48;
+        const v = y / MAP_H * 48 * aspectCorrection;
         const n = fbm(regolithNoise, u, v, 5, 2.2, 0.45);
         const mask = edgeMask[y * MAP_W + x];
         hmap[y * MAP_W + x] += n * regolithStrength * mask;
@@ -1424,7 +1428,7 @@ export function buildHeightmap(
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const u = x / MAP_W * 96;
-        const v = y / MAP_H * 96;
+        const v = y / MAP_H * 96 * aspectCorrection;
         const n = fineRegolith(u, v);
         const mask = edgeMask[y * MAP_W + x];
         hmap[y * MAP_W + x] += n * fineStrength * mask;
