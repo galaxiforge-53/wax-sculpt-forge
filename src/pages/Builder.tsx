@@ -562,6 +562,17 @@ function BuilderInner() {
                     <Printer className="w-3 h-3" />
                   </button>
                   <button
+                    onClick={() => setRotationLocked((v) => !v)}
+                    className={`px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
+                      ${rotationLocked
+                        ? "bg-warning/30 text-warning border border-warning/40 shadow-[0_0_8px_hsl(var(--warning)/0.3)]"
+                        : "bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
+                      }`}
+                    title={rotationLocked ? "Unlock rotation" : "Lock rotation to inspect area"}
+                  >
+                    {rotationLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                  </button>
+                  <button
                     onClick={() => setRenderGalleryOpen(true)}
                     className="px-2 py-1 text-[10px] font-medium rounded backdrop-blur-sm transition-all flex items-center gap-1
                       bg-card/70 text-muted-foreground border border-border/50 hover:bg-card hover:text-foreground"
