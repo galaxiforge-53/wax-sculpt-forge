@@ -1277,7 +1277,7 @@ function PrinterBedSimulation({ params }: { params: RingParameters }) {
   );
 }
 
-export type CutawayMode = "normal" | "inside" | "cross-section";
+export type CutawayMode = "normal" | "inside" | "cross-section" | "quarter-cut";
 
 interface RingViewportProps {
   params: RingParameters;
@@ -1295,6 +1295,7 @@ interface RingViewportProps {
   showMeasurements?: boolean;
   engraving?: EngravingState;
   cutawayMode?: CutawayMode;
+  cutawayOffset?: number; // -1 to 1, controls where the clip plane sits
   lighting?: LightingSettings;
   showcaseMode?: boolean;
   inspectionMode?: boolean;
@@ -1303,25 +1304,33 @@ interface RingViewportProps {
   showPrinterBed?: boolean;
 }
 
-// ── Clipping plane manager ─────────────────────────────────────────
-function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
+// ── Clipping plane manager with interactive offset ─────────────────
+function ClipPlaneManager({ mode, offset = 0, params }: { mode: CutawayMode; offset: number; params: RingParameters }) {
   const { gl } = useThree();
+  const outerR = (params.innerDiameter / 2 + params.thickness) / 10;
 
-  const clipPlane = useMemo(() => {
+  const clipPlanes = useMemo(() => {
+    const scaledOffset = offset * outerR * 1.2;
+
     if (mode === "cross-section") {
-      // Clip along Z axis — shows cross-section from front
-      return new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+      return [new THREE.Plane(new THREE.Vector3(0, 0, -1), scaledOffset)];
     }
     if (mode === "inside") {
-      // Clip top half — reveals interior bore
-      return new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.001);
+      return [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.001 + scaledOffset * 0.5)];
     }
-    return null;
-  }, [mode]);
+    if (mode === "quarter-cut") {
+      // Two planes to cut a quarter away — reveals both profile and bore
+      return [
+        new THREE.Plane(new THREE.Vector3(0, 0, -1), scaledOffset * 0.1),
+        new THREE.Plane(new THREE.Vector3(-1, 0, 0), scaledOffset * 0.1),
+      ];
+    }
+    return [];
+  }, [mode, offset, outerR]);
 
   useEffect(() => {
-    if (clipPlane) {
-      gl.clippingPlanes = [clipPlane];
+    if (clipPlanes.length > 0) {
+      gl.clippingPlanes = clipPlanes;
       gl.localClippingEnabled = true;
     } else {
       gl.clippingPlanes = [];
@@ -1331,9 +1340,133 @@ function ClipPlaneManager({ mode }: { mode: CutawayMode }) {
       gl.clippingPlanes = [];
       gl.localClippingEnabled = false;
     };
-  }, [clipPlane, gl]);
+  }, [clipPlanes, gl]);
 
   return null;
+}
+
+// ── Cross-section dimension annotations ────────────────────────────
+function CrossSectionAnnotations({ params, cutawayMode, engraving }: {
+  params: RingParameters;
+  cutawayMode: CutawayMode;
+  engraving?: EngravingState;
+}) {
+  const innerR = params.innerDiameter / 2 / 10;
+  const outerR = innerR + params.thickness / 10;
+  const halfW = params.width / 2 / 10;
+  const wallThickness = params.thickness / 10;
+
+  if (cutawayMode === "normal") return null;
+
+  // Only show annotations for cross-section and quarter-cut
+  const showProfile = cutawayMode === "cross-section" || cutawayMode === "quarter-cut";
+  const showBore = cutawayMode === "inside" || cutawayMode === "quarter-cut";
+
+  return (
+    <group>
+      {/* Wall thickness dimension line — vertical on the cross-section face */}
+      {showProfile && (
+        <group position={[0, 0, 0.01]} rotation={[Math.PI / 2, 0, 0]}>
+          {/* Outer edge marker */}
+          <mesh position={[outerR, 0, 0]}>
+            <boxGeometry args={[0.008, halfW * 1.6, 0.001]} />
+            <meshBasicMaterial color="#ff6644" transparent opacity={0.8} />
+          </mesh>
+          {/* Inner edge marker */}
+          <mesh position={[innerR, 0, 0]}>
+            <boxGeometry args={[0.008, halfW * 1.6, 0.001]} />
+            <meshBasicMaterial color="#ff6644" transparent opacity={0.8} />
+          </mesh>
+          {/* Connecting line */}
+          <mesh position={[(innerR + outerR) / 2, halfW * 0.9, 0]}>
+            <boxGeometry args={[wallThickness, 0.004, 0.001]} />
+            <meshBasicMaterial color="#ff6644" transparent opacity={0.6} />
+          </mesh>
+          {/* Thickness label */}
+          <Text
+            position={[(innerR + outerR) / 2, halfW * 0.9 + 0.06, 0.005]}
+            fontSize={0.04}
+            color="#ff6644"
+            anchorX="center"
+            anchorY="bottom"
+          >
+            {`${params.thickness.toFixed(1)}mm`}
+          </Text>
+
+          {/* Width dimension — horizontal */}
+          <mesh position={[outerR + 0.08, 0, 0]}>
+            <boxGeometry args={[0.004, halfW * 2, 0.001]} />
+            <meshBasicMaterial color="#44aaff" transparent opacity={0.6} />
+          </mesh>
+          {/* Width top tick */}
+          <mesh position={[outerR + 0.08, halfW, 0]}>
+            <boxGeometry args={[0.04, 0.004, 0.001]} />
+            <meshBasicMaterial color="#44aaff" transparent opacity={0.6} />
+          </mesh>
+          {/* Width bottom tick */}
+          <mesh position={[outerR + 0.08, -halfW, 0]}>
+            <boxGeometry args={[0.04, 0.004, 0.001]} />
+            <meshBasicMaterial color="#44aaff" transparent opacity={0.6} />
+          </mesh>
+          {/* Width label */}
+          <Text
+            position={[outerR + 0.15, 0, 0.005]}
+            fontSize={0.035}
+            color="#44aaff"
+            anchorX="left"
+            anchorY="middle"
+          >
+            {`${params.width.toFixed(1)}mm`}
+          </Text>
+
+          {/* Inner diameter label */}
+          <Text
+            position={[innerR * 0.5, -halfW - 0.08, 0.005]}
+            fontSize={0.03}
+            color="#888888"
+            anchorX="center"
+            anchorY="top"
+          >
+            {`⌀${params.innerDiameter.toFixed(1)}mm`}
+          </Text>
+        </group>
+      )}
+
+      {/* Engraving depth indicator */}
+      {showProfile && engraving?.enabled && engraving.text && (
+        <group position={[0, 0, 0.01]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh position={[innerR - (engraving.depthMm / 10) / 2, 0, 0]}>
+            <boxGeometry args={[engraving.depthMm / 10, 0.004, 0.001]} />
+            <meshBasicMaterial color="#ffaa22" transparent opacity={0.7} />
+          </mesh>
+          <Text
+            position={[innerR - engraving.depthMm / 10 - 0.02, 0, 0.005]}
+            fontSize={0.025}
+            color="#ffaa22"
+            anchorX="right"
+            anchorY="middle"
+          >
+            {`Engrave ${engraving.depthMm.toFixed(1)}mm`}
+          </Text>
+        </group>
+      )}
+
+      {/* Inside view — bore diameter callout */}
+      {showBore && (
+        <group position={[0, 0, 0]}>
+          <Text
+            position={[0, 0.02, innerR + 0.08]}
+            fontSize={0.04}
+            color="#66bbff"
+            anchorX="center"
+            anchorY="bottom"
+          >
+            {`Bore ⌀${params.innerDiameter.toFixed(1)}mm`}
+          </Text>
+        </group>
+      )}
+    </group>
+  );
 }
 
 const RingViewport = forwardRef<RingViewportHandle, RingViewportProps>(
