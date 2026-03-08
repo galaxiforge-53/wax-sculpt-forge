@@ -1923,7 +1923,7 @@ export function buildHeightmap(
   }
 
   // ─── 4) Maria fill pass ──
-  applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeMask, lunar.seed);
+  applyMariaFill(hmap, MAP_W, MAP_H, mariaFactor, edgeRow, lunar.seed);
 
   // ─── 5) Erosion pass — age-dependent: large old craters erode more, small fresh stay sharp ──
   // First pass: global erosion for base weathering
