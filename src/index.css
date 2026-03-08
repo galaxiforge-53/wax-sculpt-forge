@@ -310,5 +310,26 @@
 
 /* Safe area for mobile bottom panels */
 .safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+/* Ensure mobile viewport doesn't get covered by panels */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .mobile-viewport-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 60px);
+  }
+}
+
+/* Touch-friendly hit targets on mobile */
+@media (max-width: 640px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Larger slider thumbs on mobile for easier dragging */
+  .slider-mobile [role="slider"] {
+    width: 24px;
+    height: 24px;
+  }
 }
