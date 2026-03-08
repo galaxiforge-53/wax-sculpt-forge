@@ -343,6 +343,7 @@ function BuilderInner() {
             onPresetApplied={() => setCameraPreset(null)}
             showMeasurements={showMeasurements || activeTool === "measure"}
             cutawayMode={cutawayMode}
+            cutawayOffset={cutawayOffset}
             lighting={lighting}
             showcaseMode={showcaseMode}
             inspectionMode={inspectionMode}
