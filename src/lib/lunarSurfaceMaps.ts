@@ -45,6 +45,9 @@ function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
   const zonesKey = lunar.zonesEnabled && lunar.zones?.length
     ? lunar.zones.map(z => `${z.startV}-${z.endV}-${z.intensity}-${z.smoothness}-${z.blendWidth}`).join("|")
     : "no-zones";
+  const masksKey = lunar.masksEnabled && lunar.masks?.length
+    ? lunar.masks.filter(m => m.enabled).map(m => `${m.shape}-${m.centerU}-${m.centerV}-${m.width}-${m.height}-${m.feather}-${m.invert}`).join("|")
+    : "no-masks";
   return [
     lunar.seed, lunar.craterDensity, lunar.craterSize, lunar.intensity,
     lunar.microDetail, lunar.rimSharpness, lunar.overlapIntensity,
@@ -62,6 +65,8 @@ function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
     lunar.symmetry ?? "none",
     lunar.symmetryBlend ?? 30,
     zonesKey,
+    masksKey,
+    lunar.maskMode ?? "include",
     // Include ring aspect ratio so different ring sizes get distinct textures
     ringAspect !== undefined ? ringAspect.toFixed(2) : "1.00",
   ].join("-");
