@@ -29,6 +29,7 @@ import { ChevronDown, Lock, Sparkles, Layers, Moon, PenTool, Palette, Send, Flam
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { useAccess } from "@/hooks/useAccess";
+import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
 interface BuilderSidebarProps {
