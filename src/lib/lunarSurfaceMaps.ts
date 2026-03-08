@@ -408,13 +408,17 @@ function stampCrater(
 
       const idx = py * w + wpx;
       if (delta < 0) {
-        hmap[idx] = Math.max(0, Math.min(1, hmap[idx] + delta));
+        // Allow overlapping craters to stack deeper (minimum -0.3 for realistic depth)
+        // Previous clamping to 0 prevented natural multi-impact basins
+        hmap[idx] = Math.max(-0.3, hmap[idx] + delta);
       } else {
+        // Rim accumulation: newer rims partially overwrite older terrain
+        // Larger overlap factor means more aggressive stacking
         const target = 0.5 + delta;
         if (target > hmap[idx]) {
-          hmap[idx] = Math.min(1, hmap[idx] + delta * 0.7);
+          hmap[idx] = Math.min(1.2, hmap[idx] + delta * 0.7);
         } else {
-          hmap[idx] = Math.min(1, hmap[idx] + delta * 0.15);
+          hmap[idx] = Math.min(1.2, hmap[idx] + delta * 0.15);
         }
       }
     }
