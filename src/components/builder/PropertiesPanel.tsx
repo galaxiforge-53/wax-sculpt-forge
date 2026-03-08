@@ -222,6 +222,87 @@ export default function PropertiesPanel({ params, onUpdate, showMeasure, viewMod
         </p>
       </div>
 
+      {/* ── Interior Shape ── */}
+      <div className="mt-1 p-3 rounded-lg bg-secondary/60 border border-border space-y-3">
+        <h4 className="text-[11px] font-display text-primary uppercase tracking-wider">Interior Shape</h4>
+
+        {/* Interior profile selector */}
+        <div className="space-y-1">
+          <Label className="text-[10px] text-muted-foreground">Bore Profile</Label>
+          <div className="grid grid-cols-2 gap-1">
+            {([
+              { value: "flat" as InteriorProfile, label: "Flat", icon: "▬" },
+              { value: "comfort-dome" as InteriorProfile, label: "Comfort Dome", icon: "◠" },
+              { value: "european" as InteriorProfile, label: "European", icon: "⌢" },
+              { value: "anatomical" as InteriorProfile, label: "Anatomical", icon: "∿" },
+            ]).map((p) => (
+              <button
+                key={p.value}
+                onClick={() => onUpdate({ interiorProfile: p.value })}
+                className={`flex items-center gap-1.5 px-2 py-1.5 text-[10px] rounded-md border transition-all
+                  ${(params.interiorProfile ?? "comfort-dome") === p.value
+                    ? "bg-primary/15 border-primary/40 text-primary"
+                    : "bg-card border-border text-muted-foreground hover:text-foreground hover:bg-card/80"
+                  }`}
+              >
+                <span className="text-sm">{p.icon}</span>
+                <span className="font-medium">{p.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Interior curvature */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-[10px] text-muted-foreground">Curvature</Label>
+            <span className="text-[10px] font-mono text-primary">{(params.interiorCurvature ?? 40)}%</span>
+          </div>
+          <Slider
+            value={[params.interiorCurvature ?? 40]}
+            onValueChange={([v]) => onUpdate({ interiorCurvature: v })}
+            min={0}
+            max={100}
+            step={5}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            {(params.interiorCurvature ?? 40) === 0 ? "Flat cylinder bore" 
+              : (params.interiorCurvature ?? 40) < 30 ? "Subtle curve for slim bands"
+              : (params.interiorCurvature ?? 40) < 70 ? "Standard comfort curvature"
+              : "Deep curvature — maximizes comfort"}
+          </p>
+        </div>
+
+        {/* Comfort fit depth */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-[10px] text-muted-foreground">Comfort Depth</Label>
+            <span className="text-[10px] font-mono text-primary">{(params.comfortFitDepth ?? 50)}%</span>
+          </div>
+          <Slider
+            value={[params.comfortFitDepth ?? 50]}
+            onValueChange={([v]) => onUpdate({ comfortFitDepth: v })}
+            min={0}
+            max={100}
+            step={5}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            How deep the inner dome extends into the wall thickness
+          </p>
+          {(params.comfortFitDepth ?? 50) > 75 && params.thickness < 1.5 && (
+            <p className="text-[10px] text-amber-400">⚠ High depth on thin bands may weaken the ring</p>
+          )}
+        </div>
+
+        {/* Interior info */}
+        <div className="pt-2 border-t border-border/50">
+          <p className="text-[9px] text-muted-foreground/60 leading-relaxed">
+            Use the Inside or X-Section camera view to inspect interior shape changes.
+            Interior curvature affects comfort, weight, and engraving depth clearance.
+          </p>
+        </div>
+      </div>
+
       {/* ── Grooves ── */}
       <div className="space-y-2">
         <Label className="text-xs text-secondary-foreground">Grooves: {params.grooveCount}</Label>
