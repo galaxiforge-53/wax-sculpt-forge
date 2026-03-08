@@ -1234,22 +1234,41 @@ function applySurfaceZones(
   // Sort zones by startV for predictable processing
   const sortedZones = [...zones].sort((a, b) => a.startV - b.startV);
 
+  // Pre-compute zone parameters to avoid repeated divisions in the inner loop
+  const numZones = sortedZones.length;
+  const zStartV = new Float64Array(numZones);
+  const zEndV = new Float64Array(numZones);
+  const zBlendRegion = new Float64Array(numZones);
+  const zIntensity = new Float64Array(numZones);
+  const zSmoothness = new Float64Array(numZones);
+
+  for (let z = 0; z < numZones; z++) {
+    const zone = sortedZones[z];
+    zStartV[z] = zone.startV;
+    zEndV[z] = zone.endV;
+    const zoneWidth = zone.endV - zone.startV;
+    zBlendRegion[z] = (zone.blendWidth / 100) * zoneWidth;
+    zIntensity[z] = zone.intensity / 100;
+    zSmoothness[z] = zone.smoothness / 100;
+  }
+
+  const invH = 1 / h;
+
   for (let y = 0; y < h; y++) {
-    const v = y / h; // 0 to 1 along the ring width
+    const v = y * invH;
+    const rowOff = y * w;
 
-    // Find which zone(s) this row belongs to
-    let zoneInfluence = 1.0; // Default: full texture intensity
-    let smoothnessFactor = 0; // 0 = full texture, 1 = completely smooth
+    // Pre-compute zone influence for this entire row (v is constant)
+    let zoneInfluence = 1.0;
+    let smoothnessFactor = 0;
 
-    for (const zone of sortedZones) {
-      if (v < zone.startV || v > zone.endV) continue;
+    for (let z = 0; z < numZones; z++) {
+      if (v < zStartV[z] || v > zEndV[z]) continue;
 
-      const zoneWidth = zone.endV - zone.startV;
-      const blendRegion = (zone.blendWidth / 100) * zoneWidth;
-      const posInZone = v - zone.startV;
-      const distFromEnd = zone.endV - v;
+      const blendRegion = zBlendRegion[z];
+      const posInZone = v - zStartV[z];
+      const distFromEnd = zEndV[z] - v;
 
-      // Calculate blend factor at zone edges
       let edgeBlend = 1.0;
       if (blendRegion > 0) {
         if (posInZone < blendRegion) {
@@ -1259,28 +1278,19 @@ function applySurfaceZones(
         }
       }
 
-      // Apply zone's intensity and smoothness
-      const zoneIntensity = (zone.intensity / 100) * edgeBlend;
-      const zoneSmoothness = (zone.smoothness / 100) * edgeBlend;
-
-      // Blend with existing influence (for overlapping zones)
-      zoneInfluence = zoneInfluence * (1 - edgeBlend) + zoneIntensity * edgeBlend;
-      smoothnessFactor = smoothnessFactor * (1 - edgeBlend) + zoneSmoothness * edgeBlend;
+      const zInt = zIntensity[z] * edgeBlend;
+      const zSmooth = zSmoothness[z] * edgeBlend;
+      zoneInfluence = zoneInfluence * (1 - edgeBlend) + zInt * edgeBlend;
+      smoothnessFactor = smoothnessFactor * (1 - edgeBlend) + zSmooth * edgeBlend;
     }
 
-    // Apply zone effects to this row
+    // Apply zone effects to entire row (avoiding per-pixel zone lookup)
+    const invSmooth = 1 - smoothnessFactor;
     for (let x = 0; x < w; x++) {
-      const idx = y * w + x;
+      const idx = rowOff + x;
       const original = hmap[idx];
-
-      // Reduce texture intensity based on zone settings
-      // As smoothness increases, flatten toward 0.5 (neutral height)
-      const flattened = 0.5 + (original - 0.5) * (1 - smoothnessFactor);
-
-      // Apply intensity reduction
-      const final = 0.5 + (flattened - 0.5) * zoneInfluence;
-
-      hmap[idx] = final;
+      const flattened = 0.5 + (original - 0.5) * invSmooth;
+      hmap[idx] = 0.5 + (flattened - 0.5) * zoneInfluence;
     }
   }
 }
@@ -1738,13 +1748,18 @@ export function buildHeightmap(
   // ─── 5) Erosion pass — age-dependent: large old craters erode more, small fresh stay sharp ──
   // First pass: global erosion for base weathering
   applyErosion(hmap, MAP_W, MAP_H, erosionFactor * 0.6);
+
   // Second pass: selective stronger erosion in areas dominated by large craters
-  // Large craters occupy >0.06 radius bands; we blur those regions more heavily
   if (erosionFactor > 0.15 && stamps.length > 0) {
-    // Build an "age mask" — higher near old large craters
-    const ageMask = new Float32Array(MAP_W * MAP_H);
+    // Reuse pooled buffer for age mask instead of allocating new Float32Array
+    const len = MAP_W * MAP_H;
+    if (!_erosionBuf2 || _erosionBuf2.length !== len) _erosionBuf2 = new Float32Array(len);
+    const ageMask = _erosionBuf2;
+    ageMask.fill(0); // Clear previous contents
+
+    // Build age mask using mega/hero craters only
     for (const s of stamps) {
-      if (s.tier > 1) continue; // only mega/hero get extra aging
+      if (s.tier > 1) continue;
       const extraErosion = (1 - s.tier / 2) * erosionFactor * 0.4;
       const spreadU = s.radius * 1.5;
       const spreadV = s.radius * 1.5 * physicalAspect;
@@ -1754,37 +1769,48 @@ export function buildHeightmap(
       const y1 = Math.min(MAP_H - 1, Math.ceil((s.cv + spreadV) * MAP_H));
       const rPx = s.radius * MAP_W;
       const rPx2 = rPx * rPx;
+      const invR2 = 1 / (rPx2 * 2.25);
+
       for (let py = y0; py <= y1; py++) {
+        const rowOff = py * MAP_W;
         for (let px = x0; px <= x1; px++) {
           let wpx = px % MAP_W;
           if (wpx < 0) wpx += MAP_W;
           const du = px - s.cu * MAP_W;
-          const dv = (py - s.cv * MAP_H);
+          const dv = py - s.cv * MAP_H;
           const d2 = du * du + dv * dv;
           if (d2 > rPx2 * 2.25) continue;
-          const falloff = Math.max(0, 1 - d2 / (rPx2 * 2.25));
-          const idx = py * MAP_W + wpx;
-          ageMask[idx] = Math.max(ageMask[idx], falloff * extraErosion);
+          const falloff = (1 - d2 * invR2);
+          const idx = rowOff + wpx;
+          const newVal = falloff * extraErosion;
+          if (newVal > ageMask[idx]) ageMask[idx] = newVal;
         }
       }
     }
-    // Apply age-weighted additional blur
-    const len = MAP_W * MAP_H;
+
+    // Apply age-weighted blur using pooled buffer
     if (!_erosionBuf1 || _erosionBuf1.length !== len) _erosionBuf1 = new Float32Array(len);
     const blurred = _erosionBuf1;
-    // Quick 3x3 blur
+
+    // Quick 3×3 blur with row-offset caching
     for (let y = 0; y < MAP_H; y++) {
-      const yA = Math.max(0, y - 1), yB = Math.min(MAP_H - 1, y + 1);
+      const yA = y > 0 ? y - 1 : 0;
+      const yB = y < MAP_H - 1 ? y + 1 : MAP_H - 1;
+      const rowA = yA * MAP_W;
+      const rowM = y * MAP_W;
+      const rowB = yB * MAP_W;
       for (let x = 0; x < MAP_W; x++) {
         const xL = x === 0 ? MAP_W - 1 : x - 1;
         const xR = x === MAP_W - 1 ? 0 : x + 1;
-        blurred[y * MAP_W + x] = (
-          hmap[yA * MAP_W + xL] + hmap[yA * MAP_W + x] + hmap[yA * MAP_W + xR] +
-          hmap[y * MAP_W + xL] + hmap[y * MAP_W + x] + hmap[y * MAP_W + xR] +
-          hmap[yB * MAP_W + xL] + hmap[yB * MAP_W + x] + hmap[yB * MAP_W + xR]
-        ) / 9;
+        blurred[rowM + x] = (
+          hmap[rowA + xL] + hmap[rowA + x] + hmap[rowA + xR] +
+          hmap[rowM + xL] + hmap[rowM + x] + hmap[rowM + xR] +
+          hmap[rowB + xL] + hmap[rowB + x] + hmap[rowB + xR]
+        ) * 0.111111111; // 1/9
       }
     }
+
+    // Apply masked blur
     for (let i = 0; i < len; i++) {
       const a = ageMask[i];
       if (a > 0.001) hmap[i] = hmap[i] * (1 - a) + blurred[i] * a;
@@ -2066,36 +2092,49 @@ function heightmapToRoughnessCanvas(hmap: Float32Array, w: number, h: number, mi
 
   const halfRough = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
+    const rowOff = y * hw;
     for (let x = 0; x < hw; x++) {
-      const hVal = halfHmap[y * hw + x];
+      const hVal = halfHmap[rowOff + x];
       let roughness = 0.92 - (hVal - 0.5) * 0.9;
       if (microFactor > 0) roughness += (grainRng() - 0.5) * 0.12 * microFactor;
-      halfRough[y * hw + x] = roughness < 0.2 ? 0.2 : roughness > 1.0 ? 1.0 : roughness;
+      halfRough[rowOff + x] = roughness < 0.2 ? 0.2 : roughness > 1.0 ? 1.0 : roughness;
     }
   }
 
   const img = ctx.createImageData(w, h);
   const buf32 = new Uint32Array(img.data.buffer);
+
+  // Batch bilinear upscale with pre-computed interpolation weights
+  const invH = 1 / h;
+  const invW = 1 / w;
+  const hhm1 = hh - 1;
+  const hwm1 = hw - 1;
+
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * (hh - 1);
+    const fy = y * invH * hhm1;
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
-    const iy0 = Math.min(iy, hh - 1);
-    const iy1c = Math.min(iy + 1, hh - 1);
-    const yy = (h - 1 - y);
+    const fy0 = 1 - fy1;
+    const iy0 = iy < hhm1 ? iy : hhm1;
+    const iy1c = iy + 1 < hh ? iy + 1 : hhm1;
+    const yy = h - 1 - y;
     const outRow = yy * w;
+    const row0 = iy0 * hw;
+    const row1 = iy1c * hw;
+
     for (let x = 0; x < w; x++) {
-      const fx = (x / w) * (hw - 1);
+      const fx = x * invW * hwm1;
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
-      const ix0 = ((ix) % hw + hw) % hw;
-      const ix1c = ((ix + 1) % hw + hw) % hw;
+      const fx0 = 1 - fx1;
+      const ix0 = ix % hw;
+      const ix1c = (ix + 1) % hw;
 
       const v = (
-        halfRough[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfRough[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
-        halfRough[iy1c * hw + ix0] * (1 - fx1) * fy1 +
-        halfRough[iy1c * hw + ix1c] * fx1 * fy1
+        halfRough[row0 + ix0] * fx0 * fy0 +
+        halfRough[row0 + ix1c] * fx1 * fy0 +
+        halfRough[row1 + ix0] * fx0 * fy1 +
+        halfRough[row1 + ix1c] * fx1 * fy1
       ) * 255 + 0.5 | 0;
       buf32[outRow + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
@@ -2128,17 +2167,21 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
 
   const halfAO = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
+    const rowOff = y * hw;
     for (let x = 0; x < hw; x++) {
-      const center = halfHmap[y * hw + x];
+      const center = halfHmap[rowOff + x];
       let totalAO = 0;
 
       for (const kernel of kernels) {
         let higher = 0, samples = 0, heightDiffSum = 0;
         for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
-          const sy = Math.max(0, Math.min(hh - 1, y + ky));
+          const sy = y + ky;
+          const syc = sy < 0 ? 0 : sy >= hh ? hh - 1 : sy;
+          const sRow = syc * hw;
           for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
-            const sx = ((x + kx) % hw + hw) % hw;
-            const sampleH = halfHmap[sy * hw + sx];
+            let sx = x + kx;
+            if (sx < 0) sx += hw; else if (sx >= hw) sx -= hw;
+            const sampleH = halfHmap[sRow + sx];
             if (sampleH > center) {
               higher++;
               heightDiffSum += sampleH - center;
@@ -2147,37 +2190,47 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
           }
         }
         const invSamples = 1 / samples;
-        const kernelAO = (higher * invSamples) * 0.6 + Math.min(1, heightDiffSum * invSamples * 8) * 0.4;
+        const kernelAO = higher * invSamples * 0.6 + (heightDiffSum * invSamples * 8 < 1 ? heightDiffSum * invSamples * 8 : 1) * 0.4;
         totalAO += kernelAO * kernel.weight;
       }
-      halfAO[y * hw + x] = 1.0 - totalAO * 0.7;
+      halfAO[rowOff + x] = 1.0 - totalAO * 0.7;
     }
   }
 
   const img = ctx.createImageData(w, h);
   const buf32 = new Uint32Array(img.data.buffer);
+  const invH = 1 / h;
+  const invW = 1 / w;
+  const hhm1 = hh - 1;
+  const hwm1 = hw - 1;
+
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * (hh - 1);
+    const fy = y * invH * hhm1;
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
-    const iy0 = Math.min(iy, hh - 1);
-    const iy1c = Math.min(iy + 1, hh - 1);
-    const yy = (h - 1 - y);
+    const fy0 = 1 - fy1;
+    const iy0 = iy < hhm1 ? iy : hhm1;
+    const iy1c = iy + 1 < hh ? iy + 1 : hhm1;
+    const yy = h - 1 - y;
     const outRow = yy * w;
+    const row0 = iy0 * hw;
+    const row1 = iy1c * hw;
+
     for (let x = 0; x < w; x++) {
-      const fx = (x / w) * (hw - 1);
+      const fx = x * invW * hwm1;
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
-      const ix0 = ((ix) % hw + hw) % hw;
-      const ix1c = ((ix + 1) % hw + hw) % hw;
+      const fx0 = 1 - fx1;
+      const ix0 = ix % hw;
+      const ix1c = (ix + 1) % hw;
 
-      const ao = halfAO[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfAO[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
-        halfAO[iy1c * hw + ix0] * (1 - fx1) * fy1 +
-        halfAO[iy1c * hw + ix1c] * fx1 * fy1;
+      const ao = halfAO[row0 + ix0] * fx0 * fy0 +
+        halfAO[row0 + ix1c] * fx1 * fy0 +
+        halfAO[row1 + ix0] * fx0 * fy1 +
+        halfAO[row1 + ix1c] * fx1 * fy1;
 
       let v = ao * 255 + 0.5 | 0;
-      if (v < 51) v = 51; // clamp to 0.2 min
+      if (v < 51) v = 51;
       if (v > 255) v = 255;
       buf32[outRow + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
@@ -2205,41 +2258,54 @@ function heightmapToAlbedoCanvas(hmap: Float32Array, w: number, h: number, seed:
   const halfHmap = sharedHalf ?? getSharedHalfHmap(hmap, w, h);
 
   const halfAlbedo = new Float32Array(hw * hh);
+  const invHW4 = 4 / hw;
+  const invHH4 = 4 / hh;
   for (let y = 0; y < hh; y++) {
+    const v = y * invHH4;
+    const rowOff = y * hw;
     for (let x = 0; x < hw; x++) {
-      const u = x / hw * 4;
-      const v = y / hh * 4;
+      const u = x * invHW4;
       const n = fbm(stoneNoise, u, v, 2, 2.0, 0.5) * 0.5 + 0.5;
       const grain = (grainRng() - 0.5) * 0.04;
-      const hVal = halfHmap[y * hw + x];
+      const hVal = halfHmap[rowOff + x];
       const heightTint = 0.95 + (hVal - 0.5) * 0.1;
       let albedo = (0.82 + n * 0.12 + grain) * heightTint;
-      halfAlbedo[y * hw + x] = albedo < 0.6 ? 0.6 : albedo > 1.0 ? 1.0 : albedo;
+      halfAlbedo[rowOff + x] = albedo < 0.6 ? 0.6 : albedo > 1.0 ? 1.0 : albedo;
     }
   }
 
   const img = ctx.createImageData(w, h);
   const buf32 = new Uint32Array(img.data.buffer);
+  const invH = 1 / h;
+  const invW = 1 / w;
+  const hhm1 = hh - 1;
+  const hwm1 = hw - 1;
+
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * (hh - 1);
+    const fy = y * invH * hhm1;
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
-    const iy0 = Math.min(iy, hh - 1);
-    const iy1c = Math.min(iy + 1, hh - 1);
-    const yy = (h - 1 - y);
+    const fy0 = 1 - fy1;
+    const iy0 = iy < hhm1 ? iy : hhm1;
+    const iy1c = iy + 1 < hh ? iy + 1 : hhm1;
+    const yy = h - 1 - y;
     const outRow = yy * w;
+    const row0 = iy0 * hw;
+    const row1 = iy1c * hw;
+
     for (let x = 0; x < w; x++) {
-      const fx = (x / w) * (hw - 1);
+      const fx = x * invW * hwm1;
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
-      const ix0 = ((ix) % hw + hw) % hw;
-      const ix1c = ((ix + 1) % hw + hw) % hw;
+      const fx0 = 1 - fx1;
+      const ix0 = ix % hw;
+      const ix1c = (ix + 1) % hw;
 
       const val = (
-        halfAlbedo[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfAlbedo[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
-        halfAlbedo[iy1c * hw + ix0] * (1 - fx1) * fy1 +
-        halfAlbedo[iy1c * hw + ix1c] * fx1 * fy1
+        halfAlbedo[row0 + ix0] * fx0 * fy0 +
+        halfAlbedo[row0 + ix1c] * fx1 * fy0 +
+        halfAlbedo[row1 + ix0] * fx0 * fy1 +
+        halfAlbedo[row1 + ix1c] * fx1 * fy1
       ) * 255 + 0.5 | 0;
       buf32[outRow + x] = 0xFF000000 | (val << 16) | (val << 8) | val;
     }
