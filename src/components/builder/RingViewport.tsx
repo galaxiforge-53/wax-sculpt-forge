@@ -580,10 +580,10 @@ function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activ
 
   // Ring dimensions for surface-area-aware texture scaling
   const ringDims = useMemo(() => ({
-    innerDiameterMm: params.innerDiameter,
-    widthMm: params.width,
-    thicknessMm: params.thickness,
-  }), [params.innerDiameter, params.width, params.thickness]);
+    innerDiameterMm: debouncedParams.innerDiameter,
+    widthMm: debouncedParams.width,
+    thicknessMm: debouncedParams.thickness,
+  }), [debouncedParams.innerDiameter, debouncedParams.width, debouncedParams.thickness]);
 
   // Async texture generation with progress tracking + debounce
   const [lunarMaps, setLunarMaps] = useState<LunarSurfaceMapSet | null>(null);
