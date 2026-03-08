@@ -2167,17 +2167,21 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
 
   const halfAO = new Float32Array(hw * hh);
   for (let y = 0; y < hh; y++) {
+    const rowOff = y * hw;
     for (let x = 0; x < hw; x++) {
-      const center = halfHmap[y * hw + x];
+      const center = halfHmap[rowOff + x];
       let totalAO = 0;
 
       for (const kernel of kernels) {
         let higher = 0, samples = 0, heightDiffSum = 0;
         for (let ky = -kernel.radius; ky <= kernel.radius; ky += kernel.step) {
-          const sy = Math.max(0, Math.min(hh - 1, y + ky));
+          const sy = y + ky;
+          const syc = sy < 0 ? 0 : sy >= hh ? hh - 1 : sy;
+          const sRow = syc * hw;
           for (let kx = -kernel.radius; kx <= kernel.radius; kx += kernel.step) {
-            const sx = ((x + kx) % hw + hw) % hw;
-            const sampleH = halfHmap[sy * hw + sx];
+            let sx = x + kx;
+            if (sx < 0) sx += hw; else if (sx >= hw) sx -= hw;
+            const sampleH = halfHmap[sRow + sx];
             if (sampleH > center) {
               higher++;
               heightDiffSum += sampleH - center;
@@ -2186,37 +2190,47 @@ function heightmapToAOCanvas(hmap: Float32Array, w: number, h: number, sharedHal
           }
         }
         const invSamples = 1 / samples;
-        const kernelAO = (higher * invSamples) * 0.6 + Math.min(1, heightDiffSum * invSamples * 8) * 0.4;
+        const kernelAO = higher * invSamples * 0.6 + (heightDiffSum * invSamples * 8 < 1 ? heightDiffSum * invSamples * 8 : 1) * 0.4;
         totalAO += kernelAO * kernel.weight;
       }
-      halfAO[y * hw + x] = 1.0 - totalAO * 0.7;
+      halfAO[rowOff + x] = 1.0 - totalAO * 0.7;
     }
   }
 
   const img = ctx.createImageData(w, h);
   const buf32 = new Uint32Array(img.data.buffer);
+  const invH = 1 / h;
+  const invW = 1 / w;
+  const hhm1 = hh - 1;
+  const hwm1 = hw - 1;
+
   for (let y = 0; y < h; y++) {
-    const fy = (y / h) * (hh - 1);
+    const fy = y * invH * hhm1;
     const iy = Math.floor(fy);
     const fy1 = fy - iy;
-    const iy0 = Math.min(iy, hh - 1);
-    const iy1c = Math.min(iy + 1, hh - 1);
-    const yy = (h - 1 - y);
+    const fy0 = 1 - fy1;
+    const iy0 = iy < hhm1 ? iy : hhm1;
+    const iy1c = iy + 1 < hh ? iy + 1 : hhm1;
+    const yy = h - 1 - y;
     const outRow = yy * w;
+    const row0 = iy0 * hw;
+    const row1 = iy1c * hw;
+
     for (let x = 0; x < w; x++) {
-      const fx = (x / w) * (hw - 1);
+      const fx = x * invW * hwm1;
       const ix = Math.floor(fx);
       const fx1 = fx - ix;
-      const ix0 = ((ix) % hw + hw) % hw;
-      const ix1c = ((ix + 1) % hw + hw) % hw;
+      const fx0 = 1 - fx1;
+      const ix0 = ix % hw;
+      const ix1c = (ix + 1) % hw;
 
-      const ao = halfAO[iy0 * hw + ix0] * (1 - fx1) * (1 - fy1) +
-        halfAO[iy0 * hw + ix1c] * fx1 * (1 - fy1) +
-        halfAO[iy1c * hw + ix0] * (1 - fx1) * fy1 +
-        halfAO[iy1c * hw + ix1c] * fx1 * fy1;
+      const ao = halfAO[row0 + ix0] * fx0 * fy0 +
+        halfAO[row0 + ix1c] * fx1 * fy0 +
+        halfAO[row1 + ix0] * fx0 * fy1 +
+        halfAO[row1 + ix1c] * fx1 * fy1;
 
       let v = ao * 255 + 0.5 | 0;
-      if (v < 51) v = 51; // clamp to 0.2 min
+      if (v < 51) v = 51;
       if (v > 255) v = 255;
       buf32[outRow + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
     }
