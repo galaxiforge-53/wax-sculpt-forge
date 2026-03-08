@@ -638,6 +638,98 @@ function buildSolidRingGeometry(params: RingParameters, hasLunar: boolean, isMob
   return { outerGeo, innerGeo, capGeoTop, capGeoBot };
 }
 
+// ── Thickness heatmap overlay — vertex-colored mesh showing wall thickness ──
+function ThicknessHeatmapOverlay({ outerGeo, params }: { outerGeo: THREE.LatheGeometry; params: RingParameters }) {
+  const heatmapGeo = useMemo(() => {
+    const geo = outerGeo.clone();
+    const pos = geo.attributes.position;
+    const innerR = params.innerDiameter / 2 / 10;
+    const nominalThickness = params.thickness / 10;
+    // Casting risk threshold: 1.2mm = 0.12 scene units
+    const riskThreshold = 0.12;
+    const warnThreshold = 0.18;
+
+    // Build inner bore radius lookup by Y position
+    const interiorProfile = params.interiorProfile ?? "comfort-dome";
+    const curvature = (params.interiorCurvature ?? 40) / 100;
+    const comfortDepth = (params.comfortFitDepth ?? 50) / 100;
+    const halfW = params.width / 2 / 10;
+    const maxBulge = nominalThickness * 0.35 * curvature * comfortDepth;
+
+    function getInnerRadiusAtY(y: number): number {
+      if (Math.abs(y) > halfW) return innerR;
+      const t = (y / (halfW * 2)) + 0.5; // 0..1
+      let r = innerR;
+      if (interiorProfile === "comfort-dome" && curvature >= 0.01) {
+        r = innerR - maxBulge * Math.sin(t * Math.PI);
+      } else if (interiorProfile === "european" && curvature >= 0.01) {
+        r = innerR - maxBulge * 0.7 * Math.pow(Math.sin(t * Math.PI), 2);
+      } else if (interiorProfile === "anatomical" && curvature >= 0.01) {
+        const asymmetry = 0.15 * curvature;
+        r = innerR - maxBulge * Math.sin(t * Math.PI) * (1 + asymmetry * (t - 0.5));
+      }
+      return Math.max(r, innerR * 0.85);
+    }
+
+    // Heatmap color ramp: red (thin/risk) → yellow (warn) → green (ok) → blue (thick/safe)
+    function thicknessToColor(thickness: number): [number, number, number] {
+      const t = Math.max(0, Math.min(1, (thickness - riskThreshold) / (nominalThickness * 1.1 - riskThreshold)));
+      if (t < 0.25) {
+        // Red to orange
+        const s = t / 0.25;
+        return [1, s * 0.5, 0];
+      } else if (t < 0.5) {
+        // Orange to yellow
+        const s = (t - 0.25) / 0.25;
+        return [1, 0.5 + s * 0.5, 0];
+      } else if (t < 0.75) {
+        // Yellow to green
+        const s = (t - 0.5) / 0.25;
+        return [1 - s, 1, s * 0.3];
+      } else {
+        // Green to blue
+        const s = (t - 0.75) / 0.25;
+        return [0, 1 - s * 0.5, 0.3 + s * 0.7];
+      }
+    }
+
+    const colors = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const outerDist = Math.sqrt(x * x + z * z); // radial distance in XZ plane (lathe)
+      const innerRAtY = getInnerRadiusAtY(y);
+      const localThickness = outerDist - innerRAtY;
+      const [r, g, b] = thicknessToColor(localThickness);
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }, [outerGeo, params]);
+
+  useEffect(() => {
+    return () => { heatmapGeo.dispose(); };
+  }, [heatmapGeo]);
+
+  return (
+    <mesh geometry={heatmapGeo} renderOrder={1}>
+      <meshBasicMaterial
+        vertexColors
+        transparent
+        opacity={0.65}
+        depthWrite={false}
+        side={THREE.FrontSide}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        polygonOffsetUnits={-1}
+      />
+    </mesh>
+  );
+}
+
 // ── Procedural ring mesh — SOLID with separate inner/outer/cap surfaces ──────
 function ProceduralRingMesh({ params, viewMode, metalPreset, finishPreset, activeTool, onAddWaxMark, stampSettings, lunarTexture, wearPreview = 0, polishPreview = 0, detailBoost = 0, thicknessHeatmap = false, onGenProgress }: RingMeshProps & { onGenProgress?: (p: GenerationProgress | null) => void }) {
   const hasLunar = !!lunarTexture?.enabled;
