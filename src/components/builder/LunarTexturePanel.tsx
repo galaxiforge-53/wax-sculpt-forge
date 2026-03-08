@@ -1,4 +1,4 @@
-import { LunarTextureState, CraterDensity, CraterSize, CraterShape, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
+import { LunarTextureState, CraterDensity, CraterSize, CraterShape, SymmetryMode, DEFAULT_LUNAR_TEXTURE } from "@/types/lunar";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +9,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake } from "lucide-react";
+import { Moon, Shuffle, Dices, RotateCcw, ChevronDown, Sparkles, Globe, Lock, Unlock, Gem, Hammer, Circle, Orbit, Waves, Diamond, SlidersHorizontal, Snowflake, RotateCw } from "lucide-react";
 import { useState, useMemo } from "react";
 import SurfaceThumbnail from "./SurfaceThumbnail";
 import { cn } from "@/lib/utils";
@@ -965,6 +965,65 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
               </div>
               <Switch checked={state.smoothEdges} onCheckedChange={(v) => patch({ smoothEdges: v })} />
             </div>
+          </SubSection>
+
+          {/* ── Pattern Symmetry ── */}
+          <SubSection title="Pattern Symmetry" defaultOpen={false}>
+            <p className="text-[8px] text-muted-foreground/50 leading-tight -mt-0.5 mb-1.5">
+              Repeat the surface pattern evenly around the ring for a balanced look
+            </p>
+
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <RotateCw className="w-3 h-3" /> Symmetry Mode
+              </Label>
+              <div className="grid grid-cols-3 gap-1">
+                {([
+                  { value: "none" as SymmetryMode, label: "None", desc: "Organic flow" },
+                  { value: "2" as SymmetryMode, label: "2-fold", desc: "Mirrored halves" },
+                  { value: "3" as SymmetryMode, label: "3-fold", desc: "Trinity pattern" },
+                  { value: "4" as SymmetryMode, label: "4-fold", desc: "Quarter repeat" },
+                  { value: "6" as SymmetryMode, label: "6-fold", desc: "Hex symmetry" },
+                  { value: "8" as SymmetryMode, label: "8-fold", desc: "Octagonal" },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => patch({ symmetry: opt.value })}
+                    className={cn(
+                      "flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-md text-center transition-all border",
+                      (state.symmetry ?? "none") === opt.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border/40 bg-secondary/30 text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                    )}
+                  >
+                    <span className="text-[10px] font-medium">{opt.label}</span>
+                    <span className="text-[7px] opacity-60">{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[8px] text-muted-foreground/40">
+                Higher symmetry creates more uniform, mandala-like patterns
+              </p>
+            </div>
+
+            {(state.symmetry ?? "none") !== "none" && (
+              <div className="space-y-1.5 mt-3 p-2 rounded-md bg-secondary/20 border border-border/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[10px] text-muted-foreground">Blend Smoothness</Label>
+                  <span className="text-[10px] font-mono text-primary/80">{state.symmetryBlend ?? 30}%</span>
+                </div>
+                <Slider 
+                  value={[state.symmetryBlend ?? 30]} 
+                  onValueChange={([v]) => patch({ symmetryBlend: v })} 
+                  min={0} 
+                  max={100} 
+                  step={1} 
+                />
+                <p className="text-[8px] text-muted-foreground/40">
+                  How smoothly the pattern blends at segment boundaries (0 = sharp, 100 = gradient)
+                </p>
+              </div>
+            )}
           </SubSection>
 
           {/* ── Weathering & Seed ── */}

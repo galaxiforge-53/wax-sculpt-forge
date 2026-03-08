@@ -56,6 +56,8 @@ function cacheKey(lunar: LunarTextureState, ringAspect?: number): string {
     lunar.layerLargeCraters ?? 50,
     lunar.layerMediumImpacts ?? 50,
     lunar.layerMicroPitting ?? 50,
+    lunar.symmetry ?? "none",
+    lunar.symmetryBlend ?? 30,
     // Include ring aspect ratio so different ring sizes get distinct textures
     ringAspect !== undefined ? ringAspect.toFixed(2) : "1.00",
   ].join("-");
@@ -873,6 +875,83 @@ function applyOrganicDunes(
   }
 }
 
+// ── Apply symmetry to heightmap ───────────────────────────────────
+
+import { SymmetryMode } from "@/types/lunar";
+
+function applySymmetry(
+  hmap: Float32Array,
+  w: number,
+  h: number,
+  symmetry: SymmetryMode,
+  blendPercent: number,
+) {
+  if (symmetry === "none") return;
+
+  const folds = parseInt(symmetry, 10); // 2, 3, 4, 6, or 8
+  if (isNaN(folds) || folds < 2) return;
+
+  const segmentWidth = w / folds;
+  const blendPx = Math.floor((blendPercent / 100) * segmentWidth * 0.5);
+
+  // Create a copy of the first segment to use as source
+  const sourceSegment = new Float32Array(Math.ceil(segmentWidth) * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < Math.ceil(segmentWidth); x++) {
+      sourceSegment[y * Math.ceil(segmentWidth) + x] = hmap[y * w + x];
+    }
+  }
+
+  // Apply the source segment to all other segments with optional blending
+  for (let fold = 1; fold < folds; fold++) {
+    const startX = Math.floor(fold * segmentWidth);
+    const mirror = fold % 2 === 1; // Alternate mirroring for seamless look
+
+    for (let y = 0; y < h; y++) {
+      for (let localX = 0; localX < Math.ceil(segmentWidth); localX++) {
+        const targetX = startX + localX;
+        if (targetX >= w) continue;
+
+        // Get source position (mirrored if needed)
+        const srcX = mirror
+          ? Math.min(Math.ceil(segmentWidth) - 1, Math.ceil(segmentWidth) - 1 - localX)
+          : localX;
+        const srcIdx = y * Math.ceil(segmentWidth) + srcX;
+        const srcValue = sourceSegment[srcIdx] ?? 0.5;
+
+        const targetIdx = y * w + targetX;
+        const existingValue = hmap[targetIdx];
+
+        // Blend at segment boundaries for smoother transitions
+        let blend = 1.0;
+        if (blendPx > 0) {
+          if (localX < blendPx) {
+            blend = localX / blendPx;
+          } else if (localX > segmentWidth - blendPx) {
+            blend = (segmentWidth - localX) / blendPx;
+          }
+        }
+
+        hmap[targetIdx] = existingValue * (1 - blend) + srcValue * blend;
+      }
+    }
+  }
+
+  // Ensure seamless wrap at U=0/U=1 boundary
+  if (blendPx > 0) {
+    for (let y = 0; y < h; y++) {
+      for (let dx = 0; dx < blendPx; dx++) {
+        const leftIdx = y * w + dx;
+        const rightIdx = y * w + (w - 1 - dx);
+        const t = dx / blendPx;
+        const avg = hmap[leftIdx] * (1 - t * 0.5) + hmap[rightIdx] * (t * 0.5);
+        hmap[leftIdx] = avg;
+        hmap[rightIdx] = hmap[leftIdx] * (t * 0.5) + hmap[rightIdx] * (1 - t * 0.5);
+      }
+    }
+  }
+}
+
 // ── Build heightmap ───────────────────────────────────────────────
 
 const REF_INNER_DIAM = 18.1;
@@ -1160,6 +1239,9 @@ export function buildHeightmap(
     hmap[i] = 0.5 + (hmap[i] - 0.5) * contrastMult;
     hmap[i] = Math.max(0, Math.min(1, hmap[i]));
   }
+
+  // ─── 9) Apply symmetry ──
+  applySymmetry(hmap, MAP_W, MAP_H, lunar.symmetry ?? "none", lunar.symmetryBlend ?? 30);
 
   return { hmap, craterCount: totalCraterCount };
 }
