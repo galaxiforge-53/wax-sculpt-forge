@@ -711,6 +711,18 @@ export default function LunarTexturePanel({ state, onChange, onApplyPreset, onRa
             </Button>
           </div>
 
+          {/* Enhance Surface */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-[10px] h-7 border-accent/50 text-accent hover:bg-accent/10 hover:text-accent gap-1.5"
+            onClick={handleEnhanceSurface}
+            disabled={isEnhancing}
+          >
+            <Wand2 className="w-3 h-3" />
+            {isEnhancing ? "Enhancing…" : "Enhance Surface"}
+          </Button>
+
           {/* Seed lock */}
           <div className="flex items-center justify-between bg-secondary/30 rounded px-2 py-1">
             <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
